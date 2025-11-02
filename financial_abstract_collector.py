@@ -13,6 +13,10 @@ import time
 import numpy as np
 from datetime import datetime, timedelta
 import logging
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']  # 支持中文显示
+matplotlib.rcParams['axes.unicode_minus'] = False  # 正确显示负号
 
 pd.set_option('display.precision', 2)
 
@@ -381,6 +385,7 @@ def main():
                     print(f"    每股收益: {eps}")
             
             # 保存数据
+            plot_simple_financial_charts(indicators)
             filename = collector.save_financial_data(stock, years=5)
             if filename:
                 print(f"数据已保存到: {filename}")
@@ -388,6 +393,141 @@ def main():
             print("获取数据失败")
         
         print("-" * 50)
+
+def plot_simple_financial_charts(indicators):
+    """
+    简单绘制财务指标图表
+    
+    Args:
+        indicators (dict): 财务指标数据
+    """
+    #try:
+    if True:
+        # 提取年度数据（排除当前年的月度数据）
+        annual_data = {}
+        for year, data in indicators.items():
+            print(year)
+            if year != datetime.now().year:
+                annual_data[year] = data
+        
+        if not annual_data:
+            print("没有足够的年度数据绘制图表")
+            return
+        
+        # 排序年份
+        #sorted_years = sorted(annual_data.keys())
+        sorted_years = annual_data.keys()
+        
+        # 创建图表
+        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+        fig.suptitle('财务指标趋势图', fontsize=16, fontweight='bold')
+        
+        # 1. 营业收入和净利润趋势图
+        ax1 = axes[0, 0]
+        revenue_values = [annual_data[year].get('revenue', 'N/A') for year in sorted_years]
+        net_profit_values = [annual_data[year].get('net_profit', 'N/A') for year in sorted_years]
+        
+        # 提取数值部分用于绘图
+        revenue_numeric = []
+        net_profit_numeric = []
+        
+        for rev, profit in zip(revenue_values, net_profit_values):
+            if rev != 'N/A' and isinstance(rev, str):
+                # 提取数值部分（移除单位）
+                if '亿' in rev:
+                    revenue_numeric.append(float(rev.replace('亿', '')) * 1e8)
+                elif '万' in rev:
+                    revenue_numeric.append(float(rev.replace('万', '')) * 1e4)
+                else:
+                    revenue_numeric.append(float(rev.replace(',', '')))
+            else:
+                revenue_numeric.append(0)
+                
+            if profit != 'N/A' and isinstance(profit, str):
+                if '亿' in profit:
+                    net_profit_numeric.append(float(profit.replace('亿', '')) * 1e8)
+                elif '万' in profit:
+                    net_profit_numeric.append(float(profit.replace('万', '')) * 1e4)
+                else:
+                    net_profit_numeric.append(float(profit.replace(',', '')))
+            else:
+                net_profit_numeric.append(0)
+        
+        ax1.plot(sorted_years, revenue_numeric, 'o-', label='营业收入', linewidth=2, markersize=6)
+        ax1.plot(sorted_years, net_profit_numeric, 's-', label='净利润', linewidth=2, markersize=6)
+        ax1.set_title('营业收入和净利润趋势')
+        ax1.set_xlabel('年份')
+        ax1.set_ylabel('金额（元）')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        
+        # 2. 盈利能力指标
+        ax2 = axes[0, 1]
+        roe_values = [annual_data[year].get('roe', 'N/A') for year in sorted_years]
+        
+        roe_numeric = []
+        for roe in roe_values:
+            if roe != 'N/A' and isinstance(roe, str):
+                roe_numeric.append(float(roe.replace('%', '')) / 100)
+            else:
+                roe_numeric.append(0)
+        
+        ax2.plot(sorted_years, roe_numeric, 'o-', label='净资产收益率(ROE)', linewidth=2, markersize=6)
+        ax2.set_title('盈利能力指标')
+        ax2.set_xlabel('年份')
+        ax2.set_ylabel('百分比')
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        
+        # 3. 资产负债率
+        ax3 = axes[1, 0]
+        liabilities_values = [annual_data[year].get('liabilities', 'N/A') for year in sorted_years]
+        
+        liabilities_numeric = []
+        for liab in liabilities_values:
+            if liab != 'N/A' and isinstance(liab, str):
+                liabilities_numeric.append(float(liab.replace('%', '')) / 100)
+            else:
+                liabilities_numeric.append(0)
+        
+        ax3.plot(sorted_years, liabilities_numeric, alpha=0.7, label='资产负债率')
+        ax3.set_title('资产负债率')
+        ax3.set_xlabel('年份')
+        ax3.set_ylabel('百分比')
+        ax3.legend()
+        ax3.grid(True, alpha=0.3)
+        
+        # 4. 每股收益
+        ax4 = axes[1, 1]
+        eps_values = [annual_data[year].get('eps', 'N/A') for year in sorted_years]
+        
+        eps_numeric = []
+        for eps in eps_values:
+            if eps != 'N/A' and isinstance(eps, str):
+                if '亿' in eps:
+                    eps_numeric.append(float(eps.replace('亿', '')) * 1e8)
+                elif '万' in eps:
+                    eps_numeric.append(float(eps.replace('万', '')) * 1e4)
+                else:
+                    eps_numeric.append(float(eps.replace(',', '')))
+            else:
+                eps_numeric.append(0)
+        
+        ax4.plot(sorted_years, eps_numeric, '^-', label='每股收益', linewidth=2, markersize=6)
+        ax4.set_title('每股收益趋势')
+        ax4.set_xlabel('年份')
+        ax4.set_ylabel('金额（元）')
+        ax4.legend()
+        ax4.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.show()
+        
+        print("图表绘制完成")
+        
+    #except Exception as e:
+        #print(f"绘制图表失败: {e}")
+
 
 if __name__ == "__main__":
     main()
