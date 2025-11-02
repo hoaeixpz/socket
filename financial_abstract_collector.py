@@ -17,29 +17,40 @@ import logging
 pd.set_option('display.precision', 2)
 
 def smart_format(x):
-    """智能格式化数字：小数字完整显示，大数字用科学计数法"""
+    """
+    智能格式化数字：自动识别金额单位（万、亿等）
+    
+    Args:
+        x: 需要格式化的数字
+        
+    Returns:
+        str: 格式化后的字符串，包含单位
+    """
     if pd.isna(x) or not isinstance(x, (int, float, np.number)):
         return x
     
-    # 整数直接返回
-    if isinstance(x, (int, np.integer)):
-        return f"{x:,}" if abs(x) >= 10000 else str(x)
-    
-    # 浮点数智能判断
-    abs_x = abs(x)
-    
-    if abs_x == 0:
+    # 处理零值
+    if x == 0:
         return "0"
-    elif abs_x < 0.0001:  # 极小数字：完整显示
-        return f"{x:.10f}".rstrip('0').rstrip('.')
-    elif abs_x < 1:       # 小数字：完整显示
-        return f"{x:.6f}".rstrip('0').rstrip('.')
-    elif abs_x >= 1e6:    # 大数字：科学计数法
-        return f"{x:.2e}"
-    elif abs_x >= 10000:  # 较大数字：千分位
-        return f"{x:,.2f}"
-    else:                 # 普通数字
-        return f"{x:.2f}"
+    
+    abs_x = abs(x)
+    sign = "-" if x < 0 else ""
+    
+    # 根据金额大小选择合适的单位
+    if abs_x >= 1e8:  # 1亿以上
+        value = abs_x / 1e8
+        return f"{sign}{value:.2f}亿"
+    elif abs_x >= 1e4:  # 1万以上
+        value = abs_x / 1e4
+        return f"{sign}{value:.2f}万"
+    elif abs_x >= 1:  # 1以上
+        return f"{sign}{abs_x:,.2f}"
+    elif abs_x >= 0.01:  # 0.01以上
+        return f"{sign}{abs_x:.2f}"
+    elif abs_x >= 0.0001:  # 0.0001以上
+        return f"{sign}{abs_x:.4f}"
+    else:  # 极小数字
+        return f"{sign}{abs_x:.6e}"
 
 class FinancialAbstractCollector:
     """财务摘要数据收集器"""
@@ -210,16 +221,30 @@ class FinancialAbstractCollector:
             return 0
     
     def set_indictor(self, year, indicators, data, df):
+        """设置财务指标，并对金额进行格式化"""
+        
+        def format_financial_value(value, is_ratio=False):
+            """格式化财务数值：金额用单位格式化，比率用百分比"""
+            if pd.isna(value) or value is None:
+                return None
+            
+            if is_ratio:
+                # 比率类指标：转换为百分比
+                return f"{value:.2%}"
+            else:
+                # 金额类指标：使用智能格式化
+                return smart_format(value)
+        
         indicators[year] = {
-            'revenue': data.get('营业总收入', pd.Series()).mean() if '营业总收入' in df.columns else None,
-            'net_profit': data.get('净利润', pd.Series()).mean() if '净利润' in df.columns else None,
-            'total_assets': data.get('资产总计', pd.Series()).mean() if '资产总计' in df.columns else None,
-            'liabilities': data.get('资产负债率', pd.Series()).mean() if '资产负债率' in df.columns else None,
-            'ros': data.get('销售净利率', pd.Series()).mean() if '销售净利率' in df.columns else None,
-            'total_atr': data.get('总资产周转率', pd.Series()).mean() if '总资产周转率' in df.columns else None,
-            'em': data.get('权益乘数', pd.Series()).mean() if '权益乘数' in df.columns else None,
-            'roe': data.get('净资产收益率(ROE)', pd.Series()).mean() if '净资产收益率(ROE)' in df.columns else None,
-            'eps': data.get('基本每股收益', pd.Series()).mean() if '基本每股收益' in df.columns else None
+            'revenue': format_financial_value(data.get('营业总收入', pd.Series()).mean() if '营业总收入' in df.columns else None),
+            'net_profit': format_financial_value(data.get('净利润', pd.Series()).mean() if '净利润' in df.columns else None),
+            'total_assets': format_financial_value(data.get('资产总计', pd.Series()).mean() if '资产总计' in df.columns else None),
+            'liabilities': format_financial_value(data.get('资产负债率', pd.Series()).mean() if '资产负债率' in df.columns else None, is_ratio=True),
+            'ros': format_financial_value(data.get('销售净利率', pd.Series()).mean() if '销售净利率' in df.columns else None, is_ratio=True),
+            'total_atr': format_financial_value(data.get('总资产周转率', pd.Series()).mean() if '总资产周转率' in df.columns else None),
+            'em': format_financial_value(data.get('权益乘数', pd.Series()).mean() if '权益乘数' in df.columns else None),
+            'roe': format_financial_value(data.get('净资产收益率(ROE)', pd.Series()).mean() if '净资产收益率(ROE)' in df.columns else None, is_ratio=True),
+            'eps': format_financial_value(data.get('基本每股收益', pd.Series()).mean() if '基本每股收益' in df.columns else None)
         }
 
 
@@ -335,14 +360,25 @@ def main():
 
                 revenue = data.get('revenue', 'N/A')
                 net_profit = data.get('net_profit', 'N/A')
-                roe = data.get('roe')
-                ros = data.get('ros')
-                total_atr = data.get('total_atr')
-                em = data.get('em')                                                    
-                #print(ros * total_atr * em - roe)
+                roe = data.get('roe', 'N/A')
+                ros = data.get('ros', 'N/A')
+                total_atr = data.get('total_atr', 'N/A')
+                em = data.get('em', 'N/A')
+                total_assets = data.get('total_assets', 'N/A')
+                liabilities = data.get('liabilities', 'N/A')
+                eps = data.get('eps', 'N/A')
+                
                 if year is not None and data is not None:
-                    print(f"  {year}: 营收={revenue}, 净利润={net_profit},\
-ROE={roe}, ROS={ros}, 总资产周转率={total_atr}, 权益乘数={em}")
+                    print(f"  {year}:")
+                    print(f"    营业收入: {revenue}")
+                    print(f"    净利润: {net_profit}")
+                    print(f"    总资产: {total_assets}")
+                    print(f"    资产负债率: {liabilities}")
+                    print(f"    净资产收益率(ROE): {roe}")
+                    print(f"    销售净利率(ROS): {ros}")
+                    print(f"    总资产周转率: {total_atr}")
+                    print(f"    权益乘数: {em}")
+                    print(f"    每股收益: {eps}")
             
             # 保存数据
             filename = collector.save_financial_data(stock, years=5)
