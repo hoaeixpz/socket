@@ -209,6 +209,20 @@ class FinancialAbstractCollector:
         except:
             return 0
     
+    def set_indictor(self, year, indicators, data, df):
+        indicators[year] = {
+            'revenue': data.get('营业总收入', pd.Series()).mean() if '营业总收入' in df.columns else None,
+            'net_profit': data.get('净利润', pd.Series()).mean() if '净利润' in df.columns else None,
+            'total_assets': data.get('资产总计', pd.Series()).mean() if '资产总计' in df.columns else None,
+            'liabilities': data.get('资产负债率', pd.Series()).mean() if '资产负债率' in df.columns else None,
+            'ros': data.get('销售净利率', pd.Series()).mean() if '销售净利率' in df.columns else None,
+            'total_atr': data.get('总资产周转率', pd.Series()).mean() if '总资产周转率' in df.columns else None,
+            'em': data.get('权益乘数', pd.Series()).mean() if '权益乘数' in df.columns else None,
+            'roe': data.get('净资产收益率(ROE)', pd.Series()).mean() if '净资产收益率(ROE)' in df.columns else None,
+            'eps': data.get('基本每股收益', pd.Series()).mean() if '基本每股收益' in df.columns else None
+        }
+
+
     def get_key_financial_indicators(self, stock_code, years=5):
         """
         获取关键财务指标
@@ -228,9 +242,9 @@ class FinancialAbstractCollector:
             return {}
 
         print("关键指标不为空")
-        print("-----------------------------------------------")
-        print(df)
-        print("-----------------------------------------------")
+        # print("-----------------------------------------------")
+        # print(df)
+        # print("-----------------------------------------------")
         
         # 提取关键财务指标
         indicators = {}
@@ -246,17 +260,13 @@ class FinancialAbstractCollector:
             # print(data)
             # print("--------------------------------------------------------------------------------------------------")
             
-            indicators[year] = {
-                'revenue': data.get('营业总收入', pd.Series()).mean() if '营业总收入' in df.columns else None,
-                'net_profit': data.get('净利润', pd.Series()).mean() if '净利润' in df.columns else None,
-                'total_assets': data.get('资产总计', pd.Series()).mean() if '资产总计' in df.columns else None,
-                'liabilities': data.get('资产负债率', pd.Series()).mean() if '资产负债率' in df.columns else None,
-                'ros': data.get('销售净利率', pd.Series()).mean() if '销售净利率' in df.columns else None,
-                'total_atr': data.get('总资产周转率', pd.Series()).mean() if '总资产周转率' in df.columns else None,
-                'em': data.get('权益乘数', pd.Series()).mean() if '权益乘数' in df.columns else None,
-                'roe': data.get('净资产收益率(ROE)', pd.Series()).mean() if '净资产收益率(ROE)' in df.columns else None,
-                'eps': data.get('基本每股收益', pd.Series()).mean() if '基本每股收益' in df.columns else None
-            }
+            self.set_indictor(year, indicators, data, df)
+
+            current_year = datetime.now().year
+            if year == current_year:
+                for month in year_data['report_date']:
+                    report_data = year_data[year_data['report_date'] == month]
+                    self.set_indictor(month, indicators, report_data, df)
         
         return indicators
     
@@ -320,10 +330,19 @@ def main():
             indicators = collector.get_key_financial_indicators(stock, years=5)
             print(f"\n关键财务指标:")
             for year, data in indicators.items():
-                #print(year)
-                #print(data)
+                if year == datetime.now().year:
+                    continue
+
+                revenue = data.get('revenue', 'N/A')
+                net_profit = data.get('net_profit', 'N/A')
+                roe = data.get('roe')
+                ros = data.get('ros')
+                total_atr = data.get('total_atr')
+                em = data.get('em')                                                    
+                #print(ros * total_atr * em - roe)
                 if year is not None and data is not None:
-                    print(f"  {year}年: 营收={data.get('revenue', 'N/A')}, 净利润={data.get('net_profit', 'N/A')}, ROE={data.get('roe')}")
+                    print(f"  {year}: 营收={revenue}, 净利润={net_profit},\
+ROE={roe}, ROS={ros}, 总资产周转率={total_atr}, 权益乘数={em}")
             
             # 保存数据
             filename = collector.save_financial_data(stock, years=5)
