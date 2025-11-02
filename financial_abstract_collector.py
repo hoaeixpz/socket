@@ -1,0 +1,338 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+财务摘要数据收集器
+使用 stock_financial_abstract 获取近五年的财务数据
+"""
+
+from dis import code_info
+from operator import index
+import akshare as ak
+import pandas as pd
+import time
+import numpy as np
+from datetime import datetime, timedelta
+import logging
+
+pd.set_option('display.precision', 2)
+
+def smart_format(x):
+    """智能格式化数字：小数字完整显示，大数字用科学计数法"""
+    if pd.isna(x) or not isinstance(x, (int, float, np.number)):
+        return x
+    
+    # 整数直接返回
+    if isinstance(x, (int, np.integer)):
+        return f"{x:,}" if abs(x) >= 10000 else str(x)
+    
+    # 浮点数智能判断
+    abs_x = abs(x)
+    
+    if abs_x == 0:
+        return "0"
+    elif abs_x < 0.0001:  # 极小数字：完整显示
+        return f"{x:.10f}".rstrip('0').rstrip('.')
+    elif abs_x < 1:       # 小数字：完整显示
+        return f"{x:.6f}".rstrip('0').rstrip('.')
+    elif abs_x >= 1e6:    # 大数字：科学计数法
+        return f"{x:.2e}"
+    elif abs_x >= 10000:  # 较大数字：千分位
+        return f"{x:,.2f}"
+    else:                 # 普通数字
+        return f"{x:.2f}"
+
+class FinancialAbstractCollector:
+    """财务摘要数据收集器"""
+    
+    def __init__(self, max_retries=3, retry_delay=2):
+        """初始化收集器"""
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self.logger = logging.getLogger(__name__)
+    
+    def get_financial_abstract(self, stock_code, years=5):
+        """
+        获取近几年的财务摘要数据
+        
+        Args:
+            stock_code (str): 股票代码，如 "600519"
+            years (int): 获取最近几年的数据，默认5年
+            
+        Returns:
+            pandas.DataFrame: 财务摘要数据
+        """
+        
+        # 标准化股票代码（移除后缀）
+        clean_code = stock_code.replace('.SZ', '').replace('.SH', '')
+        
+        self.logger.info(f"开始获取股票 {stock_code} 的财务摘要数据，近{years}年")
+        
+        for attempt in range(self.max_retries):
+            try:
+                # 使用akshare获取财务摘要数据
+                df = ak.stock_financial_abstract(clean_code)
+                
+                if df is None or df.empty:
+                    self.logger.warning(f"第{attempt+1}次尝试获取 {stock_code} 财务摘要数据为空")
+                    if attempt < self.max_retries - 1:
+                        time.sleep(self.retry_delay)
+                        continue
+                    else:
+                        self.logger.error(f"获取 {stock_code} 财务摘要数据失败，所有重试次数已用完")
+                        return pd.DataFrame()
+                
+                # 处理数据，筛选近几年的数据
+                processed_df = self._process_financial_data(df, years)
+                
+                self.logger.info(f"成功获取 {stock_code} 的财务摘要数据，共 {len(processed_df)} 条记录")
+                return processed_df
+                
+            except Exception as e:
+                self.logger.error(f"第{attempt+1}次尝试获取 {stock_code} 财务摘要数据失败: {e}")
+                if attempt < self.max_retries - 1:
+                    self.logger.info(f"等待 {self.retry_delay} 秒后重试...")
+                    time.sleep(self.retry_delay)
+                else:
+                    self.logger.error(f"获取 {stock_code} 财务摘要数据失败，所有重试次数已用完")
+                    return pd.DataFrame()
+    
+    def _process_financial_data(self, df, years):
+        """
+        处理财务摘要数据，筛选近几年的数据
+        
+        Args:
+            df (pandas.DataFrame): 原始财务摘要数据（行：财务指标，列：报告期）
+            years (int): 筛选最近几年
+            
+        Returns:
+            pandas.DataFrame: 处理后的数据
+        """
+        
+        if df.empty:
+            return df
+
+        # print("print df---------------------------")
+        # print(df.iloc[[0,2,11],:20].applymap(smart_format))
+
+        # 获取当前年份
+        current_year = datetime.now().year
+        
+        # 筛选近几年的数据
+        processed_data = []
+        index_list = {}
+        
+        # 遍历DataFrame的列（通常是日期）
+        for column in df.columns:
+            try:
+                if column == '指标' :
+                    for idx, value in df[column].items():
+                        index_list[idx] = value
+                    #print(index_list)
+
+                # 尝试解析日期（假设列名是日期格式，如20240930）
+                if isinstance(column, (int, str)) and len(str(column)) == 8:
+                    date_str = str(column)
+                    year = int(date_str[:4])
+                    
+                    # 筛选近几年的数据
+                    if year >= current_year - years:
+                        # 获取该日期的数据
+                        period_data = df[column]
+                        
+                        # 转换为字典格式
+                        data_dict = {
+                            'report_date': date_str,
+                            'year': year,
+                            'quarter': self._get_quarter_from_date(date_str)
+                        }
+                        
+                        # 添加财务指标（保留原始索引）
+                        for idx, value in period_data.items():
+                            if pd.notna(value):
+                                data_dict[index_list[idx]] = value
+                        
+                        processed_data.append(data_dict)
+                        
+            except Exception as e:
+                self.logger.warning(f"处理日期列 {column} 时出错: {e}")
+                continue
+        
+        if processed_data:
+            return pd.DataFrame(processed_data)
+        else:
+            self.logger.warning("未能找到近几年的财务数据")
+            return pd.DataFrame()
+    
+    def get_financial_indicator_names(self, stock_code):
+        """
+        获取财务指标名称映射
+        
+        Args:
+            stock_code (str): 股票代码
+            
+        Returns:
+            dict: 财务指标编号到名称的映射
+        """
+        
+        # 获取原始数据来查看指标名称
+        clean_code = stock_code.replace('.SZ', '').replace('.SH', '')
+        
+        try:
+            df = ak.stock_financial_abstract(clean_code)
+            
+            if df is None or df.empty:
+                return {}
+            
+            # 获取索引名称（财务指标名称）
+            indicator_names = {}
+            for idx, name in enumerate(df.index):
+                indicator_names[idx] = str(name)
+            
+            return indicator_names
+            
+        except Exception as e:
+            self.logger.error(f"获取财务指标名称失败: {e}")
+            return {}
+    
+    def _get_quarter_from_date(self, date_str):
+        """从日期字符串获取季度信息"""
+        try:
+            month = int(date_str[4:6])
+            if month <= 3:
+                return 1
+            elif month <= 6:
+                return 2
+            elif month <= 9:
+                return 3
+            else:
+                return 4
+        except:
+            return 0
+    
+    def get_key_financial_indicators(self, stock_code, years=5):
+        """
+        获取关键财务指标
+        
+        Args:
+            stock_code (str): 股票代码
+            years (int): 近几年的数据
+            
+        Returns:
+            dict: 关键财务指标
+        """
+        
+        df = self.get_financial_abstract(stock_code, years)
+        
+        if df.empty:
+            print("关键指标为空")
+            return {}
+
+        print("关键指标不为空")
+        print("-----------------------------------------------")
+        print(df)
+        print("-----------------------------------------------")
+        
+        # 提取关键财务指标
+        indicators = {}
+        
+        # 按年份分组
+        for year in sorted(df['year'].unique(), reverse=True):
+            year_data = df[df['year'] == year]
+            data = year_data[year_data['quarter'] == 4]
+            # print("year data")
+            # print(year_data)
+            # print("--------------------------------------------------------------------------------------------------")
+            # print("data")
+            # print(data)
+            # print("--------------------------------------------------------------------------------------------------")
+            
+            indicators[year] = {
+                'revenue': data.get('营业总收入', pd.Series()).mean() if '营业总收入' in df.columns else None,
+                'net_profit': data.get('净利润', pd.Series()).mean() if '净利润' in df.columns else None,
+                'total_assets': data.get('资产总计', pd.Series()).mean() if '资产总计' in df.columns else None,
+                'liabilities': data.get('资产负债率', pd.Series()).mean() if '资产负债率' in df.columns else None,
+                'ros': data.get('销售净利率', pd.Series()).mean() if '销售净利率' in df.columns else None,
+                'total_atr': data.get('总资产周转率', pd.Series()).mean() if '总资产周转率' in df.columns else None,
+                'em': data.get('权益乘数', pd.Series()).mean() if '权益乘数' in df.columns else None,
+                'roe': data.get('净资产收益率(ROE)', pd.Series()).mean() if '净资产收益率(ROE)' in df.columns else None,
+                'eps': data.get('基本每股收益', pd.Series()).mean() if '基本每股收益' in df.columns else None
+            }
+        
+        return indicators
+    
+    def save_financial_data(self, stock_code, years=5, filename=None):
+        """
+        保存财务数据到文件
+        
+        Args:
+            stock_code (str): 股票代码
+            years (int): 近几年的数据
+            filename (str): 文件名，如果为None则自动生成
+            
+        Returns:
+            str: 保存的文件路径
+        """
+        
+        df = self.get_financial_abstract(stock_code, years)
+        
+        if df.empty:
+            self.logger.warning(f"没有数据可保存: {stock_code}")
+            return None
+        
+        if filename is None:
+            filename = f"{stock_code}_financial_abstract_{years}years.csv"
+        
+        try:
+            df.to_csv(filename, index=False, encoding='utf-8-sig')
+            self.logger.info(f"财务数据已保存到: {filename}")
+            return filename
+        except Exception as e:
+            self.logger.error(f"保存财务数据失败: {e}")
+            return None
+
+def main():
+    """主函数 - 演示如何使用"""
+    
+    # 设置日志
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    
+    # 创建收集器
+    collector = FinancialAbstractCollector()
+    
+    # 测试股票代码
+    test_stocks = ['600519']
+    
+    for stock in test_stocks:
+        print(f"\n=== 获取 {stock} 近5年财务摘要数据 ===")
+        
+        # 获取财务摘要数据
+        df = collector.get_financial_abstract(stock, years=5)
+        
+        if not df.empty:
+            print(f"成功获取 {len(df)} 条记录")
+            print("数据列:", df.columns.tolist())
+            
+            # 显示前几行数据
+            print("\n前5行数据:")
+            print(df.head())
+            
+            # 获取关键财务指标
+            indicators = collector.get_key_financial_indicators(stock, years=5)
+            print(f"\n关键财务指标:")
+            for year, data in indicators.items():
+                #print(year)
+                #print(data)
+                if year is not None and data is not None:
+                    print(f"  {year}年: 营收={data.get('revenue', 'N/A')}, 净利润={data.get('net_profit', 'N/A')}, ROE={data.get('roe')}")
+            
+            # 保存数据
+            filename = collector.save_financial_data(stock, years=5)
+            if filename:
+                print(f"数据已保存到: {filename}")
+        else:
+            print("获取数据失败")
+        
+        print("-" * 50)
+
+if __name__ == "__main__":
+    main()
