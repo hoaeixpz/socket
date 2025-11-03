@@ -230,28 +230,21 @@ class FinancialAbstractCollector:
             print(f"{year}year data is empty")
             return
 
-        def format_financial_value(value, is_ratio=False):
-            """格式化财务数值：金额用单位格式化，比率用百分比"""
-            if pd.isna(value) or value is None:
-                return None
-            
-            if is_ratio:
-                # 比率类指标：转换为百分比
-                return f"{value:.2%}"
-            else:
-                # 金额类指标：使用智能格式化
-                return smart_format(value)
+        print(f"year {year}")
+        roe = data.get('净资产收益率(ROE)', pd.Series()).mean()
+        print(f"roe {roe}")
+        print(f"smart roe {smart_format(roe)}")
 
         indicators[year] = {
-            'revenue': format_financial_value(data.get('营业总收入', pd.Series()).mean() if '营业总收入' in df.columns else None),
-            'net_profit': format_financial_value(data.get('净利润', pd.Series()).mean() if '净利润' in df.columns else None),
-            'total_assets': format_financial_value(data.get('资产总计', pd.Series()).mean() if '资产总计' in df.columns else None),
-            'liabilities': format_financial_value(data.get('资产负债率', pd.Series()).mean() if '资产负债率' in df.columns else None, is_ratio=True),
-            'ros': format_financial_value(data.get('销售净利率', pd.Series()).mean() if '销售净利率' in df.columns else None, is_ratio=True),
-            'total_atr': format_financial_value(data.get('总资产周转率', pd.Series()).mean() if '总资产周转率' in df.columns else None),
-            'em': format_financial_value(data.get('权益乘数', pd.Series()).mean() if '权益乘数' in df.columns else None),
-            'roe': format_financial_value(data.get('净资产收益率(ROE)', pd.Series()).mean() if '净资产收益率(ROE)' in df.columns else None, is_ratio=True),
-            'eps': format_financial_value(data.get('基本每股收益', pd.Series()).mean() if '基本每股收益' in df.columns else None)
+            'revenue': smart_format(data.get('营业总收入', pd.Series()).mean() if '营业总收入' in df.columns else None),
+            'net_profit': smart_format(data.get('净利润', pd.Series()).mean() if '净利润' in df.columns else None),
+            'total_assets': smart_format(data.get('资产总计', pd.Series()).mean() if '资产总计' in df.columns else None),
+            'liabilities': smart_format(data.get('资产负债率', pd.Series()).mean() if '资产负债率' in df.columns else None),
+            'ros': smart_format(data.get('销售净利率', pd.Series()).mean() if '销售净利率' in df.columns else None),
+            'total_atr': smart_format(data.get('总资产周转率', pd.Series()).mean() if '总资产周转率' in df.columns else None),
+            'em': smart_format(data.get('权益乘数', pd.Series()).mean() if '权益乘数' in df.columns else None),
+            'roe': smart_format(data.get('净资产收益率(ROE)', pd.Series()).mean() if '净资产收益率(ROE)' in df.columns else None),
+            'eps': smart_format(data.get('基本每股收益', pd.Series()).mean() if '基本每股收益' in df.columns else None)
         }
 
 
@@ -361,6 +354,7 @@ def main():
             # 获取关键财务指标
             indicators = collector.get_key_financial_indicators(stock, years=5)
             print(f"\n关键财务指标:")
+            print(indicators)
             for year, data in indicators.items():
                 if year == datetime.now().year:
                     continue
@@ -388,7 +382,7 @@ def main():
                     print(f"    每股收益: {eps}")
             
             # 保存数据
-            plot_simple_financial_charts(indicators)
+            #plot_simple_financial_charts(indicators)
             filename = collector.save_financial_data(stock, years=5)
             if filename:
                 print(f"数据已保存到: {filename}")

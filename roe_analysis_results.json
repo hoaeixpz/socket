@@ -1,0 +1,786 @@
+{
+  "000001": {
+    "stock_code": "000001",
+    "stock_name": "平安银行",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 0",
+    "roe_details": {
+      "2024": 10.08,
+      "2023": 11.38,
+      "2022": 12.36,
+      "2021": 10.85,
+      "2020": 9.58
+    },
+    "years_with_low_roe": 0,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 15:59:43"
+  },
+  "000002": {
+    "stock_code": "000002",
+    "stock_name": "万  科Ａ",
+    "status": "bad",
+    "reason": "近5年中有2年ROE小于5%",
+    "roe_details": {
+      "2024": -21.82,
+      "2023": 4.91,
+      "2022": 9.48,
+      "2021": 9.78,
+      "2020": 20.13
+    },
+    "years_with_low_roe": 2,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 15:59:46"
+  },
+  "000006": {
+    "stock_code": "000006",
+    "stock_name": "深振业Ａ",
+    "status": "bad",
+    "reason": "近5年中有2年ROE小于5%",
+    "roe_details": {
+      "2024": -25.35,
+      "2023": -10.79,
+      "2022": 5.4,
+      "2021": 7.22,
+      "2020": 12.26
+    },
+    "years_with_low_roe": 2,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 15:59:49"
+  },
+  "000007": {
+    "stock_code": "000007",
+    "stock_name": "全新好",
+    "status": "bad",
+    "reason": "近5年中有2年ROE小于5%",
+    "roe_details": {
+      "2024": 36.7,
+      "2023": 33.17,
+      "2022": -5.41,
+      "2021": 48.22,
+      "2020": -83.11
+    },
+    "years_with_low_roe": 2,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 15:59:51"
+  },
+  "000008": {
+    "stock_code": "000008",
+    "stock_name": "神州高铁",
+    "status": "bad",
+    "reason": "近5年中有5年ROE小于5%",
+    "roe_details": {
+      "2024": -16.57,
+      "2023": -20.89,
+      "2022": -17.66,
+      "2021": -30.97,
+      "2020": -12.78
+    },
+    "years_with_low_roe": 5,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 15:59:53"
+  },
+  "000009": {
+    "stock_code": "000009",
+    "stock_name": "中国宝安",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 1",
+    "roe_details": {
+      "2024": 1.73,
+      "2023": 7.91,
+      "2022": 13.5,
+      "2021": 13.9,
+      "2020": 10.71
+    },
+    "years_with_low_roe": 1,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 15:59:55"
+  },
+  "000010": {
+    "stock_code": "000010",
+    "stock_name": "美丽生态",
+    "status": "bad",
+    "reason": "近5年中有3年ROE小于5%",
+    "roe_details": {
+      "2024": 6.63,
+      "2023": -106.02,
+      "2022": -87.61,
+      "2021": 4.17,
+      "2020": 8.51
+    },
+    "years_with_low_roe": 3,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 15:59:57"
+  },
+  "000011": {
+    "stock_code": "000011",
+    "stock_name": "深物业A",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 1",
+    "roe_details": {
+      "2024": -28.0,
+      "2023": 10.26,
+      "2022": 12.36,
+      "2021": 24.49,
+      "2020": 23.47
+    },
+    "years_with_low_roe": 1,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 15:59:59"
+  },
+  "000012": {
+    "stock_code": "000012",
+    "stock_name": "南  玻Ａ",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 1",
+    "roe_details": {
+      "2024": 1.93,
+      "2023": 12.3,
+      "2022": 16.78,
+      "2021": 14.11,
+      "2020": 7.91
+    },
+    "years_with_low_roe": 1,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:00:01"
+  },
+  "000014": {
+    "stock_code": "000014",
+    "stock_name": "沙河股份",
+    "status": "bad",
+    "reason": "近5年中有3年ROE小于5%",
+    "roe_details": {
+      "2024": 1.0,
+      "2023": 36.93,
+      "2022": 23.74,
+      "2021": 3.89,
+      "2020": 0.49
+    },
+    "years_with_low_roe": 3,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:00:04"
+  },
+  "000016": {
+    "stock_code": "000016",
+    "stock_name": "深康佳Ａ",
+    "status": "bad",
+    "reason": "近5年中有3年ROE小于5%",
+    "roe_details": {
+      "2024": -82.56,
+      "2023": -32.58,
+      "2022": -17.57,
+      "2021": 10.33,
+      "2020": 5.79
+    },
+    "years_with_low_roe": 3,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:01:59"
+  },
+  "000017": {
+    "stock_code": "000017",
+    "stock_name": "深中华A",
+    "status": "bad",
+    "reason": "近5年中有2年ROE小于5%",
+    "roe_details": {
+      "2024": 5.31,
+      "2023": 6.22,
+      "2022": -14.3,
+      "2021": -20.04,
+      "2020": 42.01
+    },
+    "years_with_low_roe": 2,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:01"
+  },
+  "000019": {
+    "stock_code": "000019",
+    "stock_name": "深粮控股",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 0",
+    "roe_details": {
+      "2024": 6.67,
+      "2023": 7.25,
+      "2022": 8.96,
+      "2021": 9.13,
+      "2020": 8.99
+    },
+    "years_with_low_roe": 0,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:03"
+  },
+  "000020": {
+    "stock_code": "000020",
+    "stock_name": "深华发Ａ",
+    "status": "bad",
+    "reason": "近5年中有4年ROE小于5%",
+    "roe_details": {
+      "2024": 9.53,
+      "2023": 3.7,
+      "2022": 2.91,
+      "2021": 2.12,
+      "2020": 2.03
+    },
+    "years_with_low_roe": 4,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:05"
+  },
+  "000021": {
+    "stock_code": "000021",
+    "stock_name": "深科技",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 0",
+    "roe_details": {
+      "2024": 8.14,
+      "2023": 6.06,
+      "2022": 6.54,
+      "2021": 8.67,
+      "2020": 11.83
+    },
+    "years_with_low_roe": 0,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:08"
+  },
+  "000025": {
+    "stock_code": "000025",
+    "stock_name": "特  力Ａ",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 1",
+    "roe_details": {
+      "2024": 8.21,
+      "2023": 7.59,
+      "2022": 5.69,
+      "2021": 9.56,
+      "2020": 4.48
+    },
+    "years_with_low_roe": 1,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:10"
+  },
+  "000026": {
+    "stock_code": "000026",
+    "stock_name": "飞亚达",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 0",
+    "roe_details": {
+      "2024": 6.55,
+      "2023": 10.28,
+      "2022": 8.68,
+      "2021": 13.39,
+      "2020": 10.78
+    },
+    "years_with_low_roe": 0,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:12"
+  },
+  "000027": {
+    "stock_code": "000027",
+    "stock_name": "深圳能源",
+    "status": "bad",
+    "reason": "近5年中有2年ROE小于5%",
+    "roe_details": {
+      "2024": 4.47,
+      "2023": 4.52,
+      "2022": 5.12,
+      "2021": 6.53,
+      "2020": 14.57
+    },
+    "years_with_low_roe": 2,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:14"
+  },
+  "000028": {
+    "stock_code": "000028",
+    "stock_name": "国药一致",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 1",
+    "roe_details": {
+      "2024": 3.67,
+      "2023": 9.56,
+      "2022": 9.59,
+      "2021": 9.29,
+      "2020": 10.49
+    },
+    "years_with_low_roe": 1,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:16"
+  },
+  "000029": {
+    "stock_code": "000029",
+    "stock_name": "深深房Ａ",
+    "status": "bad",
+    "reason": "近5年中有3年ROE小于5%",
+    "roe_details": {
+      "2024": -4.91,
+      "2023": -6.52,
+      "2022": 3.88,
+      "2021": 5.72,
+      "2020": 7.81
+    },
+    "years_with_low_roe": 3,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:18"
+  },
+  "000030": {
+    "stock_code": "000030",
+    "stock_name": "富奥股份",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 0",
+    "roe_details": {
+      "2024": 8.7,
+      "2023": 8.02,
+      "2022": 6.75,
+      "2021": 11.44,
+      "2020": 12.94
+    },
+    "years_with_low_roe": 0,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:20"
+  },
+  "000031": {
+    "stock_code": "000031",
+    "stock_name": "大悦城",
+    "status": "bad",
+    "reason": "近5年中有5年ROE小于5%",
+    "roe_details": {
+      "2024": -24.36,
+      "2023": -10.02,
+      "2022": -16.84,
+      "2021": 0.58,
+      "2020": -2.06
+    },
+    "years_with_low_roe": 5,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:23"
+  },
+  "000032": {
+    "stock_code": "000032",
+    "stock_name": "深桑达Ａ",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 1",
+    "roe_details": {
+      "2024": 5.07,
+      "2023": 5.29,
+      "2022": -2.69,
+      "2021": 8.25,
+      "2020": 7.69
+    },
+    "years_with_low_roe": 1,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:25"
+  },
+  "000034": {
+    "stock_code": "000034",
+    "stock_name": "神州数码",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 1",
+    "roe_details": {
+      "2024": 8.47,
+      "2023": 14.65,
+      "2022": 14.97,
+      "2021": 4.4,
+      "2020": 13.86
+    },
+    "years_with_low_roe": 1,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:27"
+  },
+  "000035": {
+    "stock_code": "000035",
+    "stock_name": "中国天楹",
+    "status": "bad",
+    "reason": "近5年中有3年ROE小于5%",
+    "roe_details": {
+      "2024": 2.6,
+      "2023": 3.22,
+      "2022": 1.15,
+      "2021": 6.25,
+      "2020": 5.81
+    },
+    "years_with_low_roe": 3,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:29"
+  },
+  "000036": {
+    "stock_code": "000036",
+    "stock_name": "华联控股",
+    "status": "bad",
+    "reason": "近5年中有2年ROE小于5%",
+    "roe_details": {
+      "2024": 0.79,
+      "2023": 1.53,
+      "2022": 8.47,
+      "2021": 8.18,
+      "2020": 11.08
+    },
+    "years_with_low_roe": 2,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:31"
+  },
+  "000037": {
+    "stock_code": "000037",
+    "stock_name": "深南电A",
+    "status": "bad",
+    "reason": "近5年中有5年ROE小于5%",
+    "roe_details": {
+      "2024": 1.49,
+      "2023": 0.29,
+      "2022": -10.43,
+      "2021": -23.95,
+      "2020": 3.15
+    },
+    "years_with_low_roe": 5,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:34"
+  },
+  "000039": {
+    "stock_code": "000039",
+    "stock_name": "中集集团",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 1",
+    "roe_details": {
+      "2024": 6.0,
+      "2023": 1.0,
+      "2022": 7.0,
+      "2021": 15.0,
+      "2020": 14.0
+    },
+    "years_with_low_roe": 1,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:36"
+  },
+  "000042": {
+    "stock_code": "000042",
+    "stock_name": "中洲控股",
+    "status": "bad",
+    "reason": "近5年中有5年ROE小于5%",
+    "roe_details": {
+      "2024": -44.93,
+      "2023": -26.66,
+      "2022": 0.99,
+      "2021": 2.59,
+      "2020": 3.6
+    },
+    "years_with_low_roe": 5,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:02:38"
+  },
+  "000045": {
+    "stock_code": "000045",
+    "stock_name": "深纺织Ａ",
+    "status": "bad",
+    "reason": "近5年中有5年ROE小于5%",
+    "roe_details": {
+      "2024": 3.06,
+      "2023": 2.77,
+      "2022": 2.59,
+      "2021": 2.0,
+      "2020": 1.36
+    },
+    "years_with_low_roe": 5,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:04:39"
+  },
+  "000048": {
+    "stock_code": "000048",
+    "stock_name": "京基智农",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 0",
+    "roe_details": {
+      "2024": 17.36,
+      "2023": 55.47,
+      "2022": 31.35,
+      "2021": 15.0,
+      "2020": 35.46
+    },
+    "years_with_low_roe": 0,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:04:43"
+  },
+  "000049": {
+    "stock_code": "000049",
+    "stock_name": "德赛电池",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 0",
+    "roe_details": {
+      "2024": 6.41,
+      "2023": 12.72,
+      "2022": 23.3,
+      "2021": 25.52,
+      "2020": 26.92
+    },
+    "years_with_low_roe": 0,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:04:47"
+  },
+  "000050": {
+    "stock_code": "000050",
+    "stock_name": "深天马Ａ",
+    "status": "bad",
+    "reason": "近5年中有4年ROE小于5%",
+    "roe_details": {
+      "2024": -2.42,
+      "2023": -7.23,
+      "2022": 0.37,
+      "2021": -0.11,
+      "2020": 5.05
+    },
+    "years_with_low_roe": 4,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:04:51"
+  },
+  "000055": {
+    "stock_code": "000055",
+    "stock_name": "方大集团",
+    "status": "bad",
+    "reason": "近5年中有3年ROE小于5%",
+    "roe_details": {
+      "2024": 2.41,
+      "2023": 4.67,
+      "2022": 5.03,
+      "2021": 4.09,
+      "2020": 7.37
+    },
+    "years_with_low_roe": 3,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:04:55"
+  },
+  "000056": {
+    "stock_code": "000056",
+    "stock_name": "皇庭国际",
+    "status": "bad",
+    "reason": "近5年中有5年ROE小于5%",
+    "roe_details": {
+      "2024": -95.0,
+      "2023": -72.53,
+      "2022": -43.35,
+      "2021": -42.71,
+      "2020": -5.62
+    },
+    "years_with_low_roe": 5,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:00"
+  },
+  "000058": {
+    "stock_code": "000058",
+    "stock_name": "深 赛 格",
+    "status": "bad",
+    "reason": "近5年中有5年ROE小于5%",
+    "roe_details": {
+      "2024": 1.87,
+      "2023": 4.6,
+      "2022": 0.81,
+      "2021": 2.41,
+      "2020": 1.37
+    },
+    "years_with_low_roe": 5,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:04"
+  },
+  "000059": {
+    "stock_code": "000059",
+    "stock_name": "华锦股份",
+    "status": "bad",
+    "reason": "近5年中有4年ROE小于5%",
+    "roe_details": {
+      "2024": -21.7,
+      "2023": 0.49,
+      "2022": 3.63,
+      "2021": 6.37,
+      "2020": 2.4
+    },
+    "years_with_low_roe": 4,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:08"
+  },
+  "000060": {
+    "stock_code": "000060",
+    "stock_name": "中金岭南",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 1",
+    "roe_details": {
+      "2024": 7.87,
+      "2023": 4.91,
+      "2022": 8.61,
+      "2021": 9.36,
+      "2020": 8.66
+    },
+    "years_with_low_roe": 1,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:12"
+  },
+  "000061": {
+    "stock_code": "000061",
+    "stock_name": "农 产 品",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 1",
+    "roe_details": {
+      "2024": 6.18,
+      "2023": 7.58,
+      "2022": 3.55,
+      "2021": 6.76,
+      "2020": 5.95
+    },
+    "years_with_low_roe": 1,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:16"
+  },
+  "000062": {
+    "stock_code": "000062",
+    "stock_name": "深圳华强",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 1",
+    "roe_details": {
+      "2024": 2.98,
+      "2023": 6.61,
+      "2022": 14.62,
+      "2021": 15.2,
+      "2020": 11.71
+    },
+    "years_with_low_roe": 1,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:20"
+  },
+  "000063": {
+    "stock_code": "000063",
+    "stock_name": "中兴通讯",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 0",
+    "roe_details": {
+      "2024": 11.97,
+      "2023": 15.19,
+      "2022": 14.66,
+      "2021": 14.49,
+      "2020": 10.18
+    },
+    "years_with_low_roe": 0,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:24"
+  },
+  "000065": {
+    "stock_code": "000065",
+    "stock_name": "北方国际",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 0",
+    "roe_details": {
+      "2024": 11.71,
+      "2023": 11.32,
+      "2022": 8.98,
+      "2021": 10.54,
+      "2020": 14.06
+    },
+    "years_with_low_roe": 0,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:28"
+  },
+  "000066": {
+    "stock_code": "000066",
+    "stock_name": "中国长城",
+    "status": "bad",
+    "reason": "近5年中有3年ROE小于5%",
+    "roe_details": {
+      "2024": -12.376,
+      "2023": -7.417,
+      "2022": 0.921,
+      "2021": 6.369,
+      "2020": 10.73
+    },
+    "years_with_low_roe": 3,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:32"
+  },
+  "000068": {
+    "stock_code": "000068",
+    "stock_name": "华控赛格",
+    "status": "bad",
+    "reason": "近5年中有4年ROE小于5%",
+    "roe_details": {
+      "2024": 1.86,
+      "2023": 175.55,
+      "2022": -140.99,
+      "2021": -31.32,
+      "2020": -37.26
+    },
+    "years_with_low_roe": 4,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:36"
+  },
+  "000069": {
+    "stock_code": "000069",
+    "stock_name": "华侨城Ａ",
+    "status": "bad",
+    "reason": "近5年中有4年ROE小于5%",
+    "roe_details": {
+      "2024": -16.18,
+      "2023": -9.9,
+      "2022": -14.54,
+      "2021": 4.73,
+      "2020": 17.47
+    },
+    "years_with_low_roe": 4,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:40"
+  },
+  "000070": {
+    "stock_code": "000070",
+    "stock_name": "特发信息",
+    "status": "bad",
+    "reason": "近5年中有5年ROE小于5%",
+    "roe_details": {
+      "2024": -23.61,
+      "2023": -14.27,
+      "2022": 0.67,
+      "2021": -28.52,
+      "2020": 0.39
+    },
+    "years_with_low_roe": 5,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:44"
+  },
+  "000078": {
+    "stock_code": "000078",
+    "stock_name": "海王生物",
+    "status": "bad",
+    "reason": "近5年中有5年ROE小于5%",
+    "roe_details": {
+      "2024": -50.71,
+      "2023": -43.94,
+      "2022": -19.34,
+      "2021": 1.57,
+      "2020": -4.72
+    },
+    "years_with_low_roe": 5,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:49"
+  },
+  "000088": {
+    "stock_code": "000088",
+    "stock_name": "盐 田 港",
+    "status": "good",
+    "reason": "近5年中ROE小于5%的年份数: 1",
+    "roe_details": {
+      "2024": 9.55,
+      "2023": 8.67,
+      "2022": 4.43,
+      "2021": 5.25,
+      "2020": 5.13
+    },
+    "years_with_low_roe": 1,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:53"
+  },
+  "000089": {
+    "stock_code": "000089",
+    "stock_name": "深圳机场",
+    "status": "bad",
+    "reason": "近5年中有5年ROE小于5%",
+    "roe_details": {
+      "2024": 3.96,
+      "2023": 3.63,
+      "2022": -9.93,
+      "2021": -0.29,
+      "2020": 0.23
+    },
+    "years_with_low_roe": 5,
+    "total_years_analyzed": 5,
+    "analysis_time": "2025-11-03 16:05:57"
+  }
+}
