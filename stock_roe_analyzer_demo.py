@@ -117,6 +117,9 @@ class StockROEAnalyzer:
             
             # 排除北交所 (8开头)
             filtered = filtered[~filtered['code'].str.startswith('8')]
+
+            # 排除北交所 (920开头)
+            filtered = filtered[~filtered['code'].str.startswith(('920'))]
             
             # 排除创业板 (30开头)
             filtered = filtered[~filtered['code'].str.startswith('30')]
@@ -379,7 +382,7 @@ def demo_test():
     print("=== 上市公司ROE分析器 Demo测试 ===\n")
     
     # 创建分析器
-    analyzer = StockROEAnalyzer()
+    analyzer = StockROEAnalyzer('','')
     
     # 测试几只股票
     test_stocks = [
@@ -420,7 +423,15 @@ def batch_analyze_main():
     #analysis all stocks
 
     analyzer = StockROEAnalyzer()
-    analyzer.batch_analyze_stocks(10,3)
+    #analyzer.batch_analyze_stocks(10,3)
+
+    summary = analyzer.get_summary()
+    print(f"\n分析摘要:")
+    print(f"  总分析股票数: {summary['total_analyzed']}")
+    print(f"  Good股票数: {summary['good_stocks']}")
+    print(f"  Bad股票数: {summary['bad_stocks']}")
+    print(f"  失败股票数: {summary['failed_stocks']}")
+    print(f"  Good比例: {summary['good_ratio']:.2%}")
 
 if __name__ == "__main__":
     #demo_test()
