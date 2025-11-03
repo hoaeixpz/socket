@@ -157,7 +157,7 @@ class FinancialAbstractCollector:
                         # 转换为字典格式
                         data_dict = {
                             'report_date': date_str,
-                            'year': year,
+                            'year': str(year),
                             'quarter': self._get_quarter_from_date(date_str)
                         }
                         
@@ -226,7 +226,10 @@ class FinancialAbstractCollector:
     
     def set_indictor(self, year, indicators, data, df):
         """设置财务指标，并对金额进行格式化"""
-        
+        if data.empty:
+            print(f"{year}year data is empty")
+            return
+
         def format_financial_value(value, is_ratio=False):
             """格式化财务数值：金额用单位格式化，比率用百分比"""
             if pd.isna(value) or value is None:
@@ -238,7 +241,7 @@ class FinancialAbstractCollector:
             else:
                 # 金额类指标：使用智能格式化
                 return smart_format(value)
-        
+
         indicators[year] = {
             'revenue': format_financial_value(data.get('营业总收入', pd.Series()).mean() if '营业总收入' in df.columns else None),
             'net_profit': format_financial_value(data.get('净利润', pd.Series()).mean() if '净利润' in df.columns else None),
@@ -270,7 +273,7 @@ class FinancialAbstractCollector:
             print("关键指标为空")
             return {}
 
-        print("关键指标不为空")
+        # print("关键指标不为空")
         # print("-----------------------------------------------")
         # print(df)
         # print("-----------------------------------------------")
@@ -292,7 +295,7 @@ class FinancialAbstractCollector:
             self.set_indictor(year, indicators, data, df)
 
             current_year = datetime.now().year
-            if year == current_year:
+            if int(year) == current_year:
                 for month in year_data['report_date']:
                     report_data = year_data[year_data['report_date'] == month]
                     self.set_indictor(month, indicators, report_data, df)
@@ -415,8 +418,7 @@ def plot_simple_financial_charts(indicators):
             return
         
         # 排序年份
-        #sorted_years = sorted(annual_data.keys())
-        sorted_years = annual_data.keys()
+        sorted_years = sorted(annual_data.keys())
         
         # 创建图表
         fig, axes = plt.subplots(2, 2, figsize=(12, 10))
