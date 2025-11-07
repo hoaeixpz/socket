@@ -114,30 +114,28 @@ class PERatioCollector:
         
         #clean_code = stock_code.replace('.SZ', '').replace('.SH', '')
         
-        try:
-            # 获取实时行情
-            '''
-            print("获取实时行情")
-            realtime_data = ak.stock_zh_a_spot_em()
-            print("获取实时行情结束")
-            if realtime_data is not None and not realtime_data.empty:
-                stock_data = realtime_data[realtime_data['代码'] == clean_code]
-                if not stock_data.empty:
-                    return float(stock_data['最新价'].iloc[0])
-            '''
-            
+        try:       
             # 获取历史数据的最新收盘价
-            print("获取历史数据的最新收盘价")
-            print(stock_code)
             hist_data = ak.stock_zh_a_hist(symbol=stock_code, period="daily", adjust="qfq")
             print("获取历史数据的最新收盘价结束")
             if hist_data is not None and not hist_data.empty:
                 return float(hist_data['收盘'].iloc[-1])
             
-            return None
-            
         except Exception as e:
-            self.logger.error(f"获取股价失败: {e}")
+            self.logger.error(f"stock_zh_a_hist获取股价失败: {e}")
+
+        try:
+            today = datetime.today()
+            print("date")
+            print(today)
+            yesterday = today - datetime.timedelta(days=1)
+            stock_zh_a_daily_qfq_df = ak.stock_zh_a_daily(symbol="sz000001", start_date=yesterday, end_date=today, adjust="qfq")
+            print(stock_zh_a_daily_qfq_df)
+            if stock_zh_a_daily_qfq_df is not None and not stock_zh_a_daily_qfq_df.empty:
+                return stock_zh_a_daily_qfq_df['收盘'].iloc[-1]
+        
+        except Exception as e:
+            self.logger.error(f"stock_zh_a_daily获取股价失败: {e}")
             return None
     
     def _get_eps(self, stock_code):
