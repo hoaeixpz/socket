@@ -230,11 +230,6 @@ class FinancialAbstractCollector:
             print(f"{year}year data is empty")
             return
 
-        print(f"year {year}")
-        roe = data.get('净资产收益率(ROE)', pd.Series()).mean()
-        print(f"roe {roe}")
-        print(f"smart roe {smart_format(roe)}")
-
         indicators[year] = {
             'revenue': smart_format(data.get('营业总收入', pd.Series()).mean() if '营业总收入' in df.columns else None),
             'net_profit': smart_format(data.get('净利润', pd.Series()).mean() if '净利润' in df.columns else None),
@@ -324,72 +319,6 @@ class FinancialAbstractCollector:
         except Exception as e:
             self.logger.error(f"保存财务数据失败: {e}")
             return None
-
-def main():
-    """主函数 - 演示如何使用"""
-    
-    # 设置日志
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    
-    # 创建收集器
-    collector = FinancialAbstractCollector()
-    
-    # 测试股票代码
-    test_stocks = ['600519']
-    
-    for stock in test_stocks:
-        print(f"\n=== 获取 {stock} 近5年财务摘要数据 ===")
-        
-        # 获取财务摘要数据
-        df = collector.get_financial_abstract(stock, years=5)
-        
-        if not df.empty:
-            print(f"成功获取 {len(df)} 条记录")
-            print("数据列:", df.columns.tolist())
-            
-            # 显示前几行数据
-            print("\n前5行数据:")
-            print(df.head())
-            
-            # 获取关键财务指标
-            indicators = collector.get_key_financial_indicators(stock, years=5)
-            print(f"\n关键财务指标:")
-            print(indicators)
-            for year, data in indicators.items():
-                if year == datetime.now().year:
-                    continue
-
-                revenue = data.get('revenue', 'N/A')
-                net_profit = data.get('net_profit', 'N/A')
-                roe = data.get('roe', 'N/A')
-                ros = data.get('ros', 'N/A')
-                total_atr = data.get('total_atr', 'N/A')
-                em = data.get('em', 'N/A')
-                total_assets = data.get('total_assets', 'N/A')
-                liabilities = data.get('liabilities', 'N/A')
-                eps = data.get('eps', 'N/A')
-                
-                if year is not None and data is not None:
-                    print(f"  {year}:")
-                    print(f"    营业收入: {revenue}")
-                    print(f"    净利润: {net_profit}")
-                    print(f"    总资产: {total_assets}")
-                    print(f"    资产负债率: {liabilities}")
-                    print(f"    净资产收益率(ROE): {roe}")
-                    print(f"    销售净利率(ROS): {ros}")
-                    print(f"    总资产周转率: {total_atr}")
-                    print(f"    权益乘数: {em}")
-                    print(f"    每股收益: {eps}")
-            
-            # 保存数据
-            #plot_simple_financial_charts(indicators)
-            filename = collector.save_financial_data(stock, years=5)
-            if filename:
-                print(f"数据已保存到: {filename}")
-        else:
-            print("获取数据失败")
-        
-        print("-" * 50)
 
 def plot_simple_financial_charts(indicators):
     """
@@ -523,6 +452,79 @@ def plot_simple_financial_charts(indicators):
         
     #except Exception as e:
         #print(f"绘制图表失败: {e}")
+
+def main():
+    """主函数 - 演示如何使用"""
+    
+    # 设置日志
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    
+    # 创建收集器
+    collector = FinancialAbstractCollector()
+    
+    # 从终端输入股票代码
+    stock_code = input("请输入股票代码（例如：600519）: ").strip()
+    
+    if not stock_code:
+        print("未输入股票代码，使用默认股票代码 600519")
+        stock_code = "600519"
+    
+    # 测试股票代码
+    test_stocks = [stock_code]
+    
+    for stock in test_stocks:
+        print(f"\n=== 获取 {stock} 近5年财务摘要数据 ===")
+        
+        # 获取财务摘要数据
+        df = collector.get_financial_abstract(stock, years=5)
+        
+        if not df.empty:
+            print(f"成功获取 {len(df)} 条记录")
+            print("数据列:", df.columns.tolist())
+            
+            # 显示前几行数据
+            print("\n前5行数据:")
+            print(df.head())
+            
+            # 获取关键财务指标
+            indicators = collector.get_key_financial_indicators(stock, years=5)
+            print(f"\n关键财务指标:")
+            for year, data in indicators.items():
+                if year == datetime.now().year:
+                    continue
+
+                revenue = data.get('revenue', 'N/A')
+                net_profit = data.get('net_profit', 'N/A')
+                roe = data.get('roe', 'N/A')
+                ros = data.get('ros', 'N/A')
+                total_atr = data.get('total_atr', 'N/A')
+                em = data.get('em', 'N/A')
+                total_assets = data.get('total_assets', 'N/A')
+                liabilities = data.get('liabilities', 'N/A')
+                eps = data.get('eps', 'N/A')
+                
+                if year is not None and data is not None:
+                    print(f"  {year}:")
+                    print(f"    营业收入: {revenue}")
+                    print(f"    净利润: {net_profit}")
+                    print(f"    总资产: {total_assets}")
+                    print(f"    资产负债率: {liabilities}")
+                    print(f"    净资产收益率(ROE): {roe}")
+                    print(f"    销售净利率(ROS): {ros}")
+                    print(f"    总资产周转率: {total_atr}")
+                    print(f"    权益乘数: {em}")
+                    print(f"    每股收益: {eps}")
+            
+            # 保存数据
+            #plot_simple_financial_charts(indicators)
+            filename = collector.save_financial_data(stock, years=5)
+            if filename:
+                print(f"数据已保存到: {filename}")
+        else:
+            print("获取数据失败")
+        
+        print("-" * 50)
+
 
 
 if __name__ == "__main__":
