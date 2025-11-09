@@ -44,99 +44,146 @@ def add_stock_prefix(stock_code):
     else:
         return code_str
 
+def load_existing_good_stocks():
+    """加载现有的good_stocks.json文件，返回所有股票代码列表"""
+    try:
+        with open('good_stocks.json', 'r', encoding='utf-8') as f:
+            stocks = json.load(f)
+        return list(stocks.keys()), stocks
+    except FileNotFoundError:
+        print("错误：找不到good_stocks.json文件")
+        return [], {}
+    except json.JSONDecodeError as e:
+        print(f"错误：JSON文件格式错误 - {e}")
+        return [], {}
+
+def update_single_stock_pe(stock_code, stock_info, pe_collector):
+    """分析单只股票的PE值并立即更新到文件"""
+    stock_name = stock_info.get('stock_name', '未知')
+    
+    # 添加市场前缀
+    full_stock_code = add_stock_prefix(stock_code)
+    
+    try:
+        # 获取当前PE值
+        current_pe = pe_collector.get_current_pe_ratio(full_stock_code)
+        
+        if current_pe is not None:
+            # 获取历史PE值
+            historical_pe = pe_collector.get_historical_pe_ratios(full_stock_code, years=5)
+            
+            # 获取历史PEG
+            historical_peg = pe_collector.get_historical_peg(full_stock_code, historical_pe, years=5)
+            
+            # 创建PE分析数据
+            pe_analysis_data = {
+                'current_pe': current_pe,
+                'historical_pe': historical_pe,
+                'historical_peg': historical_peg,
+                'analysis_time': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'error': None
+            }
+            
+            print(f" SUCCESS {stock_name} PE data")
+            print(f" current PE: {current_pe}")
+            print(f" hist PE: {historical_pe}")
+            print(f" hist PEG: {historical_peg}")
+            
+            return pe_analysis_data, True
+            
+        else:
+            print(f" FAIL {stock_name} PE data")
+            pe_analysis_data = {
+                'current_pe': None,
+                'historical_pe': {},
+                'historical_peg': {},
+                'analysis_time': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'error': '获取PE数据失败'
+            }
+            return pe_analysis_data, False
+            
+    except Exception as e:
+        print(f" analysis {stock_name} error: {e}")
+        pe_analysis_data = {
+            'current_pe': None,
+            'historical_pe': {},
+            'historical_peg': {},
+            'analysis_time': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'error': str(e)
+        }
+        return pe_analysis_data, False
+
+def save_single_stock_update(stock_code, stock_info, pe_analysis_data):
+    """保存单只股票的更新到文件"""
+    try:
+        # 读取整个文件
+        with open('good_stocks.json', 'r', encoding='utf-8') as f:
+            all_stocks = json.load(f)
+        
+        # 更新当前股票的数据
+        if stock_code in all_stocks:
+            all_stocks[stock_code]['pe_analysis'] = pe_analysis_data
+        
+        # 保存回文件
+        with open('good_stocks.json', 'w', encoding='utf-8') as f:
+            json.dump(all_stocks, f, ensure_ascii=False, indent=2)
+        
+        return True
+    except Exception as e:
+        print(f"保存股票 {stock_code} 数据失败: {e}")
+        return False
+
 def update_stocks_with_pe():
-    """分析所有good股票的PE值并更新到原文件"""
+    """分析所有good股票的PE值，每分析完一只股票就立即更新文件"""
     
-    # 加载good股票数据
-    good_stocks = load_good_stocks()
+    # 加载现有股票数据
+    stock_codes, all_stocks = load_existing_good_stocks()
     
-    if not good_stocks:
+    if not stock_codes:
         print("没有找到good状态的股票数据")
         return 0
     
-    print(f"找到 {len(good_stocks)} 只good状态的股票")
+    print(f"find {len(stock_codes)} good stocks")
     
     # 创建PE收集器
     pe_collector = PERatioCollector(max_retries=3, retry_delay=2)
     
     # 记录更新数量
     updated_count = 0
+    successful_count = 0
     
     # 遍历所有股票
-    for i, (stock_code, stock_info) in enumerate(good_stocks.items(), 1):
-        if i > 2:
-            break
+    for i, stock_code in enumerate(stock_codes, 1):
+        stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
         
         print(f"\n{'='*60}")
-        print(f"正在分析第 {i}/{len(good_stocks)} 只股票: {stock_name}({stock_code})")
+        print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
         print(f"{'='*60}")
         
-        # 添加市场前缀
-        full_stock_code = add_stock_prefix(stock_code)
+        # 分析单只股票的PE值
+        pe_analysis_data, success = update_single_stock_pe(stock_code, stock_info, pe_collector)
         
-        try:
-            # 获取当前PE值
-            current_pe = pe_collector.get_current_pe_ratio(full_stock_code)
-            
-            if current_pe is not None:
-                # 获取历史PE值
-                historical_pe = pe_collector.get_historical_pe_ratios(full_stock_code, years=5)
-                
-                # 获取历史PEG
-                historical_peg = pe_collector.get_historical_peg(full_stock_code, historical_pe, years=5)
-                
-                # 更新股票数据
-                good_stocks[stock_code]['pe_analysis'] = {
-                    'current_pe': current_pe,
-                    'historical_pe': historical_pe,
-                    'historical_peg': historical_peg,
-                    'analysis_time': time.strftime('%Y-%m-%d %H:%M:%S'),
-                    'error': None
-                }
-                
-                updated_count += 1
-                print(f"✓ 成功获取 {stock_name} 的PE数据")
-                print(f"  当前PE: {current_pe}")
-                print(f"  历史PE: {historical_pe}")
-                print(f"  历史PEG: {historical_peg}")
-                
-            else:
-                print(f"✗ 获取 {stock_name} 的PE数据失败")
-                good_stocks[stock_code]['pe_analysis'] = {
-                    'current_pe': None,
-                    'historical_pe': {},
-                    'historical_peg': {},
-                    'analysis_time': time.strftime('%Y-%m-%d %H:%M:%S'),
-                    'error': '获取PE数据失败'
-                }
-                
-        except Exception as e:
-            print(f"✗ 分析 {stock_name} 时发生错误: {e}")
-            good_stocks[stock_code]['pe_analysis'] = {
-                'current_pe': None,
-                'historical_pe': {},
-                'historical_peg': {},
-                'analysis_time': time.strftime('%Y-%m-%d %H:%M:%S'),
-                'error': str(e)
-            }
+        # 立即保存到文件
+        if save_single_stock_update(stock_code, stock_info, pe_analysis_data):
+            updated_count += 1
+            if success:
+                successful_count += 1
+            print(f"已更新 {stock_name} 的PE数据到文件")
+        else:
+            print(f"更新 {stock_name} 数据到文件失败")
+        
+        # 清除当前股票数据以节省内存
+        del all_stocks[stock_code]
         
         # 添加延时，避免请求过于频繁
-        if i < len(good_stocks):  # 最后一只股票不需要延时
+        if i < len(stock_codes):  # 最后一只股票不需要延时
             wait_time = 3
-            print(f"等待 {wait_time} 秒后继续...")
+            print(f"wait {wait_time} s...")
             time.sleep(wait_time)
     
-    # 保存更新后的文件
-    try:
-        with open('good_stocks.json', 'w', encoding='utf-8') as f:
-            json.dump(good_stocks, f, ensure_ascii=False, indent=2)
-        print(f"\n成功更新 {updated_count} 只股票的PE数据到good_stocks.json")
-        return updated_count
-        
-    except Exception as e:
-        print(f"保存更新失败: {e}")
-        return 0
+    print(f"\n分析完成！成功更新了 {updated_count} 只股票的数据，其中 {successful_count} 只成功获取PE数据")
+    return successful_count
 
 def generate_summary_report(good_stocks):
     """生成分析报告摘要"""
