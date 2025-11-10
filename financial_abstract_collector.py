@@ -516,7 +516,7 @@ def main():
                     print(f"    每股收益: {eps}")
             
             # 保存数据
-            #plot_simple_financial_charts(indicators)
+            plot_simple_financial_charts(indicators)
             filename = collector.save_financial_data(stock, years=5)
             if filename:
                 print(f"数据已保存到: {filename}")
