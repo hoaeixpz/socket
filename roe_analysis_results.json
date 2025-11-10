@@ -48848,21 +48848,5 @@
     "years_with_low_roe": 0,
     "total_years_analyzed": 5,
     "analysis_time": "2025-11-03 20:04:36"
-  },
-  "689009": {
-    "stock_code": "689009",
-    "stock_name": "XD九号公",
-    "status": "good",
-    "reason": "近5年中ROE小于5%的年份数: 1",
-    "roe_details": {
-      "2024": 19.1,
-      "2023": 11.5,
-      "2022": 9.85,
-      "2021": 10.31,
-      "2020": 2.94
-    },
-    "years_with_low_roe": 1,
-    "total_years_analyzed": 5,
-    "analysis_time": "2025-11-03 20:04:40"
   }
 }
