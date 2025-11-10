@@ -58,6 +58,7 @@ class FinancialData:
 			print(f"正在获取 {symbol} 的财务数据...")
 			# 调用akshare接口获取财务摘要数据
 			df = ak.stock_financial_abstract(symbol=symbol)
+			#print(df)
 			
 			if df is None or df.empty:
 				print(f"警告：未获取到 {symbol} 的财务数据")
@@ -91,6 +92,7 @@ class FinancialData:
 		单行数据的DataFrame，保留所有列名
 		"""
 		df = self.get_financial_data(symbol)
+		#print(df)
 		if df is None:
 			return None
 
@@ -195,6 +197,7 @@ class FinancialData:
 		return 指标列表
 		'''
 		df = self.get_financial_data(symbol)
+		#print(df)
 		if df is None:
 			return None
 

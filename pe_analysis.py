@@ -160,6 +160,8 @@ def update_stocks_with_pe():
         print(f"\n{'='*60}")
         print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
         print(f"{'='*60}")
+
+        time.sleep(2)
         
         # 分析单只股票的PE值
         pe_analysis_data, success = update_single_stock_pe(stock_code, stock_info, pe_collector)
@@ -178,7 +180,7 @@ def update_stocks_with_pe():
         
         # 添加延时，避免请求过于频繁
         if i < len(stock_codes):  # 最后一只股票不需要延时
-            wait_time = 3
+            wait_time = 10 
             print(f"wait {wait_time} s...")
             time.sleep(wait_time)
     

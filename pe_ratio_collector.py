@@ -97,7 +97,7 @@ class PERatioCollector:
         try:
             # 获取当前股价
             current_price = self._get_current_price(stock_code)
-            #print(f"当前股价: {current_price}")
+            print(f"当前股价: {current_price}")
             if current_price is None:
                 return None
             
@@ -105,13 +105,13 @@ class PERatioCollector:
             hist_eps = self._get_history_eps(stock_code, years = 1)
             if hist_eps is None:
                 return None
-            #print("最近一年每股收益")
-            #print(hist_eps)
+            print("最近一年每股收益")
+            print(hist_eps)
             last_eps = hist_eps[0]
             last_date = last_eps[0]
             eps = last_eps[1]
             quater = last_date[4:6]
-            #print(quater)
+            print(quater)
             eps_d = eps * 1.0 / int(quater) * 12
             pe_d = current_price / eps_d
             pe_j = pe_d
@@ -150,6 +150,7 @@ class PERatioCollector:
             self.logger.error(f"手动计算市盈率失败: {e}")
             return None
     
+
     def _get_current_price(self, stock_code):
         """获取当前股价"""
         
@@ -183,9 +184,19 @@ class PERatioCollector:
         target_date格式: "20241219"
         '''
 
+        '''
+        clean_code = stock_code.replace('sz', '').replace('sh', '')
+        listing_date = get_stock_listing_date(clean_code)
+        #print(f"listing_date {listing_date}")
+        if listing_date is not None and int(target_date) < listing_date:
+            self.logger.warning(f"获取{stock_code} {target_date} 的股价日期早于上市日期 {listing_date}")
+            return None
+        '''
+
         startdate = target_date
         day = int(startdate[6:]) - 2
         startdate = startdate[:-2] + str(day)
+        print(f"start end {startdate} {target_date}")
         try:
             #start_t = time.time()
             df = ak.stock_zh_a_daily(
@@ -195,11 +206,16 @@ class PERatioCollector:
                 adjust="qfq")
             #end_t = time.time()
             #print(f"获取{stock_code} {target_date} 的股价结束，耗时{end_t - start_t}")
+            #print(df)
             if df is not None and not df.empty:
                 return df['close'].iloc[-1]
+            else:
+                self.logger.warning(f"获取{stock_code} {target_date} 的股价为空")
+                return None
         
         except Exception as e:
             self.logger.error(f"stock_zh_a_daily获取指定日期股价失败: {e}")
+            return None
 
         try:       
             # 获取历史数据的最新收盘价
@@ -229,12 +245,12 @@ class PERatioCollector:
         格式: [(date, eps), (date, eps), ...]
         '''
 
+        print("get history") 
         df = stock_data.get_indicator_data(stock_code, "基本每股收益")
         result_list = stock_data.get_indicator_recent_year(df, 5)
         
         print(f"获取{stock_code} 历史每股收益结束")
         return result_list
-
 
     def get_historical_pe_ratios(self, stock_code, years=5):
         """
@@ -252,12 +268,13 @@ class PERatioCollector:
         try:
             # 获取历史市盈率数据
             hist_eps = self._get_history_eps(stock_code, years)
+            #print(f"hist_eps {hist_eps}")
             for date, eps in hist_eps:
                 if date[4:6] == "12":
                     price: Any | float | None = self._get_price(stock_code, date)
                     if price is not None and eps is not None:
                         pe_ratio = price / eps
-                        #print(f"date {date} eps {eps} price {price} pe_ratio {pe_ratio}")
+                        print(f"date {date} eps {eps} price {price} pe_ratio {pe_ratio}")
                         result[date] = pe_ratio
             
             print("获取历史市盈率数据结束")
@@ -325,6 +342,26 @@ def add_stock_prefix(stock_code):
         return f"bj{code_str}"      # 北证
     else:
         raise ValueError(f"无法识别的股票代码格式: {stock_code}")
+
+def get_stock_listing_date(symbol):
+    """
+    获取股票的上市日期
+    """
+    try:
+        # 获取股票基本信息
+       stock_info = ak.stock_individual_info_em(symbol=symbol)
+       #print(stock_info)
+       # 查找上市日期信息
+       for index, row in stock_info.iterrows():
+           if '上市时间' in str(row['item']) or 'listing date' in str(row['item']).lower():
+               listing_date = row['value']
+               #print(type(listing_date))
+               if len(str(listing_date)) == 8:
+                   return listing_date
+               return None
+    except Exception as e:
+        print(f"获取{symbol}上市日期失败: {e}")
+    return None
 
 def main():
     """主函数 - 演示如何使用"""
