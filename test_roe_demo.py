@@ -18,7 +18,8 @@ def test_single_stock_analysis():
     test_stocks = [
         ('600519', '贵州茅台'),
         ('000001', '平安银行'),
-        ('601318', '中国平安')
+        ('601318', '中国平安'),
+        ('601020', '华钰矿业')
     ]
     
     for stock_code, stock_name in test_stocks:
@@ -59,7 +60,7 @@ def test_single_stock_analysis():
                         for idx, row in roe_indicators.iterrows():
                             indicator_name = row['指标']
                             print(f"  \n指标: {indicator_name}")
-                            for year_col in recent_years[:3]:  # 显示最近3年
+                            for year_col in recent_years:  # 显示最近3年
                                 if year_col in df.columns:
                                     value = row[year_col]
                                     if pd.notna(value):
@@ -117,7 +118,7 @@ def test_stock_list():
 
 if __name__ == "__main__":
     # 先测试股票列表
-    test_stock_list()
+    # test_stock_list()
     
     # 再测试单只股票分析
     test_single_stock_analysis()
