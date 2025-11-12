@@ -25,6 +25,8 @@ def get_stock_listing_date(symbol):
 # 使用示例
 symbol = "000001"  # 平安银行
 stock_financial_abstract_df = ak.stock_financial_abstract("600519")
-print(stock_financial_abstract_df)
-listing_date = get_stock_listing_date(symbol)
-print(f"{symbol} 上市日期: {listing_date}")
+indictor = ak.stock_fhps_detail_em("600519")
+#print(stock_financial_abstract_df)
+print(indictor)
+#listing_date = get_stock_listing_date(symbol)
+#print(f"{symbol} 上市日期: {listing_date}")

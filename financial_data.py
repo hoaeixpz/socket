@@ -199,8 +199,11 @@ class FinancialData:
 		df = self.get_financial_data(symbol)
 		#print(df)
 		if df is None:
+			print("获取财务数据为空")
 			return None
 
+		'''
+		'''
 		if p:
 			if '指标' in df.columns:
 				for idx, value in df['指标'].items():
