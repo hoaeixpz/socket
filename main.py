@@ -83,10 +83,11 @@ def update_single_stock(stock_code):
         hist_price = {}
         for year in years:
             price = pe_collect._get_price(full_stock_code, year)
+            time.sleep(0.3)
             if price is not None:
                 hist_price[year[0:4]] = price
 
-        print(hist_price)
+        #print(hist_price)
         return hist_price, True
             
     except Exception as e:
@@ -104,7 +105,7 @@ def save_single_stock_update(stock_code, analysis_data):
         if stock_code in all_stocks:
             all_stocks[stock_code]['history_price'] = {}
             for year, price in analysis_data.items():
-                print(f"price {year}, {price}")
+                #print(f"price {year}, {price}")
                 if '2025' in year:
                     all_stocks[stock_code]['current_price'] = ('20250930' ,price)
                     continue
@@ -137,8 +138,8 @@ def update_stocks():
     
     # 遍历所有股票
     for i, stock_code in enumerate(stock_codes, 1):
-        if i > 2:
-            break
+        if i < 70:
+            continue
         stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
         
@@ -146,7 +147,6 @@ def update_stocks():
         print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
         print(f"{'='*60}")
 
-        time.sleep(2)
         
         # 分析单只股票的PE值
         analysis_data, success = update_single_stock(stock_code)
@@ -165,7 +165,7 @@ def update_stocks():
         
         # 添加延时，避免请求过于频繁
         if i < len(stock_codes):  # 最后一只股票不需要延时
-            wait_time = 8 
+            wait_time = 6 
             print(f"wait {wait_time} s...")
             time.sleep(wait_time)
     
@@ -181,7 +181,7 @@ def generate_summary_report(good_stocks):
     
     total_stocks = len(good_stocks)
     successful_stocks = sum(1 for stock in good_stocks.values() 
-                           if stock.get('roe_details', {}).get('current') is not None)
+                           if stock.get('history_price') is not None)
     failed_stocks = total_stocks - successful_stocks
     
     print(f"总股票数: {total_stocks}")
@@ -195,7 +195,7 @@ def main():
     print("开始分析good股票的PE值并更新到原文件...")
     
     # 设置日志
-    setup_logging()
+    #setup_logging()
     
     # 分析股票PE并更新文件
     updated_count = update_stocks()
