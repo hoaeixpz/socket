@@ -335,7 +335,9 @@ class StockAnalyzer:
                 continue
             
             years = sorted([int(year) for year in historical_pe.keys() if year.isdigit()])
+            #print(f"years {years}")
             pe_values = [historical_pe[str(year)] for year in years if historical_pe[str(year)]]
+            print(f"pe_values {pe_values}")
 
             trend = True
             for i, pe in enumerate(pe_values):
@@ -350,10 +352,11 @@ class StockAnalyzer:
             
             if trend:
                 if current_pe_list[0] < pe_values[-1] or current_pe_list[1] < pe_values[-1] or current_pe_list[2] < pe_values[-1]:
-                    print(f"{stock_code} 历史PE趋势向上")
+                    print(f"{stock_code} 历史PE趋势向下")
                     #print(f"{stock_code} PE: {pe_values}")
                     #plottor.plot_three_indicators(stock_info, stock_code)
             
+            break
             # 计算潜力分数
             #potential_score = self.calculate_potential_score(stock_info)
             

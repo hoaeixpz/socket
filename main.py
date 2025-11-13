@@ -7,10 +7,13 @@
 import json
 import time
 import logging
+import akshare as ak
 from financial_data import FinancialData
+from pe_ratio_collector import PERatioCollector
 
 # 创建全局实例
 stock_data = FinancialData()
+pe_collect = PERatioCollector()
 
 def setup_logging():
     """设置日志配置"""
@@ -67,6 +70,7 @@ def update_single_stock(stock_code):
     full_stock_code = add_stock_prefix(stock_code)
     
     try:
+        '''
         print("示例1：获取ROE")
         roe = stock_data.get_indicator_value(stock_code, "净资产收益率(ROE)", "20250930")
         #roe = stock_data.get_indicator_data(stock_code, "净资产收益率(ROE)")
@@ -74,9 +78,20 @@ def update_single_stock(stock_code):
         data = ("20250930", roe)
         if roe is not None:
             return data, True
+        '''
+        years = ['20201231', '20211231', '20221231', '20231231', '20241231', '20250930']
+        hist_price = {}
+        for year in years:
+            price = pe_collect._get_price(full_stock_code, year)
+            if price is not None:
+                hist_price[year[0:4]] = price
+
+        print(hist_price)
+        return hist_price, True
             
     except Exception as e:
         print(f" analysis {stock_name} error: {e}")
+        return None, False
 
 def save_single_stock_update(stock_code, analysis_data):
     """保存单只股票的更新到文件"""
@@ -87,7 +102,13 @@ def save_single_stock_update(stock_code, analysis_data):
         
         # 更新当前股票的数据
         if stock_code in all_stocks:
-            all_stocks[stock_code]['roe_details']['current'] = analysis_data
+            all_stocks[stock_code]['history_price'] = {}
+            for year, price in analysis_data.items():
+                print(f"price {year}, {price}")
+                if '2025' in year:
+                    all_stocks[stock_code]['current_price'] = ('20250930' ,price)
+                    continue
+                all_stocks[stock_code]['history_price'][year] = price
         
         # 保存回文件
         with open('good_stocks.json', 'w', encoding='utf-8') as f:
@@ -116,6 +137,8 @@ def update_stocks():
     
     # 遍历所有股票
     for i, stock_code in enumerate(stock_codes, 1):
+        if i > 2:
+            break
         stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
         
@@ -188,7 +211,8 @@ def test_demo():
     '''
 
     #stock_data.get_indicator_list("000001", True)
-    #update_single_stock("000001", {})
+    #update_single_stock("000001")
+    #return
     stock_codes, all_stocks = load_existing_good_stocks()
     
     if not stock_codes:
@@ -205,8 +229,6 @@ def test_demo():
         print(f"\n{'='*60}")
         print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
         print(f"{'='*60}")
-
-        time.sleep(2)
         
         # 分析单只股票的PE值
         analysis_data, success = update_single_stock(stock_code)
@@ -217,6 +239,7 @@ def test_demo():
         
         # 立即保存到文件
         save_single_stock_update(stock_code, analysis_data)
+        break
             #updated_count += 1
             #if success:
 

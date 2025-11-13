@@ -196,7 +196,7 @@ class PERatioCollector:
         startdate = target_date
         day = int(startdate[6:]) - 2
         startdate = startdate[:-2] + str(day)
-        print(f"start end {startdate} {target_date}")
+        #print(f"start end {startdate} {target_date}")
         try:
             #start_t = time.time()
             df = ak.stock_zh_a_daily(
