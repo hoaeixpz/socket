@@ -6,6 +6,7 @@
 """
 
 import json
+import math
 import pandas as pd
 from datetime import datetime
 import simple_stock_plotter
@@ -31,286 +32,74 @@ class StockAnalyzer:
             print(f"加载数据失败: {e}")
             return {}
     
-    def analyze_roe_trend(self, roe_details):
-        """分析ROE趋势"""
-        years = sorted([int(year) for year in roe_details.keys() if year.isdigit()])
-        roe_values = [roe_details[str(year)] for year in years]
-        
-        # 计算趋势
-        if len(roe_values) >= 2:
-            trend = roe_values[-1] - roe_values[0]
-            recent_trend = roe_values[-1] - roe_values[-2] if len(roe_values) >= 2 else 0
+    def cal_profit(self, YEAR, stock_info):
+        '''
+        计算自YEAR年起的一年收益率，以及两年复合收益率
+        '''
+        history_price = stock_info.get('history_price')
+        next_price = 0
+        price = history_price[str(YEAR)]
+        if YEAR < 2024:
+            next_price = history_price[str(YEAR + 1)]
         else:
-            trend = 0
-            recent_trend = 0
+            next_price = stock_info.get('current_price')[1]
+        profit = (next_price - price) / price * 100
+
+        next_next_price = 0
+        if YEAR < 2023:
+            next_next_price = history_price[str(YEAR + 2)]
+        elif YEAR == 2023:
+            next_next_price = stock_info.get('current_price')[1]
+        else:
+            return profit, None
         
-        return {
-            'years': years,
-            'roe_values': roe_values,
-            'trend': trend,
-            'recent_trend': recent_trend,
-            'avg_roe': sum(roe_values) / len(roe_values) if roe_values else 0
-        }
-    
-    def analyze_pe_valuation(self, pe_data):
-        """分析PE估值，包括历史PE分析"""
-        if not pe_data:
-            return {'status': 'unknown', 'reason': '无PE数据', 'historical_analysis': {}}
-        
+        profit2 = math.sqrt(next_next_price / price) - 1
+        profit2 = profit2 * 100
+        return profit, profit2
+
+    def find_good_stocks(self, YEAR, stock_info):
+        '''
+        找到从YEAR年起，3年内股价上涨，PE下跌的公司
+        '''
+
+        pe_data= stock_info.get('pe_analysis', {})
         current_pe_list = pe_data.get('current_pe', [])
         historical_pe = pe_data.get('historical_pe', {})
-        
-        # 获取当前PE（取第一个有效值）
-        current_pe = None
-        for pe in current_pe_list:
-            if pe and pe > 0:
-                current_pe = pe
-                #break
-        
-        # 分析历史PE
-        historical_analysis = self.analyze_historical_pe(historical_pe)
-        
-        # 如果当前PE数据缺失，尝试使用历史PE数据
-        if current_pe is None and historical_pe:
-            # 取最近一年的PE作为当前PE
-            years = sorted([int(year) for year in historical_pe.keys() if year.isdigit()], reverse=True)
-            if years:
-                current_pe = historical_pe.get(str(years[0]))
-        
-        # 分析估值状态
-        if current_pe is None:
-            return {
-                'status': 'unknown', 
-                'reason': '无有效PE数据',
-                'historical_analysis': historical_analysis
-            }
-        
-        # 结合历史PE分析当前估值
-        valuation_status = self.get_valuation_status(current_pe, historical_analysis)
-        
-        return {
-            'status': valuation_status['status'],
-            'reason': valuation_status['reason'],
-            'current_pe': current_pe,
-            'historical_analysis': historical_analysis
-        }
-    
-    def analyze_historical_pe(self, historical_pe):
-        """分析历史PE数据"""
-        if not historical_pe:
-            return {
-                'status': 'no_data',
-                'reason': '无历史PE数据',
-                'avg_pe': 0,
-                'pe_trend': 0,
-                'pe_range': (0, 0),
-                'years_analyzed': 0
-            }
-        
-        # 提取有效年份和PE值
+
+        if len(historical_pe) < 2:
+            return False
+
+        if len(current_pe_list) == 0:
+            return False
+            
         years = sorted([int(year) for year in historical_pe.keys() if year.isdigit()])
-        pe_values = [historical_pe[str(year)] for year in years if historical_pe[str(year)] and historical_pe[str(year)] > 0]
-        
-        if not pe_values:
-            return {
-                'status': 'invalid_data',
-                'reason': '历史PE数据无效',
-                'avg_pe': 0,
-                'pe_trend': 0,
-                'pe_range': (0, 0),
-                'years_analyzed': 0
-            }
-        
-        # 计算统计指标
-        avg_pe = sum(pe_values) / len(pe_values)
-        min_pe = min(pe_values)
-        max_pe = max(pe_values)
-        
-        # 计算PE趋势
-        if len(pe_values) >= 2:
-            pe_trend = pe_values[-1] - pe_values[0]
-            recent_trend = pe_values[-1] - pe_values[-2] if len(pe_values) >= 2 else 0
-        else:
-            pe_trend = 0
-            recent_trend = 0
-        
-        # 分析历史PE状态
-        if len(pe_values) >= 3:
-            if pe_trend < -5:
-                trend_status = '下降明显'
-            elif pe_trend < 0:
-                trend_status = '温和下降'
-            elif pe_trend > 5:
-                trend_status = '上升明显'
-            elif pe_trend > 0:
-                trend_status = '温和上升'
-            else:
-                trend_status = '基本稳定'
-        else:
-            trend_status = '数据不足'
-        
-        return {
-            'status': 'valid',
-            'reason': f'历史PE分析完成，{trend_status}',
-            'avg_pe': avg_pe,
-            'pe_trend': pe_trend,
-            'recent_trend': recent_trend,
-            'min_pe': min_pe,
-            'max_pe': max_pe,
-            'pe_range': (min_pe, max_pe),
-            'years_analyzed': len(pe_values),
-            'trend_status': trend_status
-        }
-    
-    def get_valuation_status(self, current_pe, historical_analysis):
-        """结合历史PE分析当前估值状态"""
-        
-        # 基础估值判断
-        if current_pe < 0:
-            base_status = 'invalid'
-            base_reason = f'PE={current_pe:.1f}，估值无效'
-        elif current_pe < 10 :
-            base_status = 'undervalued'
-            base_reason = f'PE={current_pe:.1f}，估值偏低'
-        elif current_pe < 20:
-            base_status = 'reasonable'
-            base_reason = f'PE={current_pe:.1f}，估值合理'
-        elif current_pe < 30:
-            base_status = 'slightly_overvalued'
-            base_reason = f'PE={current_pe:.1f}，估值略高'
-        else:
-            base_status = 'overvalued'
-            base_reason = f'PE={current_pe:.1f}，估值偏高'
-        
-        # 如果有历史PE数据，进行更精确的分析
-        if historical_analysis['status'] == 'valid':
-            avg_pe = historical_analysis['avg_pe']
-            min_pe = historical_analysis['min_pe']
-            max_pe = historical_analysis['max_pe']
-            
-            # 相对于历史平均水平的估值
-            if current_pe < avg_pe * 0.7:
-                historical_reason = f'，显著低于历史平均({avg_pe:.1f})'
-                if base_status == 'undervalued':
-                    base_status = 'deeply_undervalued'
-            elif current_pe < avg_pe * 0.9:
-                historical_reason = f'，低于历史平均({avg_pe:.1f})'
-            elif current_pe > avg_pe * 1.3:
-                historical_reason = f'，显著高于历史平均({avg_pe:.1f})'
-                if base_status == 'overvalued':
-                    base_status = 'deeply_overvalued'
-            elif current_pe > avg_pe * 1.1:
-                historical_reason = f'，高于历史平均({avg_pe:.1f})'
-            else:
-                historical_reason = f'，接近历史平均({avg_pe:.1f})'
-            
-            # 相对于历史区间的估值
-            if current_pe < min_pe * 1.1:
-                range_reason = f'，接近历史最低({min_pe:.1f})'
-            elif current_pe > max_pe * 0.9:
-                range_reason = f'，接近历史最高({max_pe:.1f})'
-            else:
-                range_reason = f'，处于历史区间({min_pe:.1f}-{max_pe:.1f})内'
-            
-            base_reason += historical_reason + range_reason
-        
-        return {'status': base_status, 'reason': base_reason}
-    
-    def calculate_potential_score(self, stock_data):
-        """计算潜力分数"""
-        score = 0
-        reasons = []
-        
-        # ROE分析（权重40%）
-        roe_details = stock_data.get('roe_details', {})
-        roe_analysis = self.analyze_roe_trend(roe_details)
-        
-        # ROE水平评分
-        avg_roe = roe_analysis['avg_roe']
-        if avg_roe >= 15:
-            score += 40
-            reasons.append(f"ROE优秀({avg_roe:.1f}%)")
-        elif avg_roe >= 10:
-            score += 30
-            reasons.append(f"ROE良好({avg_roe:.1f}%)")
-        elif avg_roe >= 5:
-            score += 20
-            reasons.append(f"ROE一般({avg_roe:.1f}%)")
-        else:
-            score += 10
-            reasons.append(f"ROE较差({avg_roe:.1f}%)")
-        
-        # ROE趋势评分（权重20%）
-        if roe_analysis['recent_trend'] > 0:
-            score += 20
-            reasons.append("ROE趋势向上")
-        elif roe_analysis['recent_trend'] >= -2:
-            score += 15
-            reasons.append("ROE趋势稳定")
-        else:
-            score += 5
-            reasons.append("ROE趋势向下")
-        
-        # PE估值评分（权重30%）
-        pe_analysis = self.analyze_pe_valuation(stock_data.get('pe_analysis', {}))
-        
-        # 根据估值状态和历史分析进行评分
-        if pe_analysis['status'] == 'deeply_undervalued':
-            score += 35
-            reasons.append("深度低估")
-        elif pe_analysis['status'] == 'undervalued':
-            score += 30
-            reasons.append("估值偏低")
-        elif pe_analysis['status'] == 'reasonable':
-            score += 25
-            reasons.append("估值合理")
-        elif pe_analysis['status'] == 'slightly_overvalued':
-            score += 15
-            reasons.append("估值略高")
-        elif pe_analysis['status'] == 'overvalued':
-            score += 10
-            reasons.append("估值偏高")
-        elif pe_analysis['status'] == 'deeply_overvalued':
-            score += 5
-            reasons.append("深度高估")
-        else:
-            score += 10
-            reasons.append("估值未知")
-        
-        # 如果有历史PE数据，额外加分（权重5%）
-        historical_analysis = pe_analysis.get('historical_analysis', {})
-        if historical_analysis.get('status') == 'valid':
-            score += 5
-            reasons.append("有历史PE参考")
-            
-            # 如果当前PE低于历史平均，额外加分
-            current_pe = pe_analysis.get('current_pe', 0)
-            avg_pe = historical_analysis.get('avg_pe', 0)
-            if current_pe > 0 and avg_pe > 0 and current_pe < avg_pe:
-                score += 5
-                reasons.append("低于历史平均")
-        
-        '''
-        # 稳定性评分（权重10%）
-        years_with_low_roe = stock_data.get('years_with_low_roe', 0)
-        if years_with_low_roe == 0:
-            score += 10
-            reasons.append("ROE稳定")
-        elif years_with_low_roe <= 1:
-            score += 8
-            reasons.append("ROE较稳定")
-        else:
-            score += 5
-            reasons.append("ROE波动较大")
-        '''
-        
-        return {
-            'score': score,
-            'reasons': reasons,
-            'roe_analysis': roe_analysis,
-            'pe_analysis': pe_analysis
-        }
-    
+        #print(f"years {years}")
+        if int(str(years[0])[0:4]) > int(YEAR):
+            return False
+        pe_values = [historical_pe[str(year)] for year in years if historical_pe[str(year)]]
+        #print(f"pe_values {pe_values}")
+
+        current_price = stock_info.get('current_price')
+        history_price = stock_info.get('history_price')
+        price_values = [history_price[str(year)[0:4]] for year in years if history_price[str(year)[0:4]]]
+        #print(f"price_values {price_values}")
+
+        stock_code = stock_info.get('stock_code', '')
+        print(f"{stock_code}")
+        for i, year in enumerate(years):
+            if str(year)[0:4] == str(YEAR):
+                if int(YEAR) < 2023:
+                    trend = pe_values[i+2] > 0 and pe_values[i] > pe_values[i+1] and pe_values[i+1] > pe_values[i+2]
+                    if not trend:
+                        return False
+                    return price_values[i+2] > price_values[i+1] and price_values[i+1] > price_values[i]
+                elif int(YEAR) == 2023:
+                    pe = min(current_pe_list)
+                    trend = pe > 0 and pe_values[i] > pe_values[i+1] and pe_values[i+1] > pe
+                    if not trend:
+                        return False
+                    return current_price > price_values[i+1] and price_values[i+1] > price_values[i]
+
     def analyze_all_stocks(self):
         """分析所有股票"""
         stock_data = self.load_stock_data()
@@ -322,60 +111,28 @@ class StockAnalyzer:
         
         analysis_results = {}
         
+        year = 2022
         for stock_code, stock_info in stock_data.items():
-            #print(f"分析股票: {stock_code} {stock_info.get('stock_name', '')}")
-            pe_data= stock_info.get('pe_analysis', {})
-            current_pe_list = pe_data.get('current_pe', [])
-            historical_pe = pe_data.get('historical_pe', {})
-
-            if len(historical_pe) < 2:
-                continue
-
-            if len(current_pe_list) == 0:
-                continue
+            stock_name = stock_info.get('stock_name', '')
+            #print(f"分析股票: {stock_code} {stock_name}")
             
-            years = sorted([int(year) for year in historical_pe.keys() if year.isdigit()])
-            #print(f"years {years}")
-            pe_values = [historical_pe[str(year)] for year in years if historical_pe[str(year)]]
-            print(f"pe_values {pe_values}")
-
-            current_price = stock_info.get('current_price')
-            
-
-            trend = True
-            for i, pe in enumerate(pe_values):
-                if i == len(pe_values) - 1:
-                    break
-                if pe < 0 or pe_values[i+1] < 0:
-                    trend = False
-                    break
-                if pe_values[i+1] > pe:
-                    trend = False
-                    break
-            
-            if trend:
-                if current_pe_list[0] < pe_values[-1] or current_pe_list[1] < pe_values[-1] or current_pe_list[2] < pe_values[-1]:
-                    print(f"{stock_code} 历史PE趋势向下")
-                    #print(f"{stock_code} PE: {pe_values}")
+            if self.find_good_stocks(year, stock_info):
+                #print(f"{stock_code}: {stock_name} 符合标准")
+                p, p2 = self.cal_profit(year + 2, stock_info)
+                if p2 is not None:
+                    print(f"{stock_code}: {stock_name}自2022年起一年增长率{p:.2f},两年复合增长率{p2:.2f}")
+                else:
+                    print(f"{stock_code}: {stock_name}自2022年起一年增长率{p:.2f}")
                     #plottor.plot_three_indicators(stock_info, stock_code)
             
-            break
             # 计算潜力分数
             #potential_score = self.calculate_potential_score(stock_info)
             
-            # analysis_results[stock_code] = {
-            #     'stock_name': stock_info.get('stock_name', ''),
-            #     'potential_score': potential_score['score'],
-            #     'reasons': potential_score['reasons'],
-            #     'avg_roe': potential_score['roe_analysis']['avg_roe'],
-            #     'roe_trend': potential_score['roe_analysis']['recent_trend'],
-            #     'pe_status': potential_score['pe_analysis']['status'],
-            #     'pe_reason': potential_score['pe_analysis']['reason'],
-            #     'current_pe': potential_score['pe_analysis'].get('current_pe', None),
-            #     'historical_analysis': potential_score['pe_analysis'].get('historical_analysis', {}),
-            #     'years_with_low_roe': stock_info.get('years_with_low_roe', 0),
-            #     'original_status': stock_info.get('status', '')
-            # }
+                analysis_results[stock_code] = {
+                    'stock_name': stock_name,
+                    'profit': p,
+                    'profit2': p2
+                }
         
         return analysis_results
     
@@ -386,21 +143,27 @@ class StockAnalyzer:
         # 按潜力分数排序
         sorted_stocks = sorted(
             analysis_results.items(),
-            key=lambda x: x[1]['potential_score'],
+            key=lambda x: x[1]['profit'],
             reverse=True
         )
+
+        profit_values = [info['profit'] for info in analysis_results.values() if 'profit' in info]
+        #print(f"{profit_values}")
+        profit_ava = sum(profit_values) / len(profit_values)
+        profit2_values = [info['profit2'] for info in analysis_results.values() if 'profit2' in info]
+        #print(f"{profit_values}")
+        profit2_ava = sum(profit2_values) / len(profit2_values)
+        print(f"平均增长率{profit_ava:.2f},平均两年复合增长率{profit2_ava:.2f}")
         
         # 筛选有潜力的股票
-        promising_stocks = {}
-        for stock_code, stock_info in sorted_stocks:
-            #if stock_info['potential_score'] >= min_score:
-            promising_stocks[stock_code] = stock_info
         
-        return promising_stocks
+        
+        return sorted_stocks
     
     def generate_report(self, min_score=70):
         """生成分析报告"""
         promising_stocks = self.get_promising_stocks(min_score)
+        return
         
         print("\n" + "="*80)
         print("有潜力的股票分析报告")

@@ -210,9 +210,20 @@ class PERatioCollector:
             if df is not None and not df.empty:
                 return df['close'].iloc[-1]
             else:
-                self.logger.warning(f"获取{stock_code} {target_date} 的股价为空")
-                return None
-        
+                day = int(startdate[6:]) - 14
+                startdate = startdate[:-2] + str(day)
+                df = ak.stock_zh_a_daily(
+                    stock_code, 
+                    start_date=startdate, 
+                    end_date=target_date, 
+                    adjust="qfq")
+                if df is not None and not df.empty:
+                    return df['close'].iloc[-1]
+                else:
+                    self.logger.warning(f"获取{stock_code} {target_date} 的股价为空")
+                    return None
+            
+
         except Exception as e:
             self.logger.error(f"stock_zh_a_daily获取指定日期股价失败: {e}")
             return None
