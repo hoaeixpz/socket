@@ -339,6 +339,9 @@ class StockAnalyzer:
             pe_values = [historical_pe[str(year)] for year in years if historical_pe[str(year)]]
             print(f"pe_values {pe_values}")
 
+            current_price = stock_info.get('current_price')
+            
+
             trend = True
             for i, pe in enumerate(pe_values):
                 if i == len(pe_values) - 1:
