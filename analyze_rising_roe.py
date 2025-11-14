@@ -85,9 +85,11 @@ class StockAnalyzer:
         #print(f"price_values {price_values}")
 
         stock_code = stock_info.get('stock_code', '')
-        print(f"{stock_code}")
         for i, year in enumerate(years):
             if str(year)[0:4] == str(YEAR):
+                if pe_values[i] > 30:
+                    return False
+                    
                 if int(YEAR) < 2023:
                     trend = pe_values[i+2] > 0 and pe_values[i] > pe_values[i+1] and pe_values[i+1] > pe_values[i+2]
                     if not trend:
@@ -111,7 +113,7 @@ class StockAnalyzer:
         
         analysis_results = {}
         
-        year = 2022
+        year = 2020
         for stock_code, stock_info in stock_data.items():
             stock_name = stock_info.get('stock_name', '')
             #print(f"分析股票: {stock_code} {stock_name}")
@@ -120,9 +122,9 @@ class StockAnalyzer:
                 #print(f"{stock_code}: {stock_name} 符合标准")
                 p, p2 = self.cal_profit(year + 2, stock_info)
                 if p2 is not None:
-                    print(f"{stock_code}: {stock_name}自2022年起一年增长率{p:.2f},两年复合增长率{p2:.2f}")
+                    print(f"{stock_code}: {stock_name}自{year + 2}年起一年增长率{p:.2f},两年复合增长率{p2:.2f}")
                 else:
-                    print(f"{stock_code}: {stock_name}自2022年起一年增长率{p:.2f}")
+                    print(f"{stock_code}: {stock_name}自{year + 2}年起一年增长率{p:.2f}")
                     #plottor.plot_three_indicators(stock_info, stock_code)
             
             # 计算潜力分数
@@ -152,8 +154,11 @@ class StockAnalyzer:
         profit_ava = sum(profit_values) / len(profit_values)
         profit2_values = [info['profit2'] for info in analysis_results.values() if 'profit2' in info]
         #print(f"{profit_values}")
-        profit2_ava = sum(profit2_values) / len(profit2_values)
-        print(f"平均增长率{profit_ava:.2f},平均两年复合增长率{profit2_ava:.2f}")
+        if len(profit2_values) == 0 or profit2_values[0] is None:
+            print(f"平均增长率{profit_ava:.2f}")
+        else:
+            profit2_ava = sum(profit2_values) / len(profit2_values)
+            print(f"平均增长率{profit_ava:.2f},平均两年复合增长率{profit2_ava:.2f}")
         
         # 筛选有潜力的股票
         
