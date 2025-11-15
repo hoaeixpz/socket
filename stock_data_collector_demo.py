@@ -338,7 +338,11 @@ class StockDataCollector:
             if roe is None:
                 continue
             if date[0:4] == "2025":
-                current_roe = [date, roe]
+                if len(current_roe) == 0:
+                    current_roe = [date, roe]
+                else:
+                    if int(current_roe[0]) < int(date):
+                        current_roe = [date, roe]
             if date[4:6] == "12":
                 history_roe[date[0:4]] = roe
         print(f"获取{stock_code} 历史ROE结束")
