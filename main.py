@@ -138,11 +138,11 @@ def update_stocks():
     
     # 遍历所有股票
     for i, stock_code in enumerate(stock_codes, 1):
-        if i < 70:
-            continue
         stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
         
+        if stock_info.get("current_price") is not None:
+            continue
         print(f"\n{'='*60}")
         print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
         print(f"{'='*60}")

@@ -82,7 +82,7 @@ class PERatioCollector:
                     return None
     
     def _calculate_pe_ratio_manually(self, stock_code):
-        f"""
+        """
         手动计算市盈率：PE = 股价 / 每股收益
         
         Args:
