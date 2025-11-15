@@ -272,9 +272,9 @@ class StockDataCollector:
         today = "20250930"
         return [today, self.get_price(stock_code, today)]
 
-    def get_price(self, stock_code, target_date):
+    def get_price(self, stock_code, target_date, adjust = ""):
         '''
-        获取指定日期的股价
+        获取指定日期的股价(默认不复权)
         target_date格式: "20241219"
         '''
 
@@ -296,18 +296,20 @@ class StockDataCollector:
                 stock_code, 
                 start_date=startdate, 
                 end_date=target_date, 
-                adjust="qfq")
+                adjust=adjust)
             #print(df)
             if df is not None and not df.empty:
                 return df['close'].iloc[-1]
             else:
                 day = int(startdate[6:]) - 14
                 startdate = startdate[:-2] + str(day)
+                #print(f"start end {startdate} {target_date}")
                 df = ak.stock_zh_a_daily(
                     stock_code, 
                     start_date=startdate, 
                     end_date=target_date, 
-                    adjust="qfq")
+                    adjust=adjust)
+                #print(df)
                 if df is not None and not df.empty:
                     return df['close'].iloc[-1]
                 else:
@@ -349,6 +351,13 @@ class StockDataCollector:
         self.logger.info(f"开始分析 {stock_code} {stock_name} 的{ years}年历史数据")
         
         try:
+            # 获取后复权历史股价
+            now = datetime.datetime.now()
+            history_price_hfq = {}
+            for year in range(now.year - years, now.year):
+                date = str(year) + "1231"
+                history_price_hfq[year] = self.get_price(stock_code, date, adjust = "hfq")
+
             # 1. 获取ROE数据
             hist_roe, curr_roe = self.get_ROE(stock_code, stock_name, years)
             
@@ -374,7 +383,8 @@ class StockDataCollector:
             result = {
                 'stock_code': stock_code,
                 'stock_name': stock_name,
-                'history_price': price_data,
+                'history_price_hfq': history_price_hfq,
+                'history_price_bfq': price_data,
                 'current_price': current_price,
                 'roe_details': roe_detail,
                 'pe_analysis': pe_analysis_data,
@@ -480,18 +490,19 @@ def demo_test():
     
     # 测试几只股票
     test_stocks = [
-        ('600519', '贵州茅台'),
+        #('600519', '贵州茅台')
         #('000001', '平安银行'),
         #('300750', '宁德时代'),
         #('601318', '中国平安'),
-        #('603660', '苏州科达')
+        #('603660', '苏州科达'),
+        ('601919', '中远海控')
     ]
     
     print("开始测试分析单只股票...")
     for stock_code, stock_name in test_stocks:
         print(f"\n分析 {stock_code} {stock_name}:")
         
-        result = analyzer.analyze_stock(stock_code, stock_name, 2)
+        result = analyzer.analyze_stock(stock_code, stock_name, 3)
         
         # 将结果保存到分析器中
         analyzer.results[stock_code] = result
@@ -502,8 +513,10 @@ def demo_test():
             print(f"  PE分析: {result['pe_analysis']}")
         if 'current_price' in result:
             print(f"  当前股价: {result['current_price']}")
-        if 'history_price' in result:
-            print(f"  历史股价: {result['history_price']}")
+        if 'history_price_bfq' in result:
+            print(f"  历史股价: {result['history_price_bfq']}")
+        if 'history_price_hfq' in result:
+            print(f"  后复权历史股价: {result['history_price_hfq']}")
         print("-" * 50)
 
     
