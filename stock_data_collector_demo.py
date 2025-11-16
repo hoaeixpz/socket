@@ -144,7 +144,7 @@ class StockDataCollector:
             filtered = stock_list.copy()
             
             # 排除科创板 (688开头)
-            filtered = filtered[~filtered['code'].str.startswith('688')]
+            filtered = filtered[~filtered['code'].str.startswith('68')]
             
             # 排除北交所 (8开头)
             filtered = filtered[~filtered['code'].str.startswith('8')]
@@ -492,7 +492,7 @@ def demo_test():
     print("=== 上市公司ROE分析器 Demo测试 ===\n")
     
     # 创建分析器
-    analyzer = StockDataCollector('','')
+    analyzer = StockDataCollector()
     
     # 测试几只股票
     test_stocks = [
@@ -501,8 +501,9 @@ def demo_test():
         #('300750', '宁德时代'),
         #('601318', '中国平安'),
         #('603660', '苏州科达'),
-        #('600362', '江西铜业'),
-        ('689009', '九号公司')
+        ('600362', '江西铜业'),
+        #('600519', '贵州茅台')
+        #('689009', '九号公司')
     ]
     
     print("开始测试分析单只股票...")
@@ -513,6 +514,7 @@ def demo_test():
         
         # 将结果保存到分析器中
         analyzer.results[stock_code] = result
+        analyzer._save_results()
         
         if 'roe_details' in result:
             print(f"  ROE详情: {result['roe_details']}")

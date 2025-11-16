@@ -27,12 +27,12 @@ def setup_logging():
     )
 
 def load_good_stocks():
-    """加载good_stocks.json文件"""
+    """加载analysis_results.json文件"""
     try:
-        with open('good_stocks.json', 'r', encoding='utf-8') as f:
+        with open('analysis_results.json', 'r', encoding='utf-8') as f:
             return json.load(f)
     except FileNotFoundError:
-        print("错误：找不到good_stocks.json文件")
+        print("错误：找不到analysis_results.json文件")
         return {}
     except json.JSONDecodeError as e:
         print(f"错误：JSON文件格式错误 - {e}")
@@ -50,13 +50,13 @@ def add_stock_prefix(stock_code):
         return code_str
 
 def load_existing_good_stocks():
-    """加载现有的good_stocks.json文件，返回所有股票代码列表"""
+    """加载现有的analysis_results.json文件，返回所有股票代码列表"""
     try:
-        with open('good_stocks.json', 'r', encoding='utf-8') as f:
+        with open('analysis_results.json', 'r', encoding='utf-8') as f:
             stocks = json.load(f)
         return list(stocks.keys()), stocks
     except FileNotFoundError:
-        print("错误：找不到good_stocks.json文件")
+        print("错误：找不到analysis_results.json文件")
         return [], {}
     except json.JSONDecodeError as e:
         print(f"错误：JSON文件格式错误 - {e}")
@@ -98,7 +98,7 @@ def save_single_stock_update(stock_code, analysis_data):
     """保存单只股票的更新到文件"""
     try:
         # 读取整个文件
-        with open('good_stocks.json', 'r', encoding='utf-8') as f:
+        with open('analysis_results.json', 'r', encoding='utf-8') as f:
             all_stocks = json.load(f)
         
         # 更新当前股票的数据
