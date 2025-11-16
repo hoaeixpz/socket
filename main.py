@@ -305,6 +305,9 @@ def test_demo():
         if int(years[-1]) - int(years[0]) + 1 == Y:
             continue
 
+        if Y == len(stock_info['history_price_hfq'].values()):
+            continue
+
         '''
         flag = False
         for value in stock_info['history_price_hfq'].values():
@@ -319,6 +322,8 @@ def test_demo():
         print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
         print(f"{'='*60}")
         count = count + 1
+        if count == 10:
+            break
         
         #analysis_data, success = update_single_stock(stock_code)
         #print(f"analysis {analysis_data} {success}")
@@ -327,16 +332,22 @@ def test_demo():
         #print(f"info {stock_info}")
 
         update_single_stock2(stock_code, stock_info)
-        print(f"{stock_info}")
+        #print(f"{stock_info}")
         
         # 立即保存到文件
         save_single_stock(stock_code, stock_info)
 
+        end_t = time.time()
+        cpu = end_t - start_t
+        print(cpu)
+        start_t = end_t
+        if cpu < 5:
+            print("sleep 3s")
+            time.sleep(3)
+
             #updated_count += 1
             #if success:
     print(count)
-    cpu = time.time() - start_t
-    print(cpu)
 if __name__ == "__main__":
     #main()
     test_demo()
