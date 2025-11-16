@@ -42,6 +42,8 @@ class StockAnalyzer:
         if YEAR < 2024:
             next_price = history_price[str(YEAR + 1)]
         else:
+            history_price = stock_info.get('history_price_bfq')
+            price = history_price[str(YEAR)]
             next_price = stock_info.get('current_price')[1]
         profit = (next_price - price) / price * 100
 
@@ -57,9 +59,10 @@ class StockAnalyzer:
         profit2 = profit2 * 100
         return profit, profit2
 
-    def find_good_stocks(self, YEAR, stock_info):
+    def find_good_stocks(self, YEAR:int, stock_info):
         '''
-        找到从YEAR前3年内，3年内股价上涨，PE下跌的公司
+        条件：连续3年至YEAR，3年内股价上涨，PE下跌的公司
+              连续5年至YEAR，存在3年ROE > 5
         '''
 
         pe_data= stock_info.get('pe_analysis', {})
@@ -88,8 +91,16 @@ class StockAnalyzer:
         if len(price_values) != len(years):
             return False
 
+        roe_values = stock_info.get('roe_details')
         this_year = int(datetime.now().year)
-        stock_code = stock_info.get('stock_code', '')
+        count = 0
+        if YEAR < this_year:
+            for i in range(5):
+                count += int(roe_values[str(YEAR-i)] > 5)
+
+            if count < 3:
+                return False
+        
         for i, year in enumerate(years):
             if str(year)[0:4] == str(YEAR):
                 if pe_values[i] > 30:
@@ -100,6 +111,7 @@ class StockAnalyzer:
                     if not trend:
                         return False
                     if price_values[i-2] > price_values[i-1] and price_values[i-1] < price_values[i]:
+                        print(f"{YEAR - 4} roe: {roe_values[str(YEAR-4)]}, {roe_values[str(YEAR-3)]}, {roe_values[str(YEAR-2)]}, {roe_values[str(YEAR-1)]}, {roe_values[str(YEAR)]}")
                         print(f"{YEAR - 2} pe {pe_values[i-2]:.2f} {pe_values[i-1]:.2f} {pe_values[i]:.2f}")
                         print(f"{YEAR - 2} price {price_values[i-2]} {price_values[i-1]} {price_values[i]}")
                         return True
@@ -111,6 +123,7 @@ class StockAnalyzer:
                     if not trend:
                         return False
                     if current_price > price_values[i-1] and price_values[i-1] < price_values[i-2]:
+                        print(f"{YEAR - 4} roe: {roe_values[str(YEAR-4)]}, {roe_values[str(YEAR-3)]}, {roe_values[str(YEAR-2)]}, {roe_values[str(YEAR-1)]}, {roe_values[str(YEAR)]}")
                         print(f"{YEAR - 2} pe {pe_values[i-2]:.2f} {pe_values[i-1]:.2f} {pe:.2f}")
                         print(f"{YEAR - 2} price {price_values[i-2]} {price_values[i-1]} {current_price}")
                         return True
@@ -118,8 +131,8 @@ class StockAnalyzer:
                         return False
 
 
-    def analyze_all_stocks(self):
-        """分析所有股票"""
+    def analyze_all_stocks(self, year:int):
+        """分析某年所有股票"""
         stock_data = self.load_stock_data()
         plottor = simple_stock_plotter.SimpleStockPlotter()
         
@@ -129,7 +142,6 @@ class StockAnalyzer:
         
         analysis_results = {}
         
-        year = 2022
         for stock_code, stock_info in stock_data.items():
             stock_name = stock_info.get('stock_name', '')
             #print(f"分析股票: {stock_code} {stock_name}")
@@ -137,11 +149,13 @@ class StockAnalyzer:
             if self.find_good_stocks(year, stock_info):
                 #print(f"{stock_code}: {stock_name} 符合标准")
                 p, p2 = self.cal_profit(year, stock_info)
+                
                 if p2 is not None:
                     print(f"{stock_code}: {stock_name}自{year}年起一年增长率{p:.2f},两年复合增长率{p2:.2f}")
                 else:
                     print(f"{stock_code}: {stock_name}自{year}年起一年增长率{p:.2f}")
                     #plottor.plot_three_indicators(stock_info, stock_code)
+                
             
             # 计算潜力分数
             #potential_score = self.calculate_potential_score(stock_info)
@@ -156,30 +170,24 @@ class StockAnalyzer:
     
     def get_promising_stocks(self, min_score=70):
         """获取有潜力的股票"""
-        analysis_results = self.analyze_all_stocks()
-        
-        # 按潜力分数排序
-        sorted_stocks = sorted(
-            analysis_results.items(),
-            key=lambda x: x[1]['profit'],
-            reverse=True
-        )
+        for year in range(2024, 2025):
+            analysis_results = self.analyze_all_stocks(year)
 
-        profit_values = [info['profit'] for info in analysis_results.values() if 'profit' in info]
-        #print(f"{profit_values}")
-        profit_ava = sum(profit_values) / len(profit_values)
-        profit2_values = [info['profit2'] for info in analysis_results.values() if 'profit2' in info]
-        #print(f"{profit_values}")
-        if len(profit2_values) == 0 or profit2_values[0] is None:
-            print(f"平均增长率{profit_ava:.2f}")
-        else:
-            profit2_ava = sum(profit2_values) / len(profit2_values)
-            print(f"平均增长率{profit_ava:.2f},平均两年复合增长率{profit2_ava:.2f}")
+            profit_values = [info['profit'] for info in analysis_results.values() if 'profit' in info]
+            #print(f"{profit_values}")
+            profit_ava = sum(profit_values) / len(profit_values)
+            profit2_values = [info['profit2'] for info in analysis_results.values() if 'profit2' in info]
+            #print(f"{profit_values}")
+            if len(profit2_values) == 0 or profit2_values[0] is None:
+                print(f"{year} 平均增长率{profit_ava:.2f}")
+            else:
+                profit2_ava = sum(profit2_values) / len(profit2_values)
+                print(f"{year} 平均增长率{profit_ava:.2f},平均两年复合增长率{profit2_ava:.2f}")
         
-        # 筛选有潜力的股票
+            # 筛选有潜力的股票
         
         
-        return sorted_stocks
+        return None
     
     def generate_report(self, min_score=70):
         """生成分析报告"""

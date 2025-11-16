@@ -501,14 +501,14 @@ def demo_test():
         #('300750', '宁德时代'),
         #('601318', '中国平安'),
         #('603660', '苏州科达'),
-        ('601919', '中远海控')
+        ('603180', '中远海控')
     ]
     
     print("开始测试分析单只股票...")
     for stock_code, stock_name in test_stocks:
         print(f"\n分析 {stock_code} {stock_name}:")
         
-        result = analyzer.analyze_stock(stock_code, stock_name, 3)
+        result = analyzer.analyze_stock(stock_code, stock_name, 15)
         
         # 将结果保存到分析器中
         analyzer.results[stock_code] = result
@@ -541,5 +541,5 @@ def batch_analyze_main():
     analyzer.get_summary()
 
 if __name__ == "__main__":
-    #demo_test()
-    batch_analyze_main()
+    demo_test()
+    #batch_analyze_main()
