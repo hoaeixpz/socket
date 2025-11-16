@@ -8,12 +8,16 @@ import json
 import time
 import logging
 import akshare as ak
+import datetime
 from financial_data import FinancialData
 from pe_ratio_collector import PERatioCollector
+from stock_data_collector_demo import StockDataCollector
+from stock_data_collector_demo import CustomJSONEncoder
 
 # 创建全局实例
 stock_data = FinancialData()
 pe_collect = PERatioCollector()
+stock_collect = StockDataCollector()
 
 def setup_logging():
     """设置日志配置"""
@@ -112,13 +116,56 @@ def save_single_stock_update(stock_code, analysis_data):
                 all_stocks[stock_code]['history_price'][year] = price
         
         # 保存回文件
-        with open('good_stocks.json', 'w', encoding='utf-8') as f:
+        with open('analysis_results.json', 'w', encoding='utf-8') as f:
             json.dump(all_stocks, f, ensure_ascii=False, indent=2)
         
         return True
     except Exception as e:
         print(f"保存股票 {stock_code} 数据失败: {e}")
         return False
+
+def update_single_stock2(stock_code, stock_info):
+    """分析单只股票数据并立即更新到文件"""
+    
+    # 添加市场前缀
+    full_stock_code = add_stock_prefix(stock_code)
+    try:
+        # 获取后复权历史股价
+        now = datetime.datetime.now()
+        history_price_hfq = {}
+        for year in range(now.year - 15, now.year):
+            date = str(year) + "1231"
+            history_price_hfq[year] = stock_collect.get_price(full_stock_code, date, adjust = "hfq")
+            if history_price_hfq[year] is None:
+                for month in range(11, 1, -1):
+                    ms = str(month)
+                    if month < 10:
+                        ms = "0" + str(month)
+                    date = str(year) + ms + "30"
+                    history_price_hfq[year] = stock_collect.get_price(full_stock_code, date, adjust = "hfq")
+                    if history_price_hfq[year] is not None:
+                        break
+
+        stock_info['history_price_hfq'] = history_price_hfq
+
+    except Exception as e:
+        print(f" analysis {stock_code} error: {e}")
+        return None, False
+
+def save_single_stock(stock_code, stock_info):
+    """保存分析结果"""
+    try:
+        with open('analysis_results.json', 'r', encoding='utf-8') as f:
+            all_stocks = json.load(f)
+
+        all_stocks[stock_code] = stock_info
+
+        with open('analysis_results.json', 'w', encoding='utf-8') as f:
+            json.dump(all_stocks, f, ensure_ascii=False, indent=2, cls=CustomJSONEncoder)
+        print(f"分析结果已保存到: analysis_results.json")
+    except Exception as e:
+        print(f"保存结果失败: {e}")
+
 
 def update_stocks():
     """分析所有good股票的PE值，每分析完一只股票就立即更新文件"""
@@ -225,24 +272,36 @@ def test_demo():
     for i, stock_code in enumerate(stock_codes, 1):
         stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
+
+        if len(stock_info['history_price_hfq'].values()) != len(stock_info['history_price_bfq'].values()):
+            continue
+
+        flag = False
+        for value in stock_info['history_price_hfq'].values():
+            if value is None:
+                flag = True
+
+        if flag is False:
+            continue
         
         print(f"\n{'='*60}")
         print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
         print(f"{'='*60}")
         
-        # 分析单只股票的PE值
-        analysis_data, success = update_single_stock(stock_code)
-        print(f"analysis {analysis_data} {success}")
+        #analysis_data, success = update_single_stock(stock_code)
+        #print(f"analysis {analysis_data} {success}")
         #all_stocks[stock_code]['roe_details']['current'] = analysis_data
         #stock_info = all_stocks[stock_code]
         #print(f"info {stock_info}")
+
+        update_single_stock2(stock_code, stock_info)
+        print(f"{stock_info}")
         
         # 立即保存到文件
-        save_single_stock_update(stock_code, analysis_data)
-        break
+        save_single_stock(stock_code, stock_info)
             #updated_count += 1
             #if success:
 
 if __name__ == "__main__":
-    main()
-    #test_demo()
+    #main()
+    test_demo()

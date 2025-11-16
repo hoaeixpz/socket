@@ -11977,3 +11977,37 @@
 2025-11-16 18:57:04,055 - __main__ - INFO - 手动计算 sh600362 动态市盈率: 15.30 静态市盈率: 17.66 TTM市盈率: 15.36
 2025-11-16 18:57:04,055 - __main__ - INFO - sh600362 江西铜业 分析完成
 2025-11-16 18:57:04,348 - __main__ - INFO - 分析结果已保存到: analysis_results.json
+2025-11-16 19:56:49,907 - stock_data_collector_demo - WARNING - 获取sz000006 20171231 的股价为空
+2025-11-16 20:02:05,006 - stock_data_collector_demo - WARNING - 获取sz000006 20171231 的股价为空
+2025-11-16 20:02:07,747 - stock_data_collector_demo - WARNING - 获取sz000006 20171130 的股价为空
+2025-11-16 20:02:10,486 - stock_data_collector_demo - WARNING - 获取sz000006 20171030 的股价为空
+2025-11-16 20:02:12,093 - stock_data_collector_demo - ERROR - stock_zh_a_daily获取指定日期股价失败: cannot do slice indexing on DatetimeIndex with these indexers [20179-2] of type str
+2025-11-16 20:02:13,719 - stock_data_collector_demo - ERROR - stock_zh_a_daily获取指定日期股价失败: cannot do slice indexing on DatetimeIndex with these indexers [20178-2] of type str
+2025-11-16 20:02:15,255 - stock_data_collector_demo - ERROR - stock_zh_a_daily获取指定日期股价失败: cannot do slice indexing on DatetimeIndex with these indexers [20177-2] of type str
+2025-11-16 20:02:16,589 - stock_data_collector_demo - ERROR - stock_zh_a_daily获取指定日期股价失败: cannot do slice indexing on DatetimeIndex with these indexers [20176-2] of type str
+2025-11-16 20:02:17,955 - stock_data_collector_demo - ERROR - stock_zh_a_daily获取指定日期股价失败: cannot do slice indexing on DatetimeIndex with these indexers [20175-2] of type str
+2025-11-16 20:02:19,295 - stock_data_collector_demo - ERROR - stock_zh_a_daily获取指定日期股价失败: cannot do slice indexing on DatetimeIndex with these indexers [20174-2] of type str
+2025-11-16 20:04:21,228 - stock_data_collector_demo - WARNING - 获取sz000006 20171231 的股价为空
+2025-11-16 20:04:24,645 - stock_data_collector_demo - WARNING - 获取sz000006 20171130 的股价为空
+2025-11-16 20:04:27,422 - stock_data_collector_demo - WARNING - 获取sz000006 20171030 的股价为空
+2025-11-16 20:04:30,640 - stock_data_collector_demo - WARNING - 获取sz000006 20170930 的股价为空
+2025-11-16 20:15:37,164 - stock_data_collector_demo - WARNING - 获取sz000006 20171231 的股价为空
+2025-11-16 20:15:39,756 - stock_data_collector_demo - WARNING - 获取sz000006 20171130 的股价为空
+2025-11-16 20:15:42,330 - stock_data_collector_demo - WARNING - 获取sz000006 20171030 的股价为空
+2025-11-16 20:15:44,854 - stock_data_collector_demo - WARNING - 获取sz000006 20170930 的股价为空
+2025-11-16 20:16:50,089 - stock_data_collector_demo - WARNING - 获取sz000006 20171231 的股价为空
+2025-11-16 20:16:52,681 - stock_data_collector_demo - WARNING - 获取sz000006 20171130 的股价为空
+2025-11-16 20:16:55,331 - stock_data_collector_demo - WARNING - 获取sz000006 20171030 的股价为空
+2025-11-16 20:16:58,023 - stock_data_collector_demo - WARNING - 获取sz000006 20170930 的股价为空
+2025-11-16 20:21:57,658 - stock_data_collector_demo - WARNING - 获取sz000007 20171231 的股价为空
+2025-11-16 20:22:00,386 - stock_data_collector_demo - WARNING - 获取sz000007 20171130 的股价为空
+2025-11-16 20:22:03,040 - stock_data_collector_demo - WARNING - 获取sz000007 20171030 的股价为空
+2025-11-16 20:22:18,337 - stock_data_collector_demo - WARNING - 获取sz000030 20101231 的股价为空
+2025-11-16 20:22:21,193 - stock_data_collector_demo - WARNING - 获取sz000030 20101130 的股价为空
+2025-11-16 20:22:23,936 - stock_data_collector_demo - WARNING - 获取sz000030 20101030 的股价为空
+2025-11-16 20:22:26,636 - stock_data_collector_demo - WARNING - 获取sz000030 20100930 的股价为空
+2025-11-16 20:22:29,466 - stock_data_collector_demo - WARNING - 获取sz000030 20100830 的股价为空
+2025-11-16 20:22:32,072 - stock_data_collector_demo - WARNING - 获取sz000030 20100730 的股价为空
+2025-11-16 20:22:34,735 - stock_data_collector_demo - WARNING - 获取sz000030 20100630 的股价为空
+2025-11-16 20:23:10,834 - stock_data_collector_demo - WARNING - 获取sz000042 20161231 的股价为空
+2025-11-16 20:23:13,567 - stock_data_collector_demo - WARNING - 获取sz000042 20161130 的股价为空
