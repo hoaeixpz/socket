@@ -23,7 +23,7 @@ class StockAnalyzer:
             'max_bad_years': 1      # 最多不良年份数
         }
     
-    def load_stock_data(self, file_path='good_stocks.json'):
+    def load_stock_data(self, file_path='analysis_results.json'):
         """加载股票数据"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -36,7 +36,7 @@ class StockAnalyzer:
         '''
         计算自YEAR年起的一年收益率，以及两年复合收益率
         '''
-        history_price = stock_info.get('history_price')
+        history_price = stock_info.get('history_price_hfq')
         next_price = 0
         price = history_price[str(YEAR)]
         if YEAR < 2024:
@@ -77,15 +77,16 @@ class StockAnalyzer:
         if int(str(years[0])[0:4]) > int(YEAR) - 2:
             return False
         pe_values = [historical_pe[str(year)] for year in years if historical_pe[str(year)]]
-        #print(f"pe_values {pe_values}")
-
+        
         current_price = stock_info.get('current_price')
         if current_price is None:
             return False
         current_price = current_price[1]
-        history_price = stock_info.get('history_price')
+        history_price = stock_info.get('history_price_hfq')
         price_values = [history_price[str(year)[0:4]] for year in years if history_price[str(year)[0:4]]]
         #print(f"price_values {price_values}")
+        if len(price_values) != len(years):
+            return False
 
         this_year = int(datetime.now().year)
         stock_code = stock_info.get('stock_code', '')
