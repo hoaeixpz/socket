@@ -292,7 +292,10 @@ class StockDataCollector:
 
         startdate = target_date
         day = int(startdate[6:]) - 2
-        startdate = startdate[:-2] + str(day)
+        if day < 10:
+            startdate = startdate[:-2] + "0" + str(day)
+        else:
+            startdate = startdate[:-2] + str(day)
         #print(f"start end {startdate} {target_date}")
         try:
             df = ak.stock_zh_a_daily(
@@ -306,6 +309,8 @@ class StockDataCollector:
             else:
                 day = int(startdate[6:]) - 14
                 startdate = startdate[:-2] + str(day)
+                if day < 10:
+                    startdate = startdate[:-2] + "0" + str(day)
                 #print(f"start end {startdate} {target_date}")
                 df = ak.stock_zh_a_daily(
                     stock_code, 
