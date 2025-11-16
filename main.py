@@ -132,30 +132,44 @@ def update_single_stock2(stock_code, stock_info):
     try:
         # 获取后复权历史股价
         now = datetime.datetime.now()
-        history_price_hfq = {}
+        history_price_hfq = stock_info['history_price_hfq']
         history_price_bfq = stock_info['history_price_bfq']
+        pe_ana = stock_info['pe_analysis']['historical_pe']
         if len(history_price_bfq.values()) == 0:
             return
 
-        for year, v in history_price_bfq:
-            if v is not None:
+        for year in range(now.year - 15, now.year):
+            year = str(year)
+            value = history_price_bfq.get(year)
+            #print(year, value)
+            if value is not None:
                 continue
 
-            date = str(year) + "1231"
-            history_price_bfq[year] = stock_collect.get_price(full_stock_code, date, adjust = "bfq")
+            date = year + "1231"
+            history_price_bfq[year] = stock_collect.get_price(full_stock_code, date)
             if history_price_bfq[year] is None:
-                for month in range(11, 1, -1):
+                for month in range(11, 0, -1):
                     ms = str(month)
                     if month < 10:
                         ms = "0" + str(month)
-                    date = str(year) + ms + "28"
-                    history_price_bfq[year] = stock_collect.get_price(full_stock_code, date, adjust = "bfq")
-                    if history_price_bfq[year] is not None:
+                    date = year + ms + "30"
+                    if month == 2:
+                        date = year + ms + "28"
+                    price = stock_collect.get_price(full_stock_code, date)
+                    history_price_bfq[year] = price
+                    if price is not None:
+                        #print(year, price)
                         history_price_hfq[year] = stock_collect.get_price(full_stock_code, date, adjust = "hfq")
+                        hist_eps = stock_collect.get_history_eps(stock_code, 15)
+                        for dat, eps in hist_eps:
+                            if dat[0:4] == year and dat[4:6] == "12":
+                                pe_ratio = price / eps
+                                pe_ana[dat] = pe_ratio
                         break
 
         stock_info['history_price_bfq'] = history_price_bfq
         stock_info['history_price_hfq'] = history_price_hfq
+        stock_info['pe_analysis']['historical_pe'] = pe_ana
 
     except Exception as e:
         print(f" analysis {stock_code} error: {e}")
@@ -279,6 +293,7 @@ def test_demo():
     
     # 遍历所有股票
     count = 0
+    start_t = time.time()
     for i, stock_code in enumerate(stock_codes, 1):
         stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
@@ -313,13 +328,15 @@ def test_demo():
 
         update_single_stock2(stock_code, stock_info)
         print(f"{stock_info}")
-        break
         
         # 立即保存到文件
         save_single_stock(stock_code, stock_info)
+
             #updated_count += 1
             #if success:
     print(count)
+    cpu = time.time() - start_t
+    print(cpu)
 if __name__ == "__main__":
     #main()
     test_demo()
