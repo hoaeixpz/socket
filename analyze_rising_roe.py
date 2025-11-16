@@ -59,7 +59,7 @@ class StockAnalyzer:
 
     def find_good_stocks(self, YEAR, stock_info):
         '''
-        找到从YEAR年起，3年内股价上涨，PE下跌的公司
+        找到从YEAR前3年内，3年内股价上涨，PE下跌的公司
         '''
 
         pe_data= stock_info.get('pe_analysis', {})
@@ -74,33 +74,48 @@ class StockAnalyzer:
             
         years = sorted([int(year) for year in historical_pe.keys() if year.isdigit()])
         #print(f"years {years}")
-        if int(str(years[0])[0:4]) > int(YEAR):
+        if int(str(years[0])[0:4]) > int(YEAR) - 2:
             return False
         pe_values = [historical_pe[str(year)] for year in years if historical_pe[str(year)]]
         #print(f"pe_values {pe_values}")
 
         current_price = stock_info.get('current_price')
+        if current_price is None:
+            return False
+        current_price = current_price[1]
         history_price = stock_info.get('history_price')
         price_values = [history_price[str(year)[0:4]] for year in years if history_price[str(year)[0:4]]]
         #print(f"price_values {price_values}")
 
+        this_year = int(datetime.now().year)
         stock_code = stock_info.get('stock_code', '')
         for i, year in enumerate(years):
             if str(year)[0:4] == str(YEAR):
                 if pe_values[i] > 30:
                     return False
                     
-                if int(YEAR) < 2023:
-                    trend = pe_values[i+2] > 0 and pe_values[i] > pe_values[i+1] and pe_values[i+1] > pe_values[i+2]
+                if int(YEAR) < this_year:
+                    trend = pe_values[i] > 0 and pe_values[i-2] > pe_values[i-1] and pe_values[i-1] > pe_values[i]
                     if not trend:
                         return False
-                    return price_values[i+2] > price_values[i+1] and price_values[i+1] > price_values[i]
-                elif int(YEAR) == 2023:
+                    if price_values[i-2] > price_values[i-1] and price_values[i-1] < price_values[i]:
+                        print(f"{YEAR - 2} pe {pe_values[i-2]:.2f} {pe_values[i-1]:.2f} {pe_values[i]:.2f}")
+                        print(f"{YEAR - 2} price {price_values[i-2]} {price_values[i-1]} {price_values[i]}")
+                        return True
+                    else:
+                        return False
+                elif int(YEAR) == this_year:
                     pe = min(current_pe_list)
-                    trend = pe > 0 and pe_values[i] > pe_values[i+1] and pe_values[i+1] > pe
+                    trend = pe > 0 and pe_values[i-2] > pe_values[i-1] and pe_values[i-1] > pe
                     if not trend:
                         return False
-                    return current_price > price_values[i+1] and price_values[i+1] > price_values[i]
+                    if current_price > price_values[i-1] and price_values[i-1] < price_values[i-2]:
+                        print(f"{YEAR - 2} pe {pe_values[i-2]:.2f} {pe_values[i-1]:.2f} {pe:.2f}")
+                        print(f"{YEAR - 2} price {price_values[i-2]} {price_values[i-1]} {current_price}")
+                        return True
+                    else:
+                        return False
+
 
     def analyze_all_stocks(self):
         """分析所有股票"""
@@ -113,18 +128,18 @@ class StockAnalyzer:
         
         analysis_results = {}
         
-        year = 2020
+        year = 2022
         for stock_code, stock_info in stock_data.items():
             stock_name = stock_info.get('stock_name', '')
             #print(f"分析股票: {stock_code} {stock_name}")
             
             if self.find_good_stocks(year, stock_info):
                 #print(f"{stock_code}: {stock_name} 符合标准")
-                p, p2 = self.cal_profit(year + 2, stock_info)
+                p, p2 = self.cal_profit(year, stock_info)
                 if p2 is not None:
-                    print(f"{stock_code}: {stock_name}自{year + 2}年起一年增长率{p:.2f},两年复合增长率{p2:.2f}")
+                    print(f"{stock_code}: {stock_name}自{year}年起一年增长率{p:.2f},两年复合增长率{p2:.2f}")
                 else:
-                    print(f"{stock_code}: {stock_name}自{year + 2}年起一年增长率{p:.2f}")
+                    print(f"{stock_code}: {stock_name}自{year}年起一年增长率{p:.2f}")
                     #plottor.plot_three_indicators(stock_info, stock_code)
             
             # 计算潜力分数
