@@ -58,6 +58,7 @@ class StockDataCollector:
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
         
         # 如果还没有配置日志处理器，则添加文件处理器
         if not self.logger.handlers:
@@ -189,6 +190,8 @@ class StockDataCollector:
             #print(f"hist_eps {hist_eps}")
             for date, eps in hist_eps:
                 if date[4:6] == "12":
+                    # 延迟避免频繁请求
+                    time.sleep(0.2)
                     price: Any | float | None = self.get_price(stock_code, date)
                     if price is not None and eps is not None:
                         pe_ratio = price / eps
@@ -455,7 +458,7 @@ class StockDataCollector:
                     # 保存进度和结果
                     self._save_results()
                     self._save_progress()
-                    break
+                    
                     # 延迟避免频繁请求
                     time.sleep(delay)
                     
@@ -472,7 +475,6 @@ class StockDataCollector:
                     self._save_results()
                     self._save_progress()
             
-            break
             self.logger.info(f"第 {i//batch_size + 1} 批分析完成")
         
         self.logger.info("批量分析完成")
@@ -534,7 +536,7 @@ def batch_analyze_main():
     #analysis all stocks
 
     analyzer = StockDataCollector()
-    analyzer.batch_analyze_stocks(10,3)
+    analyzer.batch_analyze_stocks(15,3)
 
     analyzer.get_summary()
 
