@@ -181,8 +181,8 @@ def save_single_stock(stock_code, stock_info):
         with open('analysis_results.json', 'r', encoding='utf-8') as f:
             all_stocks = json.load(f)
 
-        #all_stocks[stock_code] = stock_info
-        all_stocks.pop(stock_code)
+        all_stocks[stock_code] = stock_info
+        #all_stocks.pop(stock_code)
 
         with open('analysis_results.json', 'w', encoding='utf-8') as f:
             json.dump(all_stocks, f, ensure_ascii=False, indent=2, cls=CustomJSONEncoder)
@@ -285,7 +285,7 @@ def test_demo():
     #update_single_stock("000001")
     #return
     stock_codes, all_stocks = load_existing_good_stocks()
-    good_codes, good_stocks = load_existing_good_stocks("good_stocks.json")
+    #good_codes, good_stocks = load_existing_good_stocks("good_stocks.json")
     #print(good_codes)
     
     if not stock_codes:
@@ -322,8 +322,8 @@ def test_demo():
             continue
         '''
         
-        if stock_code in good_codes:
-            continue
+        #if stock_code in good_codes:
+            #continue
             #print(years)
             #print(stock_info)
         print(f"\n{'='*60}")
@@ -339,9 +339,10 @@ def test_demo():
         #stock_info = all_stocks[stock_code]
         #print(f"info {stock_info}")
 
-        #update_single_stock2(stock_code, stock_info)
+        update_single_stock2(stock_code, stock_info)
         #print(f"{stock_info}")
         
+        continue
         # 立即保存到文件
         save_single_stock(stock_code, stock_info)
 
@@ -349,9 +350,9 @@ def test_demo():
         cpu = end_t - start_t
         print(cpu)
         start_t = end_t
-        #if cpu < 5:
-        #    print("sleep 3s")
-        #    time.sleep(3)
+        if cpu < 10:
+            print("sleep 10s")
+            time.sleep(10)
 
             #updated_count += 1
             #if success:
