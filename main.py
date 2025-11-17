@@ -131,10 +131,28 @@ def update_single_stock2(stock_code, stock_info):
     full_stock_code = add_stock_prefix(stock_code)
     try:
         # 获取后复权历史股价
-        now = datetime.datetime.now()
-        history_price_hfq = stock_info['history_price_hfq']
+        #now = datetime.datetime.now()
+        #history_price_hfq = stock_info['history_price_hfq']
         history_price_bfq = stock_info['history_price_bfq']
+        roe_data = stock_info['roe_details']
         pe_ana = stock_info['pe_analysis']['historical_pe']
+
+        sorted_dates = dict(sorted(history_price_bfq.items(), key=lambda x: int(x[0])))
+        sorted_roe = dict(sorted(roe_data.items()))
+
+        new_pe = {}
+        for year, pe in pe_ana.items():
+            new_pe[year[0:4]] = round(pe,2)
+
+        new_pe = dict(sorted(new_pe.items()))
+
+
+        stock_info['history_price_bfq'] = sorted_dates
+        stock_info['roe_details'] = sorted_roe
+        stock_info['pe_analysis']['historical_pe'] = new_pe
+        #stock_info['history_price_hfq'] = history_price_hfq
+        #stock_info['pe_analysis']['historical_pe'] = pe_ana
+        '''
         if len(history_price_bfq.values()) == 0:
             return
 
@@ -166,10 +184,10 @@ def update_single_stock2(stock_code, stock_info):
                                 pe_ratio = price / eps
                                 pe_ana[dat] = pe_ratio
                         break
-
-        stock_info['history_price_bfq'] = history_price_bfq
-        stock_info['history_price_hfq'] = history_price_hfq
-        stock_info['pe_analysis']['historical_pe'] = pe_ana
+        '''
+        #stock_info['history_price_bfq'] = sorted_dates
+        #stock_info['history_price_hfq'] = history_price_hfq
+        #stock_info['pe_analysis']['historical_pe'] = pe_ana
 
     except Exception as e:
         print(f" analysis {stock_code} error: {e}")
@@ -301,6 +319,7 @@ def test_demo():
         stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
 
+        '''
 
         Y = len(stock_info['history_price_bfq'].values())
         if Y == 0:
@@ -311,7 +330,7 @@ def test_demo():
 
         if Y == len(stock_info['history_price_hfq'].values()):
             continue
-
+        '''
         '''
         flag = False
         for value in stock_info['history_price_hfq'].values():
@@ -326,11 +345,10 @@ def test_demo():
             #continue
             #print(years)
             #print(stock_info)
-        print(f"\n{'='*60}")
+        #print(f"\n{'='*60}")
         print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
-        print(f"{'='*60}")
+        #print(f"{'='*60}")
         count = count + 1
-        continue
             #if count == 2:
             #    break 
         
@@ -343,7 +361,7 @@ def test_demo():
         update_single_stock2(stock_code, stock_info)
         #print(f"{stock_info}")
         
-        continue
+        #continue
         # 立即保存到文件
         save_single_stock(stock_code, stock_info)
 
@@ -351,9 +369,9 @@ def test_demo():
         cpu = end_t - start_t
         print(cpu)
         start_t = end_t
-        if cpu < 10:
-            print("sleep 10s")
-            time.sleep(10)
+        #if cpu < 10:
+            #print("sleep 10s")
+            #time.sleep(10)
 
             #updated_count += 1
             #if success:
