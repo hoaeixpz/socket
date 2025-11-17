@@ -53,14 +53,14 @@ def add_stock_prefix(stock_code):
     else:
         return code_str
 
-def load_existing_good_stocks():
+def load_existing_good_stocks(file = 'analysis_results.json'):
     """加载现有的analysis_results.json文件，返回所有股票代码列表"""
     try:
-        with open('analysis_results.json', 'r', encoding='utf-8') as f:
+        with open(file, 'r', encoding='utf-8') as f:
             stocks = json.load(f)
         return list(stocks.keys()), stocks
     except FileNotFoundError:
-        print("错误：找不到analysis_results.json文件")
+        print("错误：找不到{file}文件")
         return [], {}
     except json.JSONDecodeError as e:
         print(f"错误：JSON文件格式错误 - {e}")
@@ -285,6 +285,8 @@ def test_demo():
     #update_single_stock("000001")
     #return
     stock_codes, all_stocks = load_existing_good_stocks()
+    good_codes, good_stocks = load_existing_good_stocks("good_stocks.json")
+    #print(good_codes)
     
     if not stock_codes:
         print("没有找到good状态的股票数据")
@@ -294,10 +296,11 @@ def test_demo():
     
     # 遍历所有股票
     count = 0
-    #start_t = time.time()
+    start_t = time.time()
     for i, stock_code in enumerate(stock_codes, 1):
         stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
+
 
         Y = len(stock_info['history_price_bfq'].values())
         if Y == 0:
@@ -319,12 +322,16 @@ def test_demo():
             continue
         '''
         
+        if stock_code in good_codes:
+            continue
+            #print(years)
+            #print(stock_info)
         print(f"\n{'='*60}")
         print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
         print(f"{'='*60}")
         count = count + 1
-        #if count == 2:
-        #    continue
+            #if count == 2:
+            #    break 
         
         #analysis_data, success = update_single_stock(stock_code)
         #print(f"analysis {analysis_data} {success}")
@@ -338,10 +345,10 @@ def test_demo():
         # 立即保存到文件
         save_single_stock(stock_code, stock_info)
 
-        #end_t = time.time()
-        #cpu = end_t - start_t
-        #print(cpu)
-        #start_t = end_t
+        end_t = time.time()
+        cpu = end_t - start_t
+        print(cpu)
+        start_t = end_t
         #if cpu < 5:
         #    print("sleep 3s")
         #    time.sleep(3)
