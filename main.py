@@ -181,7 +181,8 @@ def save_single_stock(stock_code, stock_info):
         with open('analysis_results.json', 'r', encoding='utf-8') as f:
             all_stocks = json.load(f)
 
-        all_stocks[stock_code] = stock_info
+        #all_stocks[stock_code] = stock_info
+        all_stocks.pop(stock_code)
 
         with open('analysis_results.json', 'w', encoding='utf-8') as f:
             json.dump(all_stocks, f, ensure_ascii=False, indent=2, cls=CustomJSONEncoder)
@@ -293,7 +294,7 @@ def test_demo():
     
     # 遍历所有股票
     count = 0
-    start_t = time.time()
+    #start_t = time.time()
     for i, stock_code in enumerate(stock_codes, 1):
         stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
@@ -322,8 +323,8 @@ def test_demo():
         print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
         print(f"{'='*60}")
         count = count + 1
-        if count == 10:
-            break
+        #if count == 2:
+        #    continue
         
         #analysis_data, success = update_single_stock(stock_code)
         #print(f"analysis {analysis_data} {success}")
@@ -331,19 +332,19 @@ def test_demo():
         #stock_info = all_stocks[stock_code]
         #print(f"info {stock_info}")
 
-        update_single_stock2(stock_code, stock_info)
+        #update_single_stock2(stock_code, stock_info)
         #print(f"{stock_info}")
         
         # 立即保存到文件
         save_single_stock(stock_code, stock_info)
 
-        end_t = time.time()
-        cpu = end_t - start_t
-        print(cpu)
-        start_t = end_t
-        if cpu < 5:
-            print("sleep 3s")
-            time.sleep(3)
+        #end_t = time.time()
+        #cpu = end_t - start_t
+        #print(cpu)
+        #start_t = end_t
+        #if cpu < 5:
+        #    print("sleep 3s")
+        #    time.sleep(3)
 
             #updated_count += 1
             #if success:
