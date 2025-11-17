@@ -330,6 +330,7 @@ def test_demo():
         print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
         print(f"{'='*60}")
         count = count + 1
+        continue
             #if count == 2:
             #    break 
         
