@@ -36,6 +36,7 @@ class CustomJSONEncoder(json.JSONEncoder):
         if isinstance(obj, (np.integer, np.int64, np.int32)):
             return int(obj)
         elif isinstance(obj, (np.floating, np.float64, np.float32)):
+            obj = round(obj, 2)
             return float(obj)
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
@@ -45,6 +46,13 @@ class CustomJSONEncoder(json.JSONEncoder):
             return obj.strftime('%Y-%m-%d')
         # 让基类处理其他类型
         return super().default(obj)
+
+    def iterencode(self, o, _one_shot=False):
+        """重写iterencode方法，处理浮点数"""
+        if isinstance(o, float):
+        # 四舍五入到指定小数位
+            o = round(o, 2)
+        return super().iterencode(o, _one_shot)
 
 class StockDataCollector:
     """股票数据收集器"""
@@ -308,9 +316,10 @@ class StockDataCollector:
                 return df['close'].iloc[-1]
             else:
                 day = int(startdate[6:]) - 14
-                startdate = startdate[:-2] + str(day)
                 if day < 10:
                     startdate = startdate[:-2] + "0" + str(day)
+                else:
+                    startdate = startdate[:-2] + str(day)
                 #print(f"start end {startdate} {target_date}")
                 df = ak.stock_zh_a_daily(
                     stock_code, 
