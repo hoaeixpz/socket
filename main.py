@@ -131,27 +131,48 @@ def update_single_stock2(stock_code, stock_info):
     full_stock_code = add_stock_prefix(stock_code)
     try:
         # 获取后复权历史股价
-        #now = datetime.datetime.now()
+        #now = datetime.datetime.now()       
+
+        roe_data = stock_info['roe_details']
+        df = stock_data.get_indicator_data(stock_code, "净资产收益率_平均_扣除非经常损益")
+        kf_roe = stock_data.get_indicator_recent_year(df, 15)
+        #print(kf_roe)
+
+        history_roe = {}
+        current_roe = {}
+        for year, roe in roe_data.items():
+            if year[0:2] == "20":
+                history_roe[year] = roe
+            else:
+                current_roe[roe[0]] = roe[1]
+        
+        for date, kf_roe_v in kf_roe:
+            if date in current_roe:
+                current_roe[date] = (current_roe[date], kf_roe_v)
+            elif date[4:6] == "12" and date[0:4] in history_roe:
+                history_roe[date[0:4]] = (history_roe[date[0:4]], kf_roe_v)
+
+        print(history_roe)
+        print(current_roe)
+
+        stock_info['roe_details'] = {}
+        stock_info['roe_details']['history_roe'] = history_roe
+        stock_info['roe_details']['current_roe'] = current_roe
+
+        '''
         history_price_hfq = stock_info['history_price_hfq']
         history_price_hfq['2025'] = stock_collect.get_price(full_stock_code, '20251118', 'hfq')
         #history_price_bfq = stock_info['history_price_bfq']
         #roe_data = stock_info['roe_details']
         #pe_ana = stock_info['pe_analysis']['historical_pe']
 
-        '''
         sorted_dates = dict(sorted(history_price_bfq.items(), key=lambda x: int(x[0])))
         sorted_roe = dict(sorted(roe_data.items()))
 
-        new_pe = {}
-        for year, pe in pe_ana.items():
-            new_pe[year[0:4]] = round(pe,2)
+        #stock_info['history_price_bfq'] = sorted_dates
+        #stock_info['roe_details'] = sorted_roe
+        #stock_info['pe_analysis']['historical_pe'] = new_pe
 
-        new_pe = dict(sorted(new_pe.items()))
-
-
-        stock_info['history_price_bfq'] = sorted_dates
-        stock_info['roe_details'] = sorted_roe
-        stock_info['pe_analysis']['historical_pe'] = new_pe
         #stock_info['history_price_hfq'] = history_price_hfq
         #stock_info['pe_analysis']['historical_pe'] = pe_ana
         '''
@@ -335,38 +356,12 @@ def test_demo():
         else:
             continue
 
-        '''
-
-        Y = len(stock_info['history_price_bfq'].values())
-        if Y == 0:
-            continue
-        years = sorted(stock_info['history_price_bfq'].keys())
-        if int(years[-1]) - int(years[0]) + 1 == Y:
-            continue
-
-        if Y == len(stock_info['history_price_hfq'].values()):
-            continue
-        '''
-        '''
-        flag = False
-        for value in stock_info['history_price_hfq'].values():
-            if value is None:
-                flag = True
-
-        if flag is False:
-            continue
-        '''
-        
-        #if stock_code in good_codes:
-            #continue
-            #print(years)
-            #print(stock_info)
-        #print(f"\n{'='*60}")
+        print(f"\n{'='*60}")
         print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
-        #print(f"{'='*60}")
+        print(f"{'='*60}")
         count = count + 1
-        #if count == 16:
-         #   break 
+        if count == 8:
+           break 
         
         #analysis_data, success = update_single_stock(stock_code)
         #print(f"analysis {analysis_data} {success}")
@@ -375,16 +370,19 @@ def test_demo():
         #print(f"info {stock_info}")
 
         update_single_stock2(stock_code, stock_info)
-        #print(f"{stock_info}")
+        
+        print(f"{stock_info}")
         
         #continue
         # 立即保存到文件
+
         #save_single_stock(stock_code, stock_info)
-    save_all_stocks(all_stocks)
-    end_t = time.time()
-    cpu = end_t - start_t
-    print(cpu)
-    start_t = end_t
+
+        end_t = time.time()
+        cpu = end_t - start_t
+        print(cpu)
+        start_t = end_t
+
         #if cpu < 10:
             #print("sleep 10s")
             #time.sleep(10)
@@ -392,6 +390,7 @@ def test_demo():
             #updated_count += 1
             #if success:
     print(count)
+    save_all_stocks(all_stocks)
 if __name__ == "__main__":
     #main()
     test_demo()

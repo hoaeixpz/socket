@@ -137,9 +137,7 @@ class FinancialData:
 		
 		return result_list
 
-	
-	def get_indicator_value(self, symbol: str, indicator: str, 
-						  date: Optional[str] = None) -> Optional[float]:
+	def get_indicator_value(self, symbol: str, indicator: str, date: Optional[str] = None) -> Optional[float]:
 		"""
 		获取指定股票、指标和日期的数值
 		
