@@ -4,6 +4,7 @@ import datetime
 from typing import Optional, Dict, List, Any
 import warnings
 warnings.filterwarnings('ignore')
+from stock_data_cache import StockDataCache
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -25,10 +26,10 @@ index
 建立一个class FinancialData，支持获取特定指标的数据
 """
 
+
 class FinancialData:
 	def __init__(self):
-		self.data_cache = {}  # 缓存股票数据：{symbol: dataframe}
-		self.fetched_symbols = set()  # 记录已经获取过数据的股票代码
+		self.data_cache = StockDataCache() # 缓存股票数据：{symbol: dataframe}
 
 	def get_financial_data(self, symbol: str) -> Optional[pd.DataFrame]:
 		"""
@@ -48,25 +49,17 @@ class FinancialData:
 		if not symbol or not isinstance(symbol, str):
 			print(f"错误：股票代码格式不正确: {symbol}")
 			return None
-			
-		# 如果数据已在缓存中，直接返回
-		if symbol in self.data_cache:
-			print(f"从缓存中获取 {symbol} 的财务数据")
-			return self.data_cache[symbol]
 		
 		try:
 			print(f"正在获取 {symbol} 的财务数据...")
 			# 调用akshare接口获取财务摘要数据
-			df = ak.stock_financial_abstract(symbol=symbol)
+			df = self.data_cache.get_stock_indicator(symbol)
 			#print(df)
 			
 			if df is None or df.empty:
 				print(f"警告：未获取到 {symbol} 的财务数据")
 				return None
 			
-			# 缓存数据
-			self.data_cache[symbol] = df
-			self.fetched_symbols.add(symbol)
 			
 			print(f"成功获取 {symbol} 的财务数据，共 {len(df)} 行")
 			return df
