@@ -350,11 +350,8 @@ def test_demo():
     count = 0
     start_t = time.time()
     for i, stock_code in enumerate(stock_codes, 1):
-        if stock_code == "003041" or stock_code == "603216":
-            stock_info = all_stocks[stock_code]
-            stock_name = stock_info.get('stock_name', '未知')
-        else:
-            continue
+        stock_info = all_stocks[stock_code]
+        stock_name = stock_info.get('stock_name', '未知')
 
         print(f"\n{'='*60}")
         print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
