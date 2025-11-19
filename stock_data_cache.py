@@ -8,9 +8,6 @@ import pickle
 from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
-from financial_data import FinancialData
-
-stock_data = FinancialData()
 
 class StockDataCache:
     def __init__(self, cache_dir="./stock_data", cache_expire_days=70):
@@ -118,7 +115,11 @@ class StockDataCache:
         # 从AkShare获取最新数据
         print("🌐 从网络获取最新股票指标...")
         try:
-            stock_indicator = stock_data.get_financial_data(stock_code)         
+            stock_indicator = ak.stock_financial_abstract(symbol=stock_code)
+
+            if stock_indicator is None or stock_indicator.empty:
+                print(f"警告：未获取到 {symbol} 的指标数据")
+                return None
                 # 保存到缓存
             with open(cache_file, 'wb') as f:
                 pickle.dump(stock_indicator, f)
