@@ -43,6 +43,8 @@ class StockAnalyzer:
         history_price = stock_info.get('history_price_hfq')
         price = history_price[str(YEAR)]
         next_price = history_price[str(YEAR + 1)]
+        if price is None or next_price is None:
+            return 0, 0
         profit = (next_price - price) / price * 100
 
         if YEAR >= this_year - 1:
@@ -53,6 +55,38 @@ class StockAnalyzer:
         profit2 = profit2 * 100
         return profit, profit2
 
+    def cal_pe(self, YEAR, pe_data):
+        '''
+        计算YEAR年份的PE在历史PE中排名第几，
+        给出排名百分位
+        '''
+
+        historical_pe = pe_data.get('historical_pe', {})
+        if len(historical_pe) < 2:
+            return 100
+
+        this_pe = historical_pe.get(str(YEAR))
+        if this_pe is None:
+            return 100
+
+        if this_pe < 0:
+            return 100
+
+        valid_pe_num = 0
+        rank = 1
+        for year, pe in historical_pe.items():
+            if int(year) > YEAR:
+                break
+            print(f"{year}: {pe}")
+            if pe > 0:
+                valid_pe_num = valid_pe_num + 1
+                if pe < this_pe:
+                    rank = rank + 1
+
+        print(rank, valid_pe_num)
+        return rank * 100.0 / valid_pe_num
+
+
     def find_good_stocks(self, YEAR:int, stock_info):
         '''
         条件：连续3年至YEAR，3年内股价上涨，PE下跌的公司
@@ -62,6 +96,12 @@ class StockAnalyzer:
         pe_data= stock_info.get('pe_analysis', {})
         current_pe_list = pe_data.get('current_pe', [])
         historical_pe = pe_data.get('historical_pe', {})
+
+        r = self.cal_pe(YEAR, pe_data)
+        if r <= 30:
+            return True
+        else:
+            return False
 
         if len(historical_pe) < 2:
             return False
@@ -140,6 +180,7 @@ class StockAnalyzer:
         
         analysis_results = {}
         
+        count = 0
         for stock_code, stock_info in stock_data.items():
             stock_name = stock_info.get('stock_name', '')
             #if stock_code != "002015":
@@ -149,13 +190,18 @@ class StockAnalyzer:
             if self.find_good_stocks(year, stock_info):
                 #print(f"{stock_code}: {stock_name} 符合标准")
                 p, p2 = self.cal_profit(year, stock_info)
-                ''' 
+                count = count + 1
+                #if p < 0:
+                #    continue
+                
+                
                 if p2 is not None:
                     print(f"{stock_code}: {stock_name}自{year}年起一年增长率{p:.2f},两年复合增长率{p2:.2f}")
                 else:
                     print(f"{stock_code}: {stock_name}自{year}年起一年增长率{p:.2f}")
-                '''
                 
+                if count == 3:
+                    break
             
             # 计算潜力分数
             #potential_score = self.calculate_potential_score(stock_info)
@@ -170,7 +216,9 @@ class StockAnalyzer:
     
     def get_promising_stocks(self, min_score=70):
         """获取有潜力的股票"""
-        for year in range(2017, 2023):
+        for year in range(2014, 2022):
+            if year != 2017:
+                continue
             analysis_results = self.analyze_all_stocks(year)
             if len(analysis_results) == 0:
                 continue
