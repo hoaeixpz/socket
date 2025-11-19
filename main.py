@@ -355,6 +355,8 @@ def test_demo():
     count = 0
     start_t = time.time()
     for i, stock_code in enumerate(stock_codes, 1):
+        if i < 333:
+            continue
         stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
 
@@ -374,8 +376,6 @@ def test_demo():
         #print(f"info {stock_info}")
 
         success = update_single_stock2(stock_code, stock_info)
-        if success:
-            break
         
         #print(f"{stock_info}")
         
@@ -389,8 +389,9 @@ def test_demo():
         print(cpu)
         start_t = end_t
 
-        print("sleep 7s")
-        time.sleep(7)
+        if success:
+            print("sleep 16s")
+            time.sleep(16)
 
             #updated_count += 1
             #if success:
