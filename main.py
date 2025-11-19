@@ -86,7 +86,7 @@ def update_single_stock(stock_code):
         years = ['20201231', '20211231', '20221231', '20231231', '20241231', '20250930']
         hist_price = {}
         for year in years:
-            price = pe_collect._get_price(full_stock_code, year)
+            price = pe_collect.get_price(full_stock_code, year)
             time.sleep(0.3)
             if price is not None:
                 hist_price[year[0:4]] = price
@@ -132,11 +132,13 @@ def update_single_stock2(stock_code, stock_info):
     try:
         # 获取后复权历史股价
         #now = datetime.datetime.now()
-        #history_price_hfq = stock_info['history_price_hfq']
-        history_price_bfq = stock_info['history_price_bfq']
-        roe_data = stock_info['roe_details']
-        pe_ana = stock_info['pe_analysis']['historical_pe']
+        history_price_hfq = stock_info['history_price_hfq']
+        history_price_hfq['2025'] = stock_collect.get_price(full_stock_code, '20251118', 'hfq')
+        #history_price_bfq = stock_info['history_price_bfq']
+        #roe_data = stock_info['roe_details']
+        #pe_ana = stock_info['pe_analysis']['historical_pe']
 
+        '''
         sorted_dates = dict(sorted(history_price_bfq.items(), key=lambda x: int(x[0])))
         sorted_roe = dict(sorted(roe_data.items()))
 
@@ -152,6 +154,9 @@ def update_single_stock2(stock_code, stock_info):
         stock_info['pe_analysis']['historical_pe'] = new_pe
         #stock_info['history_price_hfq'] = history_price_hfq
         #stock_info['pe_analysis']['historical_pe'] = pe_ana
+        '''
+
+
         '''
         if len(history_price_bfq.values()) == 0:
             return
@@ -208,6 +213,14 @@ def save_single_stock(stock_code, stock_info):
     except Exception as e:
         print(f"保存结果失败: {e}")
 
+def save_all_stocks(all_stocks):
+    """保存分析结果"""
+    try:
+        with open('analysis_results.json', 'w', encoding='utf-8') as f:
+            json.dump(all_stocks, f, ensure_ascii=False, indent=2, cls=CustomJSONEncoder)
+        print(f"分析结果已保存到: analysis_results.json")
+    except Exception as e:
+        print(f"保存结果失败: {e}")
 
 def update_stocks():
     """分析所有good股票的PE值，每分析完一只股票就立即更新文件"""
@@ -316,8 +329,11 @@ def test_demo():
     count = 0
     start_t = time.time()
     for i, stock_code in enumerate(stock_codes, 1):
-        stock_info = all_stocks[stock_code]
-        stock_name = stock_info.get('stock_name', '未知')
+        if stock_code == "003041" or stock_code == "603216":
+            stock_info = all_stocks[stock_code]
+            stock_name = stock_info.get('stock_name', '未知')
+        else:
+            continue
 
         '''
 
@@ -349,8 +365,8 @@ def test_demo():
         print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
         #print(f"{'='*60}")
         count = count + 1
-            #if count == 2:
-            #    break 
+        #if count == 16:
+         #   break 
         
         #analysis_data, success = update_single_stock(stock_code)
         #print(f"analysis {analysis_data} {success}")
@@ -363,12 +379,12 @@ def test_demo():
         
         #continue
         # 立即保存到文件
-        save_single_stock(stock_code, stock_info)
-
-        end_t = time.time()
-        cpu = end_t - start_t
-        print(cpu)
-        start_t = end_t
+        #save_single_stock(stock_code, stock_info)
+    save_all_stocks(all_stocks)
+    end_t = time.time()
+    cpu = end_t - start_t
+    print(cpu)
+    start_t = end_t
         #if cpu < 10:
             #print("sleep 10s")
             #time.sleep(10)
