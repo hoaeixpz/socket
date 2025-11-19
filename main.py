@@ -134,6 +134,9 @@ def update_single_stock2(stock_code, stock_info):
         #now = datetime.datetime.now()       
 
         roe_data = stock_info['roe_details']
+        if 'history_roe' in roe_data:
+            print("return")
+            return False
         df = stock_data.get_indicator_data(stock_code, "净资产收益率_平均_扣除非经常损益")
         kf_roe = stock_data.get_indicator_recent_year(df, 15)
         #print(kf_roe)
@@ -144,6 +147,7 @@ def update_single_stock2(stock_code, stock_info):
             if year[0:2] == "20":
                 history_roe[year] = roe
             else:
+                print(f"current roe {roe}")
                 current_roe[roe[0]] = roe[1]
         
         for date, kf_roe_v in kf_roe:
@@ -152,8 +156,8 @@ def update_single_stock2(stock_code, stock_info):
             elif date[4:6] == "12" and date[0:4] in history_roe:
                 history_roe[date[0:4]] = (history_roe[date[0:4]], kf_roe_v)
 
-        print(history_roe)
-        print(current_roe)
+        #print(history_roe)
+        #print(current_roe)
 
         stock_info['roe_details'] = {}
         stock_info['roe_details']['history_roe'] = history_roe
@@ -214,10 +218,11 @@ def update_single_stock2(stock_code, stock_info):
         #stock_info['history_price_bfq'] = sorted_dates
         #stock_info['history_price_hfq'] = history_price_hfq
         #stock_info['pe_analysis']['historical_pe'] = pe_ana
+        return True
 
     except Exception as e:
         print(f" analysis {stock_code} error: {e}")
-        return None, False
+        return False
 
 def save_single_stock(stock_code, stock_info):
     """保存分析结果"""
@@ -357,8 +362,10 @@ def test_demo():
         print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
         print(f"{'='*60}")
         count = count + 1
-        if count == 8:
-           break 
+        if count % 100 == 0:
+            print("count {count}")
+            save_all_stocks(all_stocks)
+
         
         #analysis_data, success = update_single_stock(stock_code)
         #print(f"analysis {analysis_data} {success}")
@@ -366,9 +373,11 @@ def test_demo():
         #stock_info = all_stocks[stock_code]
         #print(f"info {stock_info}")
 
-        update_single_stock2(stock_code, stock_info)
+        success = update_single_stock2(stock_code, stock_info)
+        if success:
+            break
         
-        print(f"{stock_info}")
+        #print(f"{stock_info}")
         
         #continue
         # 立即保存到文件
@@ -380,9 +389,8 @@ def test_demo():
         print(cpu)
         start_t = end_t
 
-        #if cpu < 10:
-            #print("sleep 10s")
-            #time.sleep(10)
+        print("sleep 7s")
+        time.sleep(7)
 
             #updated_count += 1
             #if success:
