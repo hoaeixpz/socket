@@ -131,8 +131,20 @@ def update_single_stock2(stock_code, stock_info):
     full_stock_code = add_stock_prefix(stock_code)
     try:
         # 获取后复权历史股价
-        #now = datetime.datetime.now()       
+        #now = datetime.datetime.now()
+        df = ak.stock_individual_info_em(stock_code)
+        shangshi = ''
+        for index, row in df.iterrows():
+            flag = False
+            for col in df.columns:
+                if flag:
+                    stock_info['shangshi'] = row[col]
+                    break
+                if row[col] == "上市时间":
+                    flag = True
 
+
+        '''
         roe_data = stock_info['roe_details']
         if 'history_roe' in roe_data:
             print("return")
@@ -162,7 +174,7 @@ def update_single_stock2(stock_code, stock_info):
         stock_info['roe_details'] = {}
         stock_info['roe_details']['history_roe'] = history_roe
         stock_info['roe_details']['current_roe'] = current_roe
-
+        '''
         '''
         history_price_hfq = stock_info['history_price_hfq']
         history_price_hfq['2025'] = stock_collect.get_price(full_stock_code, '20251118', 'hfq')
@@ -355,8 +367,6 @@ def test_demo():
     count = 0
     start_t = time.time()
     for i, stock_code in enumerate(stock_codes, 1):
-        if i < 333:
-            continue
         stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
 
@@ -376,6 +386,7 @@ def test_demo():
         #print(f"info {stock_info}")
 
         success = update_single_stock2(stock_code, stock_info)
+        break
         
         #print(f"{stock_info}")
         
@@ -389,9 +400,9 @@ def test_demo():
         print(cpu)
         start_t = end_t
 
-        if success:
-            print("sleep 16s")
-            time.sleep(16)
+        #if success:
+        #    print("sleep 16s")
+        #    time.sleep(16)
 
             #updated_count += 1
             #if success:
