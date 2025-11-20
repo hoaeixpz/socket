@@ -77,13 +77,13 @@ class StockAnalyzer:
         for year, pe in historical_pe.items():
             if int(year) > YEAR:
                 break
-            print(f"{year}: {pe}")
+            #print(f"{year}: {pe}")
             if pe > 0:
                 valid_pe_num = valid_pe_num + 1
                 if pe < this_pe:
                     rank = rank + 1
 
-        print(rank, valid_pe_num)
+        #print(rank, valid_pe_num)
         return rank * 100.0 / valid_pe_num
 
 
@@ -98,10 +98,26 @@ class StockAnalyzer:
         historical_pe = pe_data.get('historical_pe', {})
 
         r = self.cal_pe(YEAR, pe_data)
-        if r <= 30:
-            return True
-        else:
+        if r > 30:
             return False
+
+        roe_values = stock_info.get('roe_details').get('history_roe')
+        this_year = int(datetime.now().year)
+        count = 0
+        if YEAR < this_year:
+            for i in range(5):
+                roe = roe_values.get(str(YEAR-i))
+                if roe is None or len(roe) == 0:
+                    continue
+                kf_roe = roe[1]
+                #print(kf_roe)
+                if kf_roe is not None and kf_roe > 5:
+                    #print("count + 1")
+                    count += 1
+
+            if count < 3:
+                return False
+        return True
 
         if len(historical_pe) < 2:
             return False
@@ -125,19 +141,6 @@ class StockAnalyzer:
         if len(price_values) != len(years):
             return False
 
-        roe_values = stock_info.get('roe_details')
-        this_year = int(datetime.now().year)
-        count = 0
-        if YEAR < this_year:
-            for i in range(5):
-                roe = roe_values.get(str(YEAR-i))
-                #print(roe)
-                if roe is not None and roe > 5:
-                    #print("count + 1")
-                    count += 1
-
-            if count < 3:
-                return False
         
         for i, year in enumerate(years):
             if str(year)[0:4] == str(YEAR):
@@ -181,6 +184,8 @@ class StockAnalyzer:
         analysis_results = {}
         
         count = 0
+        print("pe处于历史pe中前30%\n")
+        print("扣非ROE连续5年中有3年>5\n")
         for stock_code, stock_info in stock_data.items():
             stock_name = stock_info.get('stock_name', '')
             #if stock_code != "002015":
@@ -200,8 +205,8 @@ class StockAnalyzer:
                 else:
                     print(f"{stock_code}: {stock_name}自{year}年起一年增长率{p:.2f}")
                 
-                if count == 3:
-                    break
+                #if count == 3:
+                #    break
             
             # 计算潜力分数
             #potential_score = self.calculate_potential_score(stock_info)
