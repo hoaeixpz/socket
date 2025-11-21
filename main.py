@@ -133,17 +133,57 @@ def update_single_stock2(stock_code, stock_info):
         # 获取后复权历史股价
         #now = datetime.datetime.now()
         df = ak.stock_individual_info_em(stock_code)
-        shangshi = ''
         for index, row in df.iterrows():
-            flag = False
             for col in df.columns:
-                if flag:
-                    stock_info['shangshi'] = row[col]
-                    break
                 if row[col] == "上市时间":
-                    flag = True
+                    stock_info['listingDate'] = row['value']
+                elif row[col] == "行业":
+                    stock_info['industry'] = row['value']
 
 
+        historical_pe = stock_info['pe_analysis']['historical_pe']
+        years = sorted([int(year) for year in historical_pe.keys() if year.isdigit()])
+        first_year = int(years[0] + 1)
+        print(first_year)
+        df = ak.stock_financial_analysis_indicator(stock_code, str(first_year))
+        print(df)
+        result_dict = {}
+        for index, row in df.iterrows():
+            for col in df.columns:
+                if col == "日期":
+                    date = str(row[col])
+                    result_dict[date] = row["扣除非经常性损益后的每股收益(元)"]
+                    break
+        print(result_dict)
+
+        history_price_bfq = stock_info['history_price_bfq']
+        for year, pe in historical_pe.items():
+            date = str(year) + "-12-31"
+            print(date)
+            if result_dict.get(date) is None:
+                historical_pe[year] = [pe, None]
+            else:
+                print(result_dict[date])
+                historical_pe[year] = [pe, history_price_bfq[year] / result_dict[date]]
+
+        print(historical_pe)
+
+        finan_data = stock_data.get_financial_data(stock_code)
+        print(finan_data)
+
+        row_num = len(finan_data)
+        for col in finan_data.columns:
+            if col == "选项":
+                finan_data[row_num, col] = "常用指标"
+            elif col == "指标":
+                finan_data[row_num, col] =  "扣除非经常性损益后的每股收益"
+            else:
+                date = col[0:4] + "-" + col[4:6] + "-" + col[6:8]
+                print(date)
+                if result_dict.get(date):
+                    finan_data[row_num, col] = result_dict[date]
+
+        print(finan_data)
         '''
         roe_data = stock_info['roe_details']
         if 'history_roe' in roe_data:
@@ -187,10 +227,6 @@ def update_single_stock2(stock_code, stock_info):
 
         #stock_info['history_price_bfq'] = sorted_dates
         #stock_info['roe_details'] = sorted_roe
-        #stock_info['pe_analysis']['historical_pe'] = new_pe
-
-        #stock_info['history_price_hfq'] = history_price_hfq
-        #stock_info['pe_analysis']['historical_pe'] = pe_ana
         '''
 
 
@@ -407,7 +443,7 @@ def test_demo():
             #updated_count += 1
             #if success:
     print(count)
-    save_all_stocks(all_stocks)
+    #save_all_stocks(all_stocks)
 if __name__ == "__main__":
     #main()
     test_demo()
