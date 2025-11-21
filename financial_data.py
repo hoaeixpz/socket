@@ -160,6 +160,7 @@ class FinancialData:
 				index_list[idx] = value
 
 		# 遍历DataFrame的列（日期）
+		date = date.replace("-", "")
 		for column in df.columns:
 			try:
 				if isinstance(column, (int, str)) and len(str(column)) == 8:

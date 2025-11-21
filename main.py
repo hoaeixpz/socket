@@ -132,6 +132,7 @@ def update_single_stock2(stock_code, stock_info):
     try:
         # 获取后复权历史股价
         #now = datetime.datetime.now()
+        '''
         df = ak.stock_individual_info_em(stock_code)
         for index, row in df.iterrows():
             for col in df.columns:
@@ -139,35 +140,41 @@ def update_single_stock2(stock_code, stock_info):
                     stock_info['listingDate'] = row['value']
                 elif row[col] == "行业":
                     stock_info['industry'] = row['value']
-
+        '''
 
         historical_pe = stock_info['pe_analysis']['historical_pe']
+        history_price_bfq = stock_info['history_price_bfq']
         years = sorted([int(year) for year in historical_pe.keys() if year.isdigit()])
         first_year = int(years[0] + 1)
         print(first_year)
-        df = ak.stock_financial_analysis_indicator(stock_code, str(first_year))
+        df = ak.stock_fhps_detail_em(stock_code)
         print(df)
         result_dict = {}
         for index, row in df.iterrows():
             for col in df.columns:
-                if col == "日期":
+                if col == "报告期":
                     date = str(row[col])
-                    result_dict[date] = row["扣除非经常性损益后的每股收益(元)"]
-                    break
+                    if history_price_bfq.get(date[0:4]):
+                        profit = stock_data.get_indicator_value(stock_code, "净利润", date)
+                        result_dict[date] = history_price_bfq[date[0:4]] * row["总股本"] / profit
+                        break
         print(result_dict)
 
-        history_price_bfq = stock_info['history_price_bfq']
         for year, pe in historical_pe.items():
             date = str(year) + "-12-31"
             print(date)
             if result_dict.get(date) is None:
                 historical_pe[year] = [pe, None]
             else:
-                print(result_dict[date])
-                historical_pe[year] = [pe, history_price_bfq[year] / result_dict[date]]
+                jb_eps = stock_data.get_indicator_value(stock_code, "基本每股收益", date)
+                xs_eps = stock_data.get_indicator_value(stock_code, "稀释每股收益", date)
+                tb_eps = stock_data.get_indicator_value(stock_code, "摊薄每股收益_最新股数", date)
+                print(f"{date} {jb_eps} {xs_eps} {tb_eps}")
+                price = history_price_bfq[year]
+                historical_pe[year] = [pe, result_dict[date], price / jb_eps, price / xs_eps, price / tb_eps]
 
         print(historical_pe)
-
+        '''
         finan_data = stock_data.get_financial_data(stock_code)
         print(finan_data)
 
@@ -184,6 +191,7 @@ def update_single_stock2(stock_code, stock_info):
                     finan_data[row_num, col] = result_dict[date]
 
         print(finan_data)
+        '''
         '''
         roe_data = stock_info['roe_details']
         if 'history_roe' in roe_data:

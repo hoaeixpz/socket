@@ -28,12 +28,20 @@ def get_stock_listing_date(symbol):
 
 # 使用示例
 symbol = "000001"  # 平安银行
+#df = ak.stock_yjbb_em("20121231")
+#print(df)
+
 #stock_financial_abstract_df = ak.stock_financial_abstract("600519")
-#indictor = ak.stock_fhps_detail_em("600519")
+indictor = ak.stock_fhps_detail_em(symbol)
+for index, row in indictor.iterrows():
+  for col in indictor.columns:
+    if col == "报告期" or col == "总股本":
+      print(col, " ",row[col])
 #print(stock_financial_abstract_df)
-#print(indictor)
+
 df = ak.stock_individual_info_em(symbol)
-print(df)
+#print(df)
+
 for index, row in df.iterrows():
   for col in df.columns:
     print(row[col])
