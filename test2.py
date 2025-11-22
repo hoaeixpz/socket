@@ -26,8 +26,34 @@ def get_stock_listing_date(symbol):
         print(f"获取{symbol}上市日期失败: {e}")
     return None
 
+def test_stock_individual_basic_info_xq(symbol):
+  df = ak.stock_individual_basic_info_xq(symbol)
+  print(df)
+
+def test_stock_board_industry_name_em():
+  bankai = ak.stock_board_industry_name_em()
+  codes = []
+  for index, row in bankai.iterrows():
+    for col in bankai.columns:
+      if col == "板块名称":
+        #print(row[col])
+        codes.append(row[col])
+
+  stock_dict = {}
+  for code in codes:
+    stocks = ak.stock_board_industry_cons_em(code)
+    for index, row in stocks.iterrows():
+      for col in stocks.columns:
+        if col == "代码":
+          stock_dict[row[col]] = code
+    break
+  print(stock_dict['000001'])
+
 # 使用示例
-symbol = "000001"  # 平安银行
+symbol = "sz000001"  # 平安银行
+#test_stock_individual_basic_info_xq(symbol)
+test_stock_board_industry_name_em()
+exit()
 #df = ak.stock_yjbb_em("20121231")
 #print(df)
 

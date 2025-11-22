@@ -8,6 +8,7 @@
 import json
 import math
 import pandas as pd
+import numpy as np
 from datetime import datetime
 import simple_stock_plotter
 from simple_stock_plotter import SimpleStockPlotter
@@ -84,8 +85,67 @@ class StockAnalyzer:
                     rank = rank + 1
 
         #print(rank, valid_pe_num)
+        if rank == 1 and valid_pe_num > 3:
+            return 1
         return rank * 100.0 / valid_pe_num
 
+    def cal_roe(sel, YEAR, stock_info):
+        '''
+        扣非ROE连续5年上涨，且有3年 > 5
+        '''
+        roe_values = stock_info.get('roe_details').get('history_roe')
+        this_year = int(datetime.now().year)
+        count = 0
+        last_roe = None
+        if YEAR < this_year:
+            for i in range(5):
+                roe = roe_values.get(str(YEAR-i))
+                if roe is None or len(roe) == 0:
+                    continue
+                kf_roe = roe[1]
+                #print(kf_roe)
+                if last_roe is not None:
+                    if last_roe < kf_roe:
+                        return False
+                last_roe = kf_roe
+                if kf_roe is not None and kf_roe > 5:
+                    #print("count + 1")
+                    count += 1
+
+            if count < 3:
+                return False
+        return True
+
+    def roe_distrub(sel, YEAR, stock_info):
+        roe_values = stock_info.get('roe_details').get('history_roe')
+        this_year = int(datetime.now().year)
+        roe_list = []
+        if YEAR < this_year:
+            for i in range(5):
+                roe = roe_values.get(str(YEAR-i))
+                if roe is None or len(roe) == 0:
+                    continue
+                kf_roe = roe[1]
+                if math.isnan(kf_roe):
+                    continue
+
+                roe_list.append(kf_roe)
+                #print(f"ROE {type(kf_roe)}{kf_roe}")
+
+        if len(roe_list) < 3:
+            return False, []
+
+        mean = np.mean(roe_list)
+        std = np.std(roe_list)
+        #print(f"mean std {mean} {std}")
+
+        if mean < 10:
+            return False, roe_list
+
+        if std > 2:
+            return False, roe_list
+
+        return True, roe_list
 
     def find_good_stocks(self, YEAR:int, stock_info):
         '''
@@ -102,22 +162,15 @@ class StockAnalyzer:
             return False
 
         roe_values = stock_info.get('roe_details').get('history_roe')
+        success, roelist = self.roe_distrub(YEAR, stock_info)
+        if success:
+            print(roelist)
+            print(np.mean(roelist))
+            print(np.std(roelist))
+        return success
+        #return self.cal_roe(YEAR, stock_info)
         this_year = int(datetime.now().year)
-        count = 0
-        if YEAR < this_year:
-            for i in range(5):
-                roe = roe_values.get(str(YEAR-i))
-                if roe is None or len(roe) == 0:
-                    continue
-                kf_roe = roe[1]
-                #print(kf_roe)
-                if kf_roe is not None and kf_roe > 5:
-                    #print("count + 1")
-                    count += 1
-
-            if count < 3:
-                return False
-        return True
+        
 
         if len(historical_pe) < 2:
             return False
@@ -184,7 +237,8 @@ class StockAnalyzer:
         analysis_results = {}
         
         count = 0
-        print("pe处于历史pe中前30%\n")
+        print("pe处于历史pe中前30%")
+        print("扣非ROE连续5年上涨")
         print("扣非ROE连续5年中有3年>5\n")
         for stock_code, stock_info in stock_data.items():
             stock_name = stock_info.get('stock_name', '')
@@ -205,7 +259,7 @@ class StockAnalyzer:
                 else:
                     print(f"{stock_code}: {stock_name}自{year}年起一年增长率{p:.2f}")
                 
-                #if count == 3:
+                #if count == 6:
                 #    break
             
             # 计算潜力分数
@@ -221,7 +275,7 @@ class StockAnalyzer:
     
     def get_promising_stocks(self, min_score=70):
         """获取有潜力的股票"""
-        for year in range(2014, 2022):
+        for year in range(2014, 2024):
             if year != 2017:
                 continue
             analysis_results = self.analyze_all_stocks(year)
@@ -229,7 +283,7 @@ class StockAnalyzer:
                 continue
 
             profit_values = [info['profit'] for info in analysis_results.values() if 'profit' in info]
-            #print(f"{profit_values}")
+            print(f"{profit_values}")
             profit_ava = sum(profit_values) / len(profit_values)
             profit2_values = [info['profit2'] for info in analysis_results.values() if 'profit2' in info]
             #print(f"{profit_values}")

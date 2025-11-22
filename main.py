@@ -132,7 +132,7 @@ def update_single_stock2(stock_code, stock_info):
     try:
         # 获取后复权历史股价
         #now = datetime.datetime.now()
-        '''
+        
         df = ak.stock_individual_info_em(stock_code)
         for index, row in df.iterrows():
             for col in df.columns:
@@ -140,7 +140,7 @@ def update_single_stock2(stock_code, stock_info):
                     stock_info['listingDate'] = row['value']
                 elif row[col] == "行业":
                     stock_info['industry'] = row['value']
-        '''
+        return True
 
         historical_pe = stock_info['pe_analysis']['historical_pe']
         history_price_bfq = stock_info['history_price_bfq']
@@ -411,6 +411,8 @@ def test_demo():
     count = 0
     start_t = time.time()
     for i, stock_code in enumerate(stock_codes, 1):
+        if i < 4:
+            continue
         stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
 
@@ -430,7 +432,7 @@ def test_demo():
         #print(f"info {stock_info}")
 
         success = update_single_stock2(stock_code, stock_info)
-        break
+        
         
         #print(f"{stock_info}")
         
@@ -444,14 +446,14 @@ def test_demo():
         print(cpu)
         start_t = end_t
 
-        #if success:
-        #    print("sleep 16s")
-        #    time.sleep(16)
+        if success:
+            print("sleep 10s")
+            time.sleep(10)
 
             #updated_count += 1
             #if success:
     print(count)
-    #save_all_stocks(all_stocks)
+    save_all_stocks(all_stocks)
 if __name__ == "__main__":
     #main()
     test_demo()
