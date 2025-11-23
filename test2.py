@@ -1,5 +1,6 @@
 import akshare as ak
-
+import json
+import time
 import pandas as pd
 from datetime import datetime
 from financial_data import FinancialData
@@ -36,18 +37,22 @@ def test_stock_board_industry_name_em():
   for index, row in bankai.iterrows():
     for col in bankai.columns:
       if col == "板块名称":
-        #print(row[col])
+        print(row[col])
         codes.append(row[col])
-
   stock_dict = {}
   for code in codes:
-    stocks = ak.stock_board_industry_cons_em(code)
+    stocks = ak.stock_board_industry_cons_em()
     for index, row in stocks.iterrows():
       for col in stocks.columns:
         if col == "代码":
           stock_dict[row[col]] = code
-    break
-  print(stock_dict['000001'])
+    print(stock_dict)
+    time.sleep(30)
+    print("sleep 30s")
+        
+  with open('industry.json', 'w', encoding='utf-8') as f:
+    json.dump(stock_dict, f, ensure_ascii=False, indent=2)
+  #print(stock_dict['000001'])
 
 # 使用示例
 symbol = "sz000001"  # 平安银行
