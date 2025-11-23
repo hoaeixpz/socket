@@ -124,6 +124,29 @@ def save_single_stock_update(stock_code, analysis_data):
         print(f"保存股票 {stock_code} 数据失败: {e}")
         return False
 
+def fill_indicator(stock_code, indicator:str):
+    df = stock_data.get_indicator_data(stock_code, indicator)
+    kf_roe = stock_data.get_indicator_recent_year(df, 15)
+    #print(kf_roe)
+        
+    history_roe = {}
+    last_year = None
+    for date, kf_roe_v in kf_roe:
+        year = date[0:4]
+        if year != last_year:
+            last_year = year
+            history_roe[year] = [None, None, None, None]
+        month = date[4:6]
+        if month == "03":
+            history_roe[year][0] = kf_roe_v
+        elif month == "06":
+            history_roe[year][1] = kf_roe_v
+        elif month == "09":
+            history_roe[year][2] = kf_roe_v
+        elif month == "12":
+            history_roe[year][3] = kf_roe_v
+    return history_roe
+
 def update_single_stock2(stock_code, stock_info):
     """分析单只股票数据并立即更新到文件"""
     
@@ -133,6 +156,7 @@ def update_single_stock2(stock_code, stock_info):
         # 获取后复权历史股价
         #now = datetime.datetime.now()
         
+        '''
         df = ak.stock_individual_info_em(stock_code)
         for index, row in df.iterrows():
             for col in df.columns:
@@ -141,88 +165,18 @@ def update_single_stock2(stock_code, stock_info):
                 elif row[col] == "行业":
                     stock_info['industry'] = row['value']
         return True
-
-        historical_pe = stock_info['pe_analysis']['historical_pe']
-        history_price_bfq = stock_info['history_price_bfq']
-        years = sorted([int(year) for year in historical_pe.keys() if year.isdigit()])
-        first_year = int(years[0] + 1)
-        print(first_year)
-        df = ak.stock_fhps_detail_em(stock_code)
-        print(df)
-        result_dict = {}
-        for index, row in df.iterrows():
-            for col in df.columns:
-                if col == "报告期":
-                    date = str(row[col])
-                    if history_price_bfq.get(date[0:4]):
-                        profit = stock_data.get_indicator_value(stock_code, "净利润", date)
-                        result_dict[date] = history_price_bfq[date[0:4]] * row["总股本"] / profit
-                        break
-        print(result_dict)
-
-        for year, pe in historical_pe.items():
-            date = str(year) + "-12-31"
-            print(date)
-            if result_dict.get(date) is None:
-                historical_pe[year] = [pe, None]
-            else:
-                jb_eps = stock_data.get_indicator_value(stock_code, "基本每股收益", date)
-                xs_eps = stock_data.get_indicator_value(stock_code, "稀释每股收益", date)
-                tb_eps = stock_data.get_indicator_value(stock_code, "摊薄每股收益_最新股数", date)
-                print(f"{date} {jb_eps} {xs_eps} {tb_eps}")
-                price = history_price_bfq[year]
-                historical_pe[year] = [pe, result_dict[date], price / jb_eps, price / xs_eps, price / tb_eps]
-
-        print(historical_pe)
         '''
-        finan_data = stock_data.get_financial_data(stock_code)
-        print(finan_data)
-
-        row_num = len(finan_data)
-        for col in finan_data.columns:
-            if col == "选项":
-                finan_data[row_num, col] = "常用指标"
-            elif col == "指标":
-                finan_data[row_num, col] =  "扣除非经常性损益后的每股收益"
-            else:
-                date = col[0:4] + "-" + col[4:6] + "-" + col[6:8]
-                print(date)
-                if result_dict.get(date):
-                    finan_data[row_num, col] = result_dict[date]
-
-        print(finan_data)
-        '''
-        '''
-        roe_data = stock_info['roe_details']
-        if 'history_roe' in roe_data:
-            print("return")
-            return False
-        df = stock_data.get_indicator_data(stock_code, "净资产收益率_平均_扣除非经常损益")
-        kf_roe = stock_data.get_indicator_recent_year(df, 15)
-        #print(kf_roe)
-
-        history_roe = {}
-        current_roe = {}
-        for year, roe in roe_data.items():
-            if year[0:2] == "20":
-                history_roe[year] = roe
-            else:
-                print(f"current roe {roe}")
-                current_roe[roe[0]] = roe[1]
-        
-        for date, kf_roe_v in kf_roe:
-            if date in current_roe:
-                current_roe[date] = (current_roe[date], kf_roe_v)
-            elif date[4:6] == "12" and date[0:4] in history_roe:
-                history_roe[date[0:4]] = (history_roe[date[0:4]], kf_roe_v)
-
-        #print(history_roe)
-        #print(current_roe)
 
         stock_info['roe_details'] = {}
-        stock_info['roe_details']['history_roe'] = history_roe
-        stock_info['roe_details']['current_roe'] = current_roe
-        '''
+        history_roe = fill_indicator(stock_code, "净资产收益率_平均_扣除非经常损益")
+        #print(history_roe)
+        stock_info['roe_details']['kf_roe'] = history_roe
+
+        history_roe = fill_indicator(stock_code, "净资产收益率(ROE)")
+        #stock_info['roe_details'] = {}
+        stock_info['roe_details']['roe'] = history_roe
+        
+        
         '''
         history_price_hfq = stock_info['history_price_hfq']
         history_price_hfq['2025'] = stock_collect.get_price(full_stock_code, '20251118', 'hfq')
@@ -398,6 +352,7 @@ def test_demo():
     #update_single_stock("000001")
     #return
     stock_codes, all_stocks = load_existing_good_stocks()
+    #industry_code, all_industry = load_existing_good_stocks("industry.json")
     #good_codes, good_stocks = load_existing_good_stocks("good_stocks.json")
     #print(good_codes)
     
@@ -411,8 +366,8 @@ def test_demo():
     count = 0
     start_t = time.time()
     for i, stock_code in enumerate(stock_codes, 1):
-        if i < 4:
-            continue
+        #if i < 4:
+        #    continue
         stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
 
@@ -448,7 +403,7 @@ def test_demo():
 
         if success:
             print("sleep 10s")
-            time.sleep(10)
+            #time.sleep(10)
 
             #updated_count += 1
             #if success:

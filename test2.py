@@ -54,10 +54,32 @@ def test_stock_board_industry_name_em():
     json.dump(stock_dict, f, ensure_ascii=False, indent=2)
   #print(stock_dict['000001'])
 
+def test_stock_board_industry_summary_ths():
+  ths_industries = ak.stock_board_industry_summary_ths()
+  codes = []
+  for index, row in ths_industries.iterrows():
+    for col in ths_industries.columns:
+      if col == "板块":
+        #print(row[col])
+        codes.append(row[col])
+
+  stock_dict = {}
+  for code in codes:
+    stocks = ak.stock_board_industry_cons_ths(code)
+    print(stocks.head())
+    for index, row in stocks.iterrows():
+      for col in stocks.columns:
+        if col == "代码":
+          stock_dict[row[col]] = code
+    break
+
 # 使用示例
-symbol = "sz000001"  # 平安银行
+symbol = "000001"  # 平安银行
 #test_stock_individual_basic_info_xq(symbol)
-test_stock_board_industry_name_em()
+#test_stock_board_industry_name_em()
+#test_stock_board_industry_summary_ths()
+listing_date = get_stock_listing_date(symbol)
+print(f"{symbol} 上市日期: {listing_date}")
 exit()
 #df = ak.stock_yjbb_em("20121231")
 #print(df)
@@ -110,5 +132,4 @@ for row in range (0,79):
     if col == "指标" or col == "20221231":
       print(df.loc[row, col])
 '''
-#listing_date = get_stock_listing_date(symbol)
-#print(f"{symbol} 上市日期: {listing_date}")
+

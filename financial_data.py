@@ -127,7 +127,6 @@ class FinancialData:
 			if date_col in df.columns:
 				value = df[date_col].iloc[0]  # 取第一行的数据
 				result_list.append((date_col, value))
-		
 		return result_list
 
 	def get_indicator_value(self, symbol: str, indicator: str, date: Optional[str] = None) -> Optional[float]:
