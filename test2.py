@@ -39,16 +39,19 @@ def test_stock_board_industry_name_em():
       if col == "板块名称":
         print(row[col])
         codes.append(row[col])
+
   stock_dict = {}
+  count = 0
   for code in codes:
-    stocks = ak.stock_board_industry_cons_em()
+    stocks = ak.stock_board_industry_cons_em(code)
     for index, row in stocks.iterrows():
       for col in stocks.columns:
         if col == "代码":
           stock_dict[row[col]] = code
     print(stock_dict)
-    time.sleep(30)
-    print("sleep 30s")
+    print("sleep 35s")
+    time.sleep(35)
+
         
   with open('industry.json', 'w', encoding='utf-8') as f:
     json.dump(stock_dict, f, ensure_ascii=False, indent=2)
