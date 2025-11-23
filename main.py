@@ -147,6 +147,36 @@ def fill_indicator(stock_code, indicator:str):
             history_roe[year][3] = kf_roe_v
     return history_roe
 
+def fill_price(full_stock_code, stock_info, adjust:str):
+    try:
+        price_adjust= 'history_price_' + adjust
+        if adjust == "bfq":
+            adjust = ""
+        history_price_hfq = stock_info[price_adjust]
+        for year, price in history_price_hfq.items():
+            history_price_hfq[str(year)] = []
+            for month in range(1,13):
+                print(month)
+                date = ''
+                if month == 2:
+                    date = str(year) + "0228"
+                elif month < 10:
+                    date = str(year) + "0" + str(month) + "30"
+                else:
+                    date = str(year) + str(month) + "30"
+                history_price_hfq[str(year)].append(stock_collect.get_price(full_stock_code, date, adjust))
+            break
+        #history_price_bfq = stock_info['history_price_bfq']
+        #roe_data = stock_info['roe_details']
+        #pe_ana = stock_info['pe_analysis']['historical_pe']
+
+        sorted_dates = dict(sorted(history_price_hfq.items(), key=lambda x: int(x[0])))
+        stock_info[price_adjust] = sorted_dates
+    except Exception as e:
+        print(f" fill_price {full_stock_code} error: {e}")
+        return False
+
+
 def update_single_stock2(stock_code, stock_info):
     """分析单只股票数据并立即更新到文件"""
     
@@ -167,6 +197,7 @@ def update_single_stock2(stock_code, stock_info):
         return True
         '''
 
+        '''
         stock_info['roe_details'] = {}
         history_roe = fill_indicator(stock_code, "净资产收益率_平均_扣除非经常损益")
         #print(history_roe)
@@ -175,21 +206,20 @@ def update_single_stock2(stock_code, stock_info):
         history_roe = fill_indicator(stock_code, "净资产收益率(ROE)")
         #stock_info['roe_details'] = {}
         stock_info['roe_details']['roe'] = history_roe
-        
-        
         '''
-        history_price_hfq = stock_info['history_price_hfq']
-        history_price_hfq['2025'] = stock_collect.get_price(full_stock_code, '20251118', 'hfq')
+        
+        
+        fill_price(full_stock_code, stock_info, 'hfq')
+        fill_price(full_stock_code, stock_info, 'bfq')
         #history_price_bfq = stock_info['history_price_bfq']
         #roe_data = stock_info['roe_details']
         #pe_ana = stock_info['pe_analysis']['historical_pe']
 
-        sorted_dates = dict(sorted(history_price_bfq.items(), key=lambda x: int(x[0])))
-        sorted_roe = dict(sorted(roe_data.items()))
+        sorted_kfroe = dict(sorted(stock_info['roe_details']['kf_roe'].items(), key=lambda x: int(x[0])))
+        sorted_roe = dict(sorted(stock_info['roe_details']['roe'].items(), key=lambda x: int(x[0])))
 
-        #stock_info['history_price_bfq'] = sorted_dates
-        #stock_info['roe_details'] = sorted_roe
-        '''
+        stock_info['roe_details']['kf_roe'] = sorted_kfroe
+        stock_info['roe_details']['roe'] = sorted_roe
 
 
         '''
@@ -377,7 +407,7 @@ def test_demo():
         count = count + 1
         if count % 100 == 0:
             print("count {count}")
-            save_all_stocks(all_stocks)
+            
 
         
         #analysis_data, success = update_single_stock(stock_code)
@@ -387,6 +417,8 @@ def test_demo():
         #print(f"info {stock_info}")
 
         success = update_single_stock2(stock_code, stock_info)
+        save_all_stocks(all_stocks)
+        break
         
         
         #print(f"{stock_info}")
@@ -408,7 +440,7 @@ def test_demo():
             #updated_count += 1
             #if success:
     print(count)
-    save_all_stocks(all_stocks)
+    #save_all_stocks(all_stocks)
 if __name__ == "__main__":
     #main()
     test_demo()

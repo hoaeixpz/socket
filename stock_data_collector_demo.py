@@ -315,6 +315,7 @@ class StockDataCollector:
             if df is not None and not df.empty:
                 return df['close'].iloc[-1]
             else:
+                self.logger.warning(f"获取{stock_code} {target_date} 的股价为空,尝试2周前股价")
                 day = int(startdate[6:]) - 14
                 if day < 10:
                     startdate = startdate[:-2] + "0" + str(day)
