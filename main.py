@@ -209,8 +209,8 @@ def update_single_stock2(stock_code, stock_info):
         '''
         
         
-        fill_price(full_stock_code, stock_info, 'hfq')
-        fill_price(full_stock_code, stock_info, 'bfq')
+        #fill_price(full_stock_code, stock_info, 'hfq')
+        #fill_price(full_stock_code, stock_info, 'bfq')
         #history_price_bfq = stock_info['history_price_bfq']
         #roe_data = stock_info['roe_details']
         #pe_ana = stock_info['pe_analysis']['historical_pe']
@@ -417,9 +417,6 @@ def test_demo():
         #print(f"info {stock_info}")
 
         success = update_single_stock2(stock_code, stock_info)
-        save_all_stocks(all_stocks)
-        break
-        
         
         #print(f"{stock_info}")
         
@@ -440,7 +437,7 @@ def test_demo():
             #updated_count += 1
             #if success:
     print(count)
-    #save_all_stocks(all_stocks)
+    save_all_stocks(all_stocks)
 if __name__ == "__main__":
     #main()
     test_demo()
