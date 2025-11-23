@@ -48,13 +48,13 @@ def test_stock_board_industry_name_em():
       for col in stocks.columns:
         if col == "代码":
           stock_dict[row[col]] = code
+    with open('industry.json', 'w', encoding='utf-8') as f:
+      json.dump(stock_dict, f, ensure_ascii=False, indent=2)
     print(stock_dict)
-    print("sleep 35s")
-    time.sleep(35)
+    print("sleep i20s")
+    time.sleep(120)
 
         
-  with open('industry.json', 'w', encoding='utf-8') as f:
-    json.dump(stock_dict, f, ensure_ascii=False, indent=2)
   #print(stock_dict['000001'])
 
 def test_stock_board_industry_summary_ths():
@@ -79,7 +79,7 @@ def test_stock_board_industry_summary_ths():
 # 使用示例
 symbol = "000001"  # 平安银行
 #test_stock_individual_basic_info_xq(symbol)
-#test_stock_board_industry_name_em()
+test_stock_board_industry_name_em()
 #test_stock_board_industry_summary_ths()
 listing_date = get_stock_listing_date(symbol)
 print(f"{symbol} 上市日期: {listing_date}")
