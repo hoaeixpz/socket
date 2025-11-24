@@ -43,8 +43,9 @@ def test_stock_board_industry_name_em():
   stock_dict = {}
   count = 0
   for code in codes:
+    print(code)
     count = count + 1
-    if count < 11:
+    if count < 16:
       continue
     stocks = ak.stock_board_industry_cons_em(code)
     for index, row in stocks.iterrows():
