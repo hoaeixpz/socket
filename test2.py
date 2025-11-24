@@ -43,6 +43,9 @@ def test_stock_board_industry_name_em():
   stock_dict = {}
   count = 0
   for code in codes:
+    count = count + 1
+    if count < 11:
+      continue
     stocks = ak.stock_board_industry_cons_em(code)
     for index, row in stocks.iterrows():
       for col in stocks.columns:
@@ -51,8 +54,8 @@ def test_stock_board_industry_name_em():
     with open('industry.json', 'w', encoding='utf-8') as f:
       json.dump(stock_dict, f, ensure_ascii=False, indent=2)
     print(stock_dict)
-    print("sleep i20s")
-    time.sleep(120)
+    print("sleep 300s")
+    time.sleep(300)
 
         
   #print(stock_dict['000001'])
