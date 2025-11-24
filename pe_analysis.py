@@ -49,13 +49,13 @@ def load_existing_good_stocks():
     try:
         with open('good_stocks.json', 'r', encoding='utf-8') as f:
             stocks = json.load(f)
-        return list(stocks.keys()), stocks
+        return stocks
     except FileNotFoundError:
         print("错误：找不到good_stocks.json文件")
-        return [], {}
+        return {}
     except json.JSONDecodeError as e:
         print(f"错误：JSON文件格式错误 - {e}")
-        return [], {}
+        return {}
 
 def update_single_stock_pe(stock_code, stock_info, pe_collector):
     """分析单只股票的PE值并立即更新到文件"""
@@ -137,7 +137,8 @@ def update_stocks_with_pe():
     """分析所有good股票的PE值，每分析完一只股票就立即更新文件"""
     
     # 加载现有股票数据
-    stock_codes, all_stocks = load_existing_good_stocks()
+    all_stocks = load_existing_good_stocks()
+    stock_codes = list(stocks.keys())
     
     if not stock_codes:
         print("没有找到good状态的股票数据")

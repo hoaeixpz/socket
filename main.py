@@ -58,13 +58,13 @@ def load_existing_good_stocks(file = 'analysis_results.json'):
     try:
         with open(file, 'r', encoding='utf-8') as f:
             stocks = json.load(f)
-        return list(stocks.keys()), stocks
+        return stocks
     except FileNotFoundError:
         print("错误：找不到{file}文件")
-        return [], {}
+        return {}
     except json.JSONDecodeError as e:
         print(f"错误：JSON文件格式错误 - {e}")
-        return [], {}
+        return {}
 
 def update_single_stock(stock_code):
     """分析单只股票数据并立即更新到文件"""
@@ -175,6 +175,17 @@ def fill_price(full_stock_code, stock_info, adjust:str):
     except Exception as e:
         print(f" fill_price {full_stock_code} error: {e}")
         return False
+
+def update_industry(stock_code, stock_info, all_industry):
+    ind = stock_info.get("industry")
+    if ind is not None:
+        ind2 = all_industry.get(stock_code)
+        if ind2 is not None and ind2 != ind:
+            print(f"{stock_code} has different industry {ind} {ind2}")
+    else:
+        ind2 = all_industry.get(stock_code)
+        if ind2 is not None:
+            stock_info["industry"] = ind2
 
 
 def update_single_stock2(stock_code, stock_info):
@@ -292,7 +303,8 @@ def update_stocks():
     """分析所有good股票的PE值，每分析完一只股票就立即更新文件"""
     
     # 加载现有股票数据
-    stock_codes, all_stocks = load_existing_good_stocks()
+    all_stocks = load_existing_good_stocks()
+    stock_codes = list(all_stocks.keys())
     
     if not stock_codes:
         print("没有找到good状态的股票数据")
@@ -381,8 +393,9 @@ def test_demo():
     #stock_data.get_indicator_list("000001", True)
     #update_single_stock("000001")
     #return
-    stock_codes, all_stocks = load_existing_good_stocks()
-    #industry_code, all_industry = load_existing_good_stocks("industry.json")
+    all_stocks = load_existing_good_stocks()
+    stock_codes = list(all_stocks.keys())
+    all_industry = load_existing_good_stocks("industry.json")
     #good_codes, good_stocks = load_existing_good_stocks("good_stocks.json")
     #print(good_codes)
     
@@ -401,13 +414,14 @@ def test_demo():
         stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
 
-        print(f"\n{'='*60}")
-        print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
-        print(f"{'='*60}")
+        #print(f"\n{'='*60}")
+        #print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
+        #print(f"{'='*60}")
         count = count + 1
-        if count % 100 == 0:
-            print("count {count}")
-            
+        #if count % 100 == 0:
+        #    print("count {count}")
+        update_industry(stock_code, stock_info, all_industry)
+        continue
 
         
         #analysis_data, success = update_single_stock(stock_code)
