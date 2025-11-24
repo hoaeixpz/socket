@@ -2,6 +2,7 @@ import akshare as ak
 import json
 import time
 import pandas as pd
+import random
 from datetime import datetime
 from financial_data import FinancialData
 
@@ -41,22 +42,29 @@ def test_stock_board_industry_name_em():
         codes.append(row[col])
 
   stock_dict = {}
-  count = 0
+  with open('industry.json', 'r', encoding='utf-8') as f:
+    stock_dict = json.load(f)
+  
+  code_set = set(stock_dict.values())
+  print(code_set)
+
   for code in codes:
     print(code)
-    count = count + 1
-    if count < 16:
+    if code in code_set:
+      print(f"{code} in set")
       continue
     stocks = ak.stock_board_industry_cons_em(code)
     for index, row in stocks.iterrows():
       for col in stocks.columns:
         if col == "代码":
+          print(row[col])
           stock_dict[row[col]] = code
     with open('industry.json', 'w', encoding='utf-8') as f:
       json.dump(stock_dict, f, ensure_ascii=False, indent=2)
-    print(stock_dict)
-    print("sleep 300s")
-    time.sleep(300)
+    randNum = random.randint(0,6)
+    t = 100 + randNum * 50
+    print(f"sleep {t}s")
+    time.sleep(t)
 
         
   #print(stock_dict['000001'])
@@ -85,8 +93,8 @@ symbol = "000001"  # 平安银行
 #test_stock_individual_basic_info_xq(symbol)
 test_stock_board_industry_name_em()
 #test_stock_board_industry_summary_ths()
-listing_date = get_stock_listing_date(symbol)
-print(f"{symbol} 上市日期: {listing_date}")
+#listing_date = get_stock_listing_date(symbol)
+#print(f"{symbol} 上市日期: {listing_date}")
 exit()
 #df = ak.stock_yjbb_em("20121231")
 #print(df)
