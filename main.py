@@ -185,6 +185,7 @@ def update_industry(stock_code, stock_info, all_industry):
     else:
         ind2 = all_industry.get(stock_code)
         if ind2 is not None:
+            print(f"{stock_code} -> {ind2}")
             stock_info["industry"] = ind2
 
 
