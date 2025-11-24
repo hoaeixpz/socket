@@ -5,6 +5,7 @@ import pandas as pd
 import random
 from datetime import datetime
 from financial_data import FinancialData
+from test_proxy import HybridProxyCrawler
 
 stock_data = FinancialData()
 
@@ -32,7 +33,9 @@ def test_stock_individual_basic_info_xq(symbol):
   df = ak.stock_individual_basic_info_xq(symbol)
   print(df)
 
-def test_stock_board_industry_name_em():
+def test_stock_board_industry_name_em(): 
+  crawler = HybridProxyCrawler()
+  use_proxy = crawler.setup_session()
   bankai = ak.stock_board_industry_name_em()
   codes = []
   for index, row in bankai.iterrows():
@@ -48,11 +51,14 @@ def test_stock_board_industry_name_em():
   code_set = set(stock_dict.values())
   print(code_set)
 
+  
   for code in codes:
     print(code)
     if code in code_set:
       print(f"{code} in set")
       continue
+    
+    use_proxy = crawler.setup_session()
     stocks = ak.stock_board_industry_cons_em(code)
     for index, row in stocks.iterrows():
       for col in stocks.columns:
@@ -62,7 +68,7 @@ def test_stock_board_industry_name_em():
     with open('industry.json', 'w', encoding='utf-8') as f:
       json.dump(stock_dict, f, ensure_ascii=False, indent=2)
     randNum = random.randint(0,6)
-    t = 100 + randNum * 50
+    t = 100 + randNum * 50 + random.uniform(20, 30)
     print(f"sleep {t}s")
     time.sleep(t)
 
