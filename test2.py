@@ -33,7 +33,8 @@ def test_stock_individual_basic_info_xq(symbol):
   df = ak.stock_individual_basic_info_xq(symbol)
   print(df)
 
-def test_stock_board_industry_name_em(): 
+def test_stock_board_industry_name_em():
+  '''
   crawler = HybridProxyCrawler()
   use_proxy = crawler.setup_session()
   bankai = ak.stock_board_industry_name_em()
@@ -43,6 +44,15 @@ def test_stock_board_industry_name_em():
       if col == "板块名称":
         print(row[col])
         codes.append(row[col])
+  '''
+
+  all_codes = set()
+  with open('industry_list.txt', 'r', encoding='utf-8') as file:
+    for line in file:
+      value = line.strip()  # 去除换行符和空白字符
+      if value:  # 避免空行
+        all_codes.add(value)
+  print(all_codes)
 
   stock_dict = {}
   with open('industry.json', 'r', encoding='utf-8') as f:
@@ -51,14 +61,13 @@ def test_stock_board_industry_name_em():
   code_set = set(stock_dict.values())
   print(code_set)
 
-  
-  for code in codes:
+  for code in all_codes:
     print(code)
     if code in code_set:
       print(f"{code} in set")
       continue
     
-    use_proxy = crawler.setup_session()
+    #use_proxy = crawler.setup_session()
     stocks = ak.stock_board_industry_cons_em(code)
     for index, row in stocks.iterrows():
       for col in stocks.columns:
