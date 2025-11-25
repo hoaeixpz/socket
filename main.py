@@ -453,6 +453,11 @@ def test_demo():
             #if success:
     print(count)
     save_all_stocks(all_stocks)
+    count = 0
+    for i, stock_code in enumerate(stock_codes, 1):
+        if all_stocks[stock_code].get("industry"):
+            count += 1
+    print(f"{count} has industry")
 if __name__ == "__main__":
     #main()
     test_demo()
