@@ -61,6 +61,8 @@ def test_stock_board_industry_name_em():
   code_set = set(stock_dict.values())
   print(code_set)
 
+  print("sleep 10 min")
+  time.sleep(600)
   for code in all_codes:
     print(code)
     if code in code_set:
@@ -76,10 +78,9 @@ def test_stock_board_industry_name_em():
           stock_dict[row[col]] = code
     with open('industry.json', 'w', encoding='utf-8') as f:
       json.dump(stock_dict, f, ensure_ascii=False, indent=2)
-    break
     randNum = random.randint(0,6)
-    t = 100 + randNum * 50 + random.uniform(20, 30)
-    print(f"sleep {t}s")
+    t = 1000 + randNum * 50 + random.uniform(20, 30)
+    print(f"sleep {t/60} min")
     time.sleep(t)
 
         
