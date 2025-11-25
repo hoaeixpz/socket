@@ -1,5 +1,5 @@
 SCRIPT_PATH="test2.py"
-INTERVAL_MINUTES=30
+INTERVAL_MINUTES=22
 LOG_FILE="scheduler.log"
 
 log() {
