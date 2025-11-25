@@ -5,7 +5,7 @@ import pandas as pd
 import random
 from datetime import datetime
 from financial_data import FinancialData
-from test_proxy import HybridProxyCrawler
+#from test_proxy import HybridProxyCrawler
 
 stock_data = FinancialData()
 
