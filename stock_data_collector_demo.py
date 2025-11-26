@@ -9,7 +9,7 @@ import os
 import numpy as np
 
 from financial_data import FinancialData
-
+from stock_data_cache import StockDataCache
 # 创建全局实例
 stock_data = FinancialData()
 
@@ -140,7 +140,8 @@ class StockDataCollector:
         """获取过滤后的股票列表（排除科创板、北交所、ST股等）"""
         try:
             # 获取所有A股股票列表
-            stock_list = ak.stock_info_a_code_name()
+            #stock_list = ak.stock_info_a_code_name()
+            stock_list = StockDataCache().get_stock_list()
             
             if stock_list is None or stock_list.empty:
                 self.logger.error("获取股票列表失败")
@@ -204,7 +205,7 @@ class StockDataCollector:
                     if price is not None and eps is not None:
                         pe_ratio = price / eps
                         #print(f"date {date} eps {eps} price {price} pe_ratio {pe_ratio}")
-                        pe_result[date] = pe_ratio
+                        pe_result[date[0:4]] = pe_ratio
                         price_result[date[0:4]] = price
             print("获取历史市盈率数据结束")
             
@@ -346,26 +347,33 @@ class StockDataCollector:
         print(f"获取{stock_code} 历史每股收益结束")
         return result_list
 
-    def get_ROE(self, stock_code: str, stock_name: str, year : int = 15) -> Dict:
+    def get_ROE(self, stock_code: str, stock_name: str, indicator: str, year : int = 15) -> Dict:
         """获取ROE"""
-        df = stock_data.get_indicator_data(stock_code, "净资产收益率(ROE)")
+        df = stock_data.get_indicator_data(stock_code, indicator)
         result_list = stock_data.get_indicator_recent_year(df, year)
+        kf_roe = stock_data.get_indicator_recent_year(df, year)
+        #print(kf_roe)
+        
         history_roe = {}
-        current_roe = []
-        for date, roe in result_list:
-            if roe is None:
-                continue
-            if date[0:4] == "2025":
-                if len(current_roe) == 0:
-                    current_roe = [date, roe]
-                else:
-                    if int(current_roe[0]) < int(date):
-                        current_roe = [date, roe]
-            if date[4:6] == "12":
-                history_roe[date[0:4]] = roe
+        last_year = None
+        for date, kf_roe_v in kf_roe:
+            year = date[0:4]
+            if year != last_year:
+                last_year = year
+                history_roe[year] = [None, None, None, None]
+            month = date[4:6]
+            if month == "03":
+                history_roe[year][0] = kf_roe_v
+            elif month == "06":
+                history_roe[year][1] = kf_roe_v
+            elif month == "09":
+                history_roe[year][2] = kf_roe_v
+            elif month == "12":
+                history_roe[year][3] = kf_roe_v
+
         print(f"获取{stock_code} 历史ROE结束")
 
-        return history_roe, current_roe
+        return history_roe
 
     def analyze_stock(self, stock_code: str, stock_name: str, years: int = 15) -> Dict:
         """分析单只股票，记录近15年每年末的股价、ROE和PE数据"""
@@ -379,12 +387,23 @@ class StockDataCollector:
             for year in range(now.year - years, now.year):
                 date = str(year) + "1231"
                 history_price_hfq[year] = self.get_price(stock_code, date, adjust = "hfq")
+            
 
             # 1. 获取ROE数据
-            hist_roe, curr_roe = self.get_ROE(stock_code, stock_name, years)
+            hist_roe = self.get_ROE(stock_code, stock_name, "净资产收益率(ROE)", years)
+            hist_kf_roe = self.get_ROE(stock_code, stock_name, "净资产收益率_平均_扣除非经常损益", years)
+            sorted_kfroe = dict(sorted(hist_kf_roe.items(), key=lambda x: int(x[0])))
+            sorted_roe = dict(sorted(hist_roe.items(), key=lambda x: int(x[0])))
+
+            hist_kf_roe = sorted_kfroe
+            hist_roe = sorted_roe
             
             # 2. 获取PE数据,和股价
             pe_data, price_data = self.get_historical_pe_ratios(stock_code, years)
+            sorted_pe = dict(sorted(pe_data.items(), key=lambda x: int(x[0])))
+            pe_data = sorted_pe
+            sorted_dates = dict(sorted(price_data.items(), key=lambda x: int(x[0])))
+            price_data = sorted_dates
             
             # 3. 获取当前股价和PE
             current_price = self.get_current_price(stock_code)
@@ -400,8 +419,9 @@ class StockDataCollector:
 
             
             # 4. 汇总结果
-            roe_detail = hist_roe
-            roe_detail['current'] = curr_roe
+            roe_detail = {}
+            roe_detail['kf_roe'] = hist_kf_roe
+            roe_detail['roe'] = hist_roe
             result = {
                 'stock_code': stock_code,
                 'stock_name': stock_name,
@@ -454,11 +474,13 @@ class StockDataCollector:
         for i in range(0, len(stocks_to_analyze), batch_size):
             batch = stocks_to_analyze[i:i + batch_size]
             
-            self.logger.info(f"分析第 {i//batch_size + 1} 批，共 {len(batch)} 只股票")
+            #self.logger.info(f"分析第 {i//batch_size + 1} 批，共 {len(batch)} 只股票")
             
             for stock_code, stock_name in batch:
                 try:
                     # 分析股票
+                    if stock_code in self.results:
+                        continue
                     result = self.analyze_stock(stock_code, stock_name)
                     
                     # 保存结果
@@ -475,7 +497,7 @@ class StockDataCollector:
                     self._save_progress()
                     
                     # 延迟避免频繁请求
-                    time.sleep(delay)
+                    #time.sleep(delay)
                     
                 except Exception as e:
                     self.logger.error(f"分析 {stock_code} 时出错: {e}")
@@ -490,9 +512,9 @@ class StockDataCollector:
                     self._save_results()
                     self._save_progress()
             
-            self.logger.info(f"第 {i//batch_size + 1} 批分析完成")
+            #self.logger.info(f"第 {i//batch_size + 1} 批分析完成")
         
-        self.logger.info("批量分析完成")
+        #self.logger.info("批量分析完成")
 
     def get_summary(self):
         """获取分析摘要"""
@@ -507,7 +529,7 @@ def demo_test():
     print("=== 上市公司ROE分析器 Demo测试 ===\n")
     
     # 创建分析器
-    analyzer = StockDataCollector()
+    analyzer = StockDataCollector('analysis_results.json', '')
     
     # 测试几只股票
     test_stocks = [
@@ -553,11 +575,11 @@ def demo_test():
 def batch_analyze_main():
     #analysis all stocks
 
-    analyzer = StockDataCollector()
+    analyzer = StockDataCollector('analysis_results.json', '')
     analyzer.batch_analyze_stocks(15,3)
 
     analyzer.get_summary()
 
 if __name__ == "__main__":
-    demo_test()
-    #batch_analyze_main()
+    #demo_test()
+    batch_analyze_main()
