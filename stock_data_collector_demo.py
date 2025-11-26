@@ -317,12 +317,8 @@ class StockDataCollector:
                 return df['close'].iloc[-1]
             else:
                 self.logger.warning(f"获取{stock_code} {target_date} 的股价为空,尝试2周前股价")
-                day = int(startdate[6:]) - 14
-                if day < 10:
-                    startdate = startdate[:-2] + "0" + str(day)
-                else:
-                    startdate = startdate[:-2] + str(day)
-                #print(f"start end {startdate} {target_date}")
+                startdate = startdate[0:6] + "01"
+                print(f"start end {startdate} {target_date}")
                 df = ak.stock_zh_a_daily(
                     stock_code, 
                     start_date=startdate, 

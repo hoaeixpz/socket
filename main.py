@@ -223,54 +223,64 @@ def update_single_stock2(stock_code, stock_info):
         
         #fill_price(full_stock_code, stock_info, 'hfq')
         #fill_price(full_stock_code, stock_info, 'bfq')
-        #history_price_bfq = stock_info['history_price_bfq']
         #roe_data = stock_info['roe_details']
-        #pe_ana = stock_info['pe_analysis']['historical_pe']
+        pe_ana = stock_info['pe_analysis']['historical_pe']
 
-        sorted_kfroe = dict(sorted(stock_info['roe_details']['kf_roe'].items(), key=lambda x: int(x[0])))
-        sorted_roe = dict(sorted(stock_info['roe_details']['roe'].items(), key=lambda x: int(x[0])))
+        #sorted_kfroe = dict(sorted(stock_info['roe_details']['kf_roe'].items(), key=lambda x: int(x[0])))
+        #sorted_roe = dict(sorted(stock_info['roe_details']['roe'].items(), key=lambda x: int(x[0])))
 
-        stock_info['roe_details']['kf_roe'] = sorted_kfroe
-        stock_info['roe_details']['roe'] = sorted_roe
+        #stock_info['roe_details']['kf_roe'] = sorted_kfroe
+        #stock_info['roe_details']['roe'] = sorted_roe
 
 
-        '''
+        history_price_bfq = stock_info['history_price_bfq']
         if len(history_price_bfq.values()) == 0:
             return
 
-        for year in range(now.year - 15, now.year):
-            year = str(year)
-            value = history_price_bfq.get(year)
-            #print(year, value)
-            if value is not None:
-                continue
+        history_price_hfq = stock_info['history_price_hfq']
 
-            date = year + "1231"
-            history_price_bfq[year] = stock_collect.get_price(full_stock_code, date)
-            if history_price_bfq[year] is None:
-                for month in range(11, 0, -1):
+        last_year = None
+        for year,price in history_price_hfq.items():
+            print(year, price)
+            if price is not None:
+                continue
+            if last_year is not None:
+                if abs(int(last_year) - int(year)) == 1:
+                    continue
+
+            date = year + "1215"
+            history_price_hfq[year] = stock_collect.get_price(full_stock_code, date, adjust = 'hfq')
+            if history_price_hfq[year] is None:
+                for month in range(11, 9, -1):
                     ms = str(month)
                     if month < 10:
                         ms = "0" + str(month)
                     date = year + ms + "30"
-                    if month == 2:
-                        date = year + ms + "28"
-                    price = stock_collect.get_price(full_stock_code, date)
-                    history_price_bfq[year] = price
-                    if price is not None:
+                    #if month == 2:
+                    #    date = year + ms + "28"
+                    price = stock_collect.get_price(full_stock_code, date, adjust = 'hfq')
+                    history_price_hfq[year] = price
+                    if price is not None and history_price_bfq.get(year) is None:
                         #print(year, price)
-                        history_price_hfq[year] = stock_collect.get_price(full_stock_code, date, adjust = "hfq")
+                        history_price_bfq[year] = stock_collect.get_price(full_stock_code, date)
                         hist_eps = stock_collect.get_history_eps(stock_code, 15)
                         for dat, eps in hist_eps:
                             if dat[0:4] == year and dat[4:6] == "12":
-                                pe_ratio = price / eps
-                                pe_ana[dat] = pe_ratio
-                        break
-        '''
-        #stock_info['history_price_bfq'] = sorted_dates
+                                pe_ratio = history_price_bfq[year] / eps
+                                pe_ana[dat[0:4]] = pe_ratio
+                                
+                                sorted_dates = dict(sorted(history_price_bfq.items(), key=lambda x: int(x[0])))
+                                stock_info['history_price_bfq'] = sorted_dates
+                                sorted_dates = dict(sorted(history_price_hfq.items(), key=lambda x: int(x[0])))
+                                stock_info['history_price_hfq'] = sorted_dates
+                                sorted_dates = dict(sorted(pe_ana.items(), key=lambda x: int(x[0])))
+                                stock_info['pe_analysis']['historical_pe'] = sorted_dates
+                                return True
+                        #break
+        #stock_info['history_price_bfq'] = history_price_bfq
         #stock_info['history_price_hfq'] = history_price_hfq
         #stock_info['pe_analysis']['historical_pe'] = pe_ana
-        return True
+        return False
 
     except Exception as e:
         print(f" analysis {stock_code} error: {e}")
@@ -386,6 +396,20 @@ def main():
         good_stocks = load_good_stocks()
         generate_summary_report(good_stocks)
         
+def extract_stock_codes_simple(file):
+    """
+    """
+    stock_codes = []
+                        
+    for line_num, line in enumerate(file, 1):
+        if '获取' in line and '的股价为空' in line:
+            parts = line.split('获取')[-1].split(' ')[0]
+            if parts.startswith('sh') or parts.startswith('sz'):
+                code = parts[2:]
+                stock_codes.append(code)
+
+    return set(stock_codes)
+
 def test_demo():
     '''
     test function update_single_stock
@@ -410,19 +434,24 @@ def test_demo():
     count = 0
     start_t = time.time()
     for i, stock_code in enumerate(stock_codes, 1):
+        fix_codes = {}
+        with open("logs/1", 'r', encoding='utf-8') as f:
+            fix_codes = extract_stock_codes_simple(f)
+        if stock_code not in fix_codes:
+            continue
         #if i < 4:
         #    continue
+        print(stock_code)
         stock_info = all_stocks[stock_code]
         stock_name = stock_info.get('stock_name', '未知')
 
         #print(f"\n{'='*60}")
         #print(f"analysis the {i}/{len(stock_codes)} stock: {stock_name}({stock_code})")
         #print(f"{'='*60}")
-        count = count + 1
         #if count % 100 == 0:
         #    print("count {count}")
-        update_industry(stock_code, stock_info, all_industry)
-        continue
+        #update_industry(stock_code, stock_info, all_industry)
+        #continue
 
         
         #analysis_data, success = update_single_stock(stock_code)
@@ -446,6 +475,9 @@ def test_demo():
         start_t = end_t
 
         if success:
+            count = count + 1
+        if count > 4:
+            break
             print("sleep 10s")
             #time.sleep(10)
 
