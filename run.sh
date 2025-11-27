@@ -1,5 +1,5 @@
 SCRIPT_PATH="test2.py"
-INTERVAL_MINUTES=22
+INTERVAL_MINUTES=60
 LOG_FILE="scheduler.log"
 
 log() {
@@ -13,12 +13,13 @@ fi
 
 log "🕒 开始定时执行: $SCRIPT_PATH"
 log "⏰ 执行间隔: $INTERVAL_MINUTES 分钟"
+log "sleep 1 hour"
 
 while true; do
 	START_TIME=$(date +%s)
 	log "🚀 开始执行脚本..."
 
-	python3 "$SCRIPT_PATH" 2>&1 | tee -a "$LOG_FILE"
+	python3.11 "$SCRIPT_PATH" 2>&1 | tee -a "$LOG_FILE"
 	EXIT_CODE=${PIPESTATUS[0]}
 
 	END_TIME=$(date +%s)
@@ -33,3 +34,4 @@ while true; do
 	log "⏳ 等待 $INTERVAL_MINUTES 分钟..."
 	sleep $((INTERVAL_MINUTES * 60))
 done
+
