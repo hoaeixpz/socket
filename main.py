@@ -437,13 +437,6 @@ def test_demo():
     count = 0
     start_t = time.time()
     for i, stock_code in enumerate(stock_codes, 1):
-        if stock_code != "000426":
-            continue
-        fix_codes = {}
-        with open("logs/1", 'r', encoding='utf-8') as f:
-            fix_codes = extract_stock_codes_simple(f)
-        if stock_code not in fix_codes:
-            continue
         #if i < 4:
         #    continue
         print(stock_code)
@@ -455,8 +448,8 @@ def test_demo():
         #print(f"{'='*60}")
         #if count % 100 == 0:
         #    print("count {count}")
-        #update_industry(stock_code, stock_info, all_industry)
-        #continue
+        update_industry(stock_code, stock_info, all_industry)
+        continue
 
         
         #analysis_data, success = update_single_stock(stock_code)
