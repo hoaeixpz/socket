@@ -239,14 +239,12 @@ def update_single_stock2(stock_code, stock_info):
 
         history_price_hfq = stock_info['history_price_hfq']
 
-        last_year = None
+        flag = False
+
         for year,price in history_price_hfq.items():
             print(year, price)
             if price is not None:
                 continue
-            if last_year is not None:
-                if abs(int(last_year) - int(year)) == 1:
-                    continue
 
             date = year + "1215"
             history_price_hfq[year] = stock_collect.get_price(full_stock_code, date, adjust = 'hfq')
@@ -260,23 +258,28 @@ def update_single_stock2(stock_code, stock_info):
                     #    date = year + ms + "28"
                     price = stock_collect.get_price(full_stock_code, date, adjust = 'hfq')
                     history_price_hfq[year] = price
-                    if price is not None and history_price_bfq.get(year) is None:
-                        #print(year, price)
-                        history_price_bfq[year] = stock_collect.get_price(full_stock_code, date)
-                        hist_eps = stock_collect.get_history_eps(stock_code, 15)
-                        for dat, eps in hist_eps:
-                            if dat[0:4] == year and dat[4:6] == "12":
-                                pe_ratio = history_price_bfq[year] / eps
-                                pe_ana[dat[0:4]] = pe_ratio
+
+            price = history_price_hfq[year]
+            print(f"hfq price is {price}")
+            print(f"bfq price is {history_price_bfq.get(year)}")
+            if price is not None and history_price_bfq.get(year) is None:
+                #print(year, price)
+                history_price_bfq[year] = stock_collect.get_price(full_stock_code, date)
+                hist_eps = stock_collect.get_history_eps(stock_code, 15)
+                for dat, eps in hist_eps:
+                    if dat[0:4] == year and dat[4:6] == "12":
+                        pe_ratio = history_price_bfq[year] / eps
+                        pe_ana[dat[0:4]] = pe_ratio
+                        flag = True
+                        break
                                 
-                                sorted_dates = dict(sorted(history_price_bfq.items(), key=lambda x: int(x[0])))
-                                stock_info['history_price_bfq'] = sorted_dates
-                                sorted_dates = dict(sorted(history_price_hfq.items(), key=lambda x: int(x[0])))
-                                stock_info['history_price_hfq'] = sorted_dates
-                                sorted_dates = dict(sorted(pe_ana.items(), key=lambda x: int(x[0])))
-                                stock_info['pe_analysis']['historical_pe'] = sorted_dates
-                                return True
-                        #break
+        sorted_dates = dict(sorted(history_price_bfq.items(), key=lambda x: int(x[0])))
+        stock_info['history_price_bfq'] = sorted_dates
+        sorted_dates = dict(sorted(history_price_hfq.items(), key=lambda x: int(x[0])))
+        stock_info['history_price_hfq'] = sorted_dates
+        sorted_dates = dict(sorted(pe_ana.items(), key=lambda x: int(x[0])))
+        stock_info['pe_analysis']['historical_pe'] = sorted_dates
+        return flag
         #stock_info['history_price_bfq'] = history_price_bfq
         #stock_info['history_price_hfq'] = history_price_hfq
         #stock_info['pe_analysis']['historical_pe'] = pe_ana
@@ -434,6 +437,8 @@ def test_demo():
     count = 0
     start_t = time.time()
     for i, stock_code in enumerate(stock_codes, 1):
+        if stock_code != "000426":
+            continue
         fix_codes = {}
         with open("logs/1", 'r', encoding='utf-8') as f:
             fix_codes = extract_stock_codes_simple(f)
@@ -476,7 +481,7 @@ def test_demo():
 
         if success:
             count = count + 1
-        if count > 4:
+        if count > 3:
             break
             print("sleep 10s")
             #time.sleep(10)
