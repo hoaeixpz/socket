@@ -27,6 +27,39 @@ def save_industry(industry_dict):
     except Exception as e:
         print(f"保存结果失败: {e}")
 
+def cal_mean_pe(pe_dict):
+    try:
+        pe_mean_dict = {}
+        pe_valid_mean_dict = {}
+        for year, pe_list in pe_dict.items():
+            #print(year)
+            #print(pe_list)
+            total = 0
+            valid_total = 0
+            count = 0
+            valid_count = 0
+            for value in pe_list:
+                if value > 0:
+                    valid_total += value
+                    valid_count += 1
+                count += 1
+                total += value
+            if count > 0:
+                pe_mean_dict[year] = total / count
+            else:
+                print(f"count == 0 year{year} pe {pe_list}")
+            if valid_count > 0:
+                pe_valid_mean_dict[year] = valid_total / valid_count
+            else:
+                print(f"valid count == 0 year{year} pe {pe_list}")
+                
+
+        pe_mean_dict = dict(sorted(pe_mean_dict.items(), key=lambda x: int(x[0])))
+        pe_valid_mean_dict = dict(sorted(pe_valid_mean_dict.items(), key=lambda x: int(x[0])))
+        return pe_mean_dict, pe_valid_mean_dict
+    except Exception as e:
+        print(f"cal pe fail {e}")
+
 def cal_mean_indicator(roe_dict):
     try:
         roe_mean_dict = {}
@@ -55,7 +88,7 @@ def cal_mean_indicator(roe_dict):
             roe_mean_dict[year] = averages
             
 
-        print(roe_mean_dict)
+        #print(roe_mean_dict)
         return roe_mean_dict
     except Exception as e:
         print(f"calc mean error {e}")
@@ -74,17 +107,20 @@ def main():
         if industry_dict.get(industry) is None:
             industry_dict[industry] = {}
         if industry_dict[industry].get("code") is None:
-            industry_dict[industry]["code"] = []
+            industry_dict[industry]["code"] = {}
         if industry_dict[industry].get("kf_roe") is None:
-            industry_dict[industry]["kf_roe"] = []
+            industry_dict[industry]["kf_roe"] = {}
         if industry_dict[industry].get("roe") is None:
-            industry_dict[industry]["roe"] = []
+            industry_dict[industry]["roe"] = {}
         if industry_dict[industry].get("pe") is None:
-            industry_dict[industry]["pe"] = []
+            industry_dict[industry]["pe"] = {}
+        if industry_dict[industry].get("valid_pe") is None:
+            industry_dict[industry]["valid_pe"] = {}
 
         industry_dict[industry]["code"].append(code)
         
     for industry, industry_info in industry_dict.items():
+        print(f"industry {industry}")
         codes = industry_info["code"]
         kf_roe_dict = {}
         roe_dict = {}
@@ -113,22 +149,22 @@ def main():
                     pe_dict[year] = []
                 pe_dict[year].append(pe)
 
-        print("cal kf roe")
+        #print("cal kf roe")
         kf_roe_mean_dict = cal_mean_indicator(kf_roe_dict)
-        print("cal roe")
+        #print("cal roe")
         roe_mean_dict = cal_mean_indicator(roe_dict)
-        print(pe_dict)
         #print("cal pe")
-        #pe_mean_dict = cal_mean_indicator(pe_dict)
+        pe_mean_dict, pe_valid_mean_dict = cal_mean_pe(pe_dict)
 
         industry_dict[industry]["kf_roe"] = kf_roe_mean_dict
         industry_dict[industry]["roe"] = roe_mean_dict
-        #industry_dict[industry]["pe"] = pe_dict
+        industry_dict[industry]["pe"] = pe_mean_dict
+        industry_dict[industry]["valid_pe"] = pe_valid_mean_dict
         #print(kf_roe_list)
 
         break
 
-    #save_industry(industry_dict)
+    save_industry(industry_dict)
 
 if __name__ == "__main__":
     main()
