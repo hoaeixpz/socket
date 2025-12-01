@@ -45,11 +45,11 @@ def cal_mean_pe(pe_dict):
                 count += 1
                 total += value
             if count > 0:
-                pe_mean_dict[year] = total / count
+                pe_mean_dict[year] = round(total / count, 4)
             else:
                 print(f"count == 0 year{year} pe {pe_list}")
             if valid_count > 0:
-                pe_valid_mean_dict[year] = valid_total / valid_count
+                pe_valid_mean_dict[year] = round(valid_total / valid_count, 4)
             else:
                 print(f"valid count == 0 year{year} pe {pe_list}")
                 
@@ -85,7 +85,7 @@ def cal_mean_indicator(roe_dict):
                 #print(counts)
 
             averages = [total / count if count > 0 else 0 for total,count in zip(roe_mean_dict[year], counts)]
-            roe_mean_dict[year] = averages
+            roe_mean_dict[year] = [round(ava, 4) for ava in averages]
             
 
         #print(roe_mean_dict)
@@ -101,13 +101,10 @@ def main():
 
     all_stocks = load_existing_stocks("analysis_results.json")
     for code, industry in industry_map.items():
-        if industry in industry_dict:
-            continue
-        print(f"{industry} is not in json")   
         if industry_dict.get(industry) is None:
             industry_dict[industry] = {}
         if industry_dict[industry].get("code") is None:
-            industry_dict[industry]["code"] = {}
+            industry_dict[industry]["code"] = set()
         if industry_dict[industry].get("kf_roe") is None:
             industry_dict[industry]["kf_roe"] = {}
         if industry_dict[industry].get("roe") is None:
@@ -117,16 +114,19 @@ def main():
         if industry_dict[industry].get("valid_pe") is None:
             industry_dict[industry]["valid_pe"] = {}
 
-        industry_dict[industry]["code"].append(code)
-        
+        industry_dict[industry]["code"] = set(industry_dict[industry]["code"])
+        industry_dict[industry]["code"].add(code)
+
     for industry, industry_info in industry_dict.items():
+        #if industry != "文化传媒":
+        #    continue
         print(f"industry {industry}")
+        industry_dict[industry]["code"] = list(industry_dict[industry]["code"])
         codes = industry_info["code"]
         kf_roe_dict = {}
         roe_dict = {}
         pe_dict = {}
         for code in codes:
-            #print(code)
             stock_info = all_stocks.get(code)
             if stock_info is None:
                 continue
@@ -145,6 +145,9 @@ def main():
                 kf_roe_dict[year].append(roe)
 
             for year, pe in hist_pe.items():
+                if math.isnan(pe):
+                    print(f"code {code} year {year}")
+                    continue
                 if pe_dict.get(year) is None:
                     pe_dict[year] = []
                 pe_dict[year].append(pe)
@@ -161,8 +164,8 @@ def main():
         industry_dict[industry]["pe"] = pe_mean_dict
         industry_dict[industry]["valid_pe"] = pe_valid_mean_dict
         #print(kf_roe_list)
+        #break
 
-        break
 
     save_industry(industry_dict)
 
