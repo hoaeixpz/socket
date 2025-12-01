@@ -325,6 +325,10 @@ def update_stocks():
         return 0
     
     print(f"find {len(stock_codes)} good stocks")
+        
+    all_stocks = dict(sorted(all_stocks.items(), key=lambda x: int(x[0])))
+    save_all_stocks(all_stocks)
+    return all_stocks
     
     # 记录更新数量
     updated_count = 0
@@ -392,12 +396,11 @@ def main():
     #setup_logging()
     
     # 分析股票PE并更新文件
-    updated_count = update_stocks()
+    update_stocks()
     
-    if updated_count > 0:
-        # 重新加载更新后的文件生成报告
-        good_stocks = load_good_stocks()
-        generate_summary_report(good_stocks)
+    # 重新加载更新后的文件生成报告
+    #good_stocks = load_good_stocks()
+    #generate_summary_report(good_stocks)
         
 def extract_stock_codes_simple(file):
     """
@@ -489,5 +492,5 @@ def test_demo():
             count += 1
     print(f"{count} has industry")
 if __name__ == "__main__":
-    #main()
-    test_demo()
+    main()
+    #test_demo()
