@@ -7,16 +7,72 @@
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from abc import ABC, abstractmethod
 from typing import List, Dict, Tuple, Optional
 from datetime import datetime
 import json
-import akshare as ak
+import logging
+import os
 
-# 设置中文字体
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']
-plt.rcParams['axes.unicode_minus'] = False
+# 尝试导入可选库
+try:
+    import matplotlib.pyplot as plt
+    # 设置中文字体
+    plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']
+    plt.rcParams['axes.unicode_minus'] = False
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+    print("⚠️ matplotlib未安装，绘图功能将被禁用")
+
+try:
+    import akshare as ak
+    AKSHARE_AVAILABLE = True
+except ImportError:
+    AKSHARE_AVAILABLE = False
+    print("⚠️ akshare未安装，真实数据功能将被禁用")
+
+def setup_logger(stock_code: str = None, strategy_name: str = None) -> logging.Logger:
+    """设置日志记录器"""
+    # 创建日志目录
+    log_dir = "logs"
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # 生成日志文件名
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if stock_code and strategy_name:
+        log_filename = f"{log_dir}/backtest_{stock_code}_{strategy_name}_{timestamp}.log"
+    else:
+        log_filename = f"{log_dir}/backtest_{timestamp}.log"
+    
+    # 创建logger
+    logger = logging.getLogger(f"backtest_{timestamp}")
+    logger.setLevel(logging.INFO)
+    
+    # 避免重复添加handler
+    if not logger.handlers:
+        # 文件handler
+        file_handler = logging.FileHandler(log_filename, encoding='utf-8')
+        file_handler.setLevel(logging.INFO)
+        
+        # 控制台handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        
+        # 设置格式
+        formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
+        
+        # 添加handler
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+    
+    logger.info(f"日志文件创建: {log_filename}")
+    return logger
 
 class Position:
     """持仓信息"""
@@ -161,6 +217,7 @@ class BacktestEngine:
     def __init__(self, initial_capital: float = 100000.0, commission_rate: float = 0.001):
         self.initial_capital = initial_capital
         self.commission_rate = commission_rate
+        self.logger = None
         self.reset()
         
     def reset(self):
@@ -170,6 +227,7 @@ class BacktestEngine:
         self.trades = []  # 交易记录
         self.portfolio_values = []  # 组合价值历史
         self.returns = []  # 收益率历史
+        self.logger = None  # 重置时清空logger
         
     def execute_trade(self, signal: int, price: float, date: str, data: pd.DataFrame):
         """执行交易"""
@@ -184,6 +242,18 @@ class BacktestEngine:
                 self.position.total_cost = trade_amount + commission
                 self.position.cost_price = self.position.total_cost / max_shares
                 self.capital -= self.position.total_cost
+                
+                # 记录日志
+                if self.logger:
+                    self.logger.info(f"🔴 买入信号执行")
+                    self.logger.info(f"   日期: {date}")
+                    self.logger.info(f"   股价: {price:.2f}")
+                    self.logger.info(f"   数量: {max_shares}股")
+                    self.logger.info(f"   金额: {trade_amount:.2f}")
+                    self.logger.info(f"   手续费: {commission:.2f}")
+                    self.logger.info(f"   成本价: {self.position.cost_price:.2f}")
+                    self.logger.info(f"   剩余资金: {self.capital:.2f}")
+                    self.logger.info(f"   持仓市值: {self.position.quantity * price:.2f}")
                 
                 self.trades.append({
                     'date': date,
@@ -204,6 +274,19 @@ class BacktestEngine:
             profit = trade_amount - commission - self.position.total_cost
             profit_rate = profit / self.position.total_cost if self.position.total_cost > 0 else 0
             
+            # 记录日志
+            if self.logger:
+                self.logger.info(f"🟢 卖出信号执行")
+                self.logger.info(f"   日期: {date}")
+                self.logger.info(f"   股价: {price:.2f}")
+                self.logger.info(f"   数量: {self.position.quantity}股")
+                self.logger.info(f"   金额: {trade_amount:.2f}")
+                self.logger.info(f"   手续费: {commission:.2f}")
+                self.logger.info(f"   成本价: {self.position.cost_price:.2f}")
+                self.logger.info(f"   利润: {profit:.2f}")
+                self.logger.info(f"   收益率: {profit_rate:.2%}")
+                self.logger.info(f"   剩余资金: {self.capital:.2f}")
+            
             self.trades.append({
                 'date': date,
                 'action': '卖出',
@@ -220,12 +303,35 @@ class BacktestEngine:
             self.position.cost_price = 0
             self.position.total_cost = 0
             
-    def run_backtest(self, strategy: BaseStrategy, data: pd.DataFrame) -> Dict:
+    def run_backtest(self, strategy: BaseStrategy, data: pd.DataFrame, stock_code: str = None) -> Dict:
         """运行回测"""
         self.reset()
         
+        # 设置日志
+        strategy_name_clean = strategy.name.replace('(', '_').replace(')', '').replace('/', '_')
+        self.logger = setup_logger(stock_code, strategy_name_clean)
+        
+        # 记录回测开始信息
+        if self.logger:
+            self.logger.info("=" * 60)
+            self.logger.info(f"开始回测 - {strategy.name}")
+            self.logger.info(f"股票代码: {stock_code if stock_code else '未知'}")
+            self.logger.info(f"数据期间: {data.index[0]} 到 {data.index[-1]}")
+            self.logger.info(f"初始资金: {self.initial_capital:.2f}")
+            self.logger.info(f"手续费率: {self.commission_rate:.2%}")
+            self.logger.info(f"数据行数: {len(data)}")
+            self.logger.info("=" * 60)
+        
         # 生成交易信号
         signals = strategy.generate_signals(data)
+        
+        # 统计信号数量
+        if self.logger:
+            buy_signals = (signals == Signal.BUY).sum()
+            sell_signals = (signals == Signal.SELL).sum()
+            hold_signals = (signals == Signal.HOLD).sum()
+            self.logger.info(f"信号统计: 买入信号 {buy_signals} 个, 卖出信号 {sell_signals} 个, 持有信号 {hold_signals} 个")
+            self.logger.info("-" * 60)
         
         for i, (date, row) in enumerate(data.iterrows()):
             current_price = row['close']
@@ -245,9 +351,33 @@ class BacktestEngine:
             else:
                 daily_return = (total_value - self.portfolio_values[i-1]) / self.portfolio_values[i-1]
                 self.returns.append(daily_return)
+            
+            # 记录每日关键信息（每20天记录一次）
+            if self.logger and i % 20 == 0:
+                self.logger.info(f"📊 第{i+1}天 ({date})")
+                self.logger.info(f"   收盘价: {current_price:.2f}")
+                self.logger.info(f"   持仓数量: {self.position.quantity}股")
+                self.logger.info(f"   现金余额: {self.capital:.2f}")
+                self.logger.info(f"   组合价值: {total_value:.2f}")
+                self.logger.info(f"   当日收益率: {daily_return:.2%}")
         
         # 计算回测结果
         results = self.calculate_results(strategy, data)
+        
+        # 记录回测结束总结
+        if self.logger:
+            self.logger.info("=" * 60)
+            self.logger.info("回测完成 - 结果总结")
+            self.logger.info(f"最终价值: {results['final_value']:.2f}")
+            self.logger.info(f"总收益率: {results['total_return']:.2%}")
+            self.logger.info(f"年化收益率: {results['annual_return']:.2%}")
+            self.logger.info(f"夏普比率: {results['sharpe_ratio']:.2f}")
+            self.logger.info(f"最大回撤: {results['max_drawdown']:.2%}")
+            self.logger.info(f"总交易次数: {results['total_trades']}")
+            self.logger.info(f"胜率: {results['win_rate']:.2%}")
+            self.logger.info("=" * 60)
+            self.logger.info("回测结束")
+        
         return results
         
     def calculate_results(self, strategy: BaseStrategy, data: pd.DataFrame) -> Dict:
@@ -298,6 +428,10 @@ class BacktestEngine:
         
     def plot_results(self, results: Dict, data: pd.DataFrame, save_path: Optional[str] = None):
         """绘制回测结果"""
+        if not MATPLOTLIB_AVAILABLE:
+            print("⚠️ matplotlib未安装，跳过绘图功能")
+            return None
+            
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(15, 12))
         
         # 图1：价格走势和买卖点
@@ -380,6 +514,10 @@ def get_akshare_data(stock_code: str, start_date: str = None, end_date: str = No
     Returns:
         pd.DataFrame: 包含OHLCV数据的DataFrame
     """
+    if not AKSHARE_AVAILABLE:
+        print("❌ akshare未安装，无法获取真实股票数据")
+        return None
+        
     try:
         print(f"📊 正在获取股票 {stock_code} 的数据...")
         
@@ -492,7 +630,7 @@ def generate_sample_data(days=252) -> pd.DataFrame:
     
     return data
 
-def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-12-31"):
+def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-02-31"):
     """使用真实股票数据演示回测框架"""
     print("=" * 50)
     print(f"股票回测框架演示 - 真实数据")
@@ -524,12 +662,12 @@ def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-
     # 创建回测引擎
     engine = BacktestEngine(initial_capital=100000, commission_rate=0.001)
     
-    # 对每个策略进行回测
+# 对每个策略进行回测
     results_list = []
     
     for strategy in strategies:
         print(f"\n开始回测: {strategy}")
-        results = engine.run_backtest(strategy, data)
+        results = engine.run_backtest(strategy, data, stock_code)
         results_list.append(results)
         
         print(f"总收益率: {results['total_return']:.2%}")
