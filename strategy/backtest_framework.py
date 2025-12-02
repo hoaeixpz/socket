@@ -200,8 +200,10 @@ class DualThrustStrategy(BaseStrategy):
             lc = lookback_data['close'].min()
             
             # 计算买入线和卖出线
-            buy_line = max(hh - lc, hc - ll) * self.k1 + data.iloc[i]['open']
-            sell_line = min(hc - ll, hh - lc) * self.k2 + data.iloc[i]['open']
+            Range = max(hh - lc, hc - ll)
+            buy_line = Range * self.k1 + data.iloc[i]['open']
+            sell_line = -Range * self.k2 + data.iloc[i]['open']
+            print(f"第{i}天 Range {Range} buyline {buy_line} sellline {sell_line} open {data.iloc[i]['open']}")
             
             # 生成信号
             if data.iloc[i]['close'] > buy_line:
@@ -476,13 +478,13 @@ class BacktestEngine:
         
         # 添加回测结果文本
         info_text = f"""回测结果摘要:
-策略: {results['strategy_name']}
-总收益率: {results['total_return']:.2%}
-年化收益率: {results['annual_return']:.2%}
-夏普比率: {results['sharpe_ratio']:.2f}
-最大回撤: {results['max_drawdown']:.2%}
-交易次数: {results['total_trades']}
-胜率: {results['win_rate']:.2%}"""
+            策略: {results['strategy_name']}
+            总收益率: {results['total_return']:.2%}
+            年化收益率: {results['annual_return']:.2%}
+            夏普比率: {results['sharpe_ratio']:.2f}
+            最大回撤: {results['max_drawdown']:.2%}
+            交易次数: {results['total_trades']}
+            胜率: {results['win_rate']:.2%}"""
         
         plt.figtext(0.02, 0.02, info_text, fontsize=10, 
                    bbox=dict(boxstyle="round,pad=0.5", facecolor="lightblue", alpha=0.8))
@@ -493,9 +495,9 @@ class BacktestEngine:
         if save_path:
             import os
             os.makedirs(save_path, exist_ok=True)
-            filename = f"{save_path}/backtest_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            filename = f"{save_path}/{results['strategy_name']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         else:
-            filename = f"backtest_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            filename = f"{results['strategy_name']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             
         plt.savefig(filename, dpi=300, bbox_inches='tight')
         plt.close(fig)
@@ -631,7 +633,7 @@ def generate_sample_data(days=252) -> pd.DataFrame:
     
     return data
 
-def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-02-31"):
+def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-01-31"):
     """使用真实股票数据演示回测框架"""
     print("=" * 50)
     print(f"股票回测框架演示 - 真实数据")
@@ -655,8 +657,8 @@ def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-
     
     # 创建策略列表
     strategies = [
-        GoldenCrossStrategy(short_window=5, long_window=20),
-        RSIStrategy(rsi_period=14, oversold=30, overbought=70),
+        #GoldenCrossStrategy(short_window=5, long_window=20),
+        #RSIStrategy(rsi_period=14, oversold=30, overbought=70),
         DualThrustStrategy(lookback_period=20, k1=0.5, k2=0.5)
     ]
     
@@ -679,7 +681,7 @@ def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-
         print(f"胜率: {results['win_rate']:.2%}")
         
         # 绘制结果
-        engine.plot_results(results, data)
+        engine.plot_results(results, data, save_path="backtest_charts")
     
     # 策略对比
     print(f"\n{'='*50}")
@@ -704,14 +706,14 @@ def demo():
     
     # 生成示例数据
     print("生成示例股票数据...")
-    data = generate_sample_data(252)
+    data = generate_sample_data(30)
     print(f"数据期间: {data.index[0]} 到 {data.index[-1]}")
     print(f"数据行数: {len(data)}")
     
     # 创建策略列表
     strategies = [
-        GoldenCrossStrategy(short_window=5, long_window=20),
-        RSIStrategy(rsi_period=14, oversold=30, overbought=70),
+        #GoldenCrossStrategy(short_window=5, long_window=20),
+        #RSIStrategy(rsi_period=14, oversold=30, overbought=70),
         DualThrustStrategy(lookback_period=20, k1=0.5, k2=0.5)
     ]
     
