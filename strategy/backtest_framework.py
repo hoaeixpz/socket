@@ -182,6 +182,9 @@ class DualThrustStrategy(BaseStrategy):
         self.lookback_period = lookback_period
         self.k1 = k1
         self.k2 = k2
+
+    def set_logger(self, log):
+        self.logger = log
         
     def generate_signals(self, data: pd.DataFrame) -> pd.Series:
         if len(data) < self.lookback_period + 1:
@@ -203,12 +206,12 @@ class DualThrustStrategy(BaseStrategy):
             Range = max(hh - lc, hc - ll)
             buy_line = Range * self.k1 + data.iloc[i]['open']
             sell_line = -Range * self.k2 + data.iloc[i]['open']
-            print(f"第{i}天 Range {Range} buyline {buy_line} sellline {sell_line} open {data.iloc[i]['open']}")
+            #self.logger.info(f"第{i}天 Range {Range:.2f} buyline {buy_line:.2f} sellline {sell_line:.2f} high {data.iloc[i]['high']:.2f} low {data.iloc[i]['low']:.2f}")
             
             # 生成信号
-            if data.iloc[i]['close'] > buy_line:
+            if data.iloc[i]['high'] > buy_line:
                 signals.iloc[i] = Signal.BUY
-            elif data.iloc[i]['close'] < sell_line:
+            elif data.iloc[i]['low'] < sell_line:
                 signals.iloc[i] = Signal.SELL
                 
         return signals
@@ -324,6 +327,7 @@ class BacktestEngine:
             self.logger.info(f"数据行数: {len(data)}")
             self.logger.info("=" * 60)
         
+        strategy.set_logger(self.logger)
         # 生成交易信号
         signals = strategy.generate_signals(data)
         
@@ -633,7 +637,7 @@ def generate_sample_data(days=252) -> pd.DataFrame:
     
     return data
 
-def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-01-31"):
+def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-02-31"):
     """使用真实股票数据演示回测框架"""
     print("=" * 50)
     print(f"股票回测框架演示 - 真实数据")
@@ -659,7 +663,7 @@ def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-
     strategies = [
         #GoldenCrossStrategy(short_window=5, long_window=20),
         #RSIStrategy(rsi_period=14, oversold=30, overbought=70),
-        DualThrustStrategy(lookback_period=20, k1=0.5, k2=0.5)
+        DualThrustStrategy(lookback_period=5, k1=0.5, k2=0.5)
     ]
     
     # 创建回测引擎
@@ -706,7 +710,7 @@ def demo():
     
     # 生成示例数据
     print("生成示例股票数据...")
-    data = generate_sample_data(30)
+    data = generate_sample_data(60)
     print(f"数据期间: {data.index[0]} 到 {data.index[-1]}")
     print(f"数据行数: {len(data)}")
     
@@ -714,7 +718,7 @@ def demo():
     strategies = [
         #GoldenCrossStrategy(short_window=5, long_window=20),
         #RSIStrategy(rsi_period=14, oversold=30, overbought=70),
-        DualThrustStrategy(lookback_period=20, k1=0.5, k2=0.5)
+        DualThrustStrategy(lookback_period=7, k1=0.5, k2=0.5)
     ]
     
     # 创建回测引擎
