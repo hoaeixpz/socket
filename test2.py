@@ -105,17 +105,18 @@ def test_stock_board_industry_summary_ths():
     break
 
 # 使用示例
-symbol = "000001"  # 平安银行
+symbol = "600180"  # 平安银行
 #test_stock_individual_basic_info_xq(symbol)
-test_stock_board_industry_name_em()
+#test_stock_board_industry_name_em()
 #test_stock_board_industry_summary_ths()
 #listing_date = get_stock_listing_date(symbol)
 #print(f"{symbol} 上市日期: {listing_date}")
-exit()
+#exit()
 #df = ak.stock_yjbb_em("20121231")
 #print(df)
 
 #stock_financial_abstract_df = ak.stock_financial_abstract("600519")
+'''
 indictor = ak.stock_fhps_detail_em(symbol)
 for index, row in indictor.iterrows():
   for col in indictor.columns:
@@ -135,7 +136,7 @@ for index, row in df.iterrows():
     if row[col] == "上市时间":
       print(type(col))
       print(row['value'])
-
+'''
 df = stock_data.get_financial_data(symbol)
 for index,row in df.iterrows():
   if "每股收益" in row['指标']:
@@ -148,7 +149,7 @@ for index,row in df.iterrows():
 #df = ak.stock_zh_a_hist(symbol)
 #print(df)
 
-df = ak.stock_financial_analysis_indicator(symbol, "2012")
+df = ak.stock_financial_analysis_indicator(symbol, "2010")
 #print(df)
 for index,row in df.iterrows():
   if str(row['日期'])[5:7] == "12":

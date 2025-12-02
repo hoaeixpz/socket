@@ -347,6 +347,7 @@ class BacktestEngine:
             
             # 计算收益率
             if i == 0:
+                daily_return = 0
                 self.returns.append(0)
             else:
                 daily_return = (total_value - self.portfolio_values[i-1]) / self.portfolio_values[i-1]
