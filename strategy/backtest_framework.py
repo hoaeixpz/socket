@@ -74,12 +74,29 @@ def setup_logger(stock_code: str = None, strategy_name: str = None) -> logging.L
     logger.info(f"日志文件创建: {log_filename}")
     return logger
 
+def add_stock_prefix(stock_code):
+    """为股票代码添加市场前缀"""
+    
+    # 确保是字符串类型
+    code_str = str(stock_code).strip()
+    
+    # 判断规则
+    if code_str.startswith('6'):
+        return f"sh{code_str}"      # 上证
+    elif code_str.startswith('0') or code_str.startswith('3'):
+        return f"sz{code_str}"      # 深证
+    elif code_str.startswith('4') or code_str.startswith('8'):
+        return f"bj{code_str}"      # 北证
+    else:
+        raise ValueError(f"无法识别的股票代码格式: {stock_code}")
+
 class Position:
     """持仓信息"""
     def __init__(self):
         self.quantity = 0  # 持股数量
         self.cost_price = 0  # 成本价
         self.total_cost = 0  # 总成本
+        self.max_toal_cost = 0 #最大成本
         
 class Signal:
     """交易信号"""
@@ -236,61 +253,84 @@ class BacktestEngine:
         
     def execute_trade(self, signal: int, price: float, date: str, data: pd.DataFrame):
         """执行交易"""
-        if signal == Signal.BUY and self.position.quantity == 0:
-            # 买入逻辑
-            max_shares = int(self.capital / (price * (1 + self.commission_rate)))
-            if max_shares > 0:
-                trade_amount = max_shares * price
-                commission = trade_amount * self.commission_rate
+        if signal == Signal.BUY and self.capital <= 0:
+            if self.logger:
+                self.logger.info(f"🔴 出现买入信号")
+                self.logger.info(f"   日期: {date}")
+                self.logger.info(f"   股价: {price:.2f}")
+
+        if signal == Signal.SELL and self.position.quantity == 0:
+            if self.logger:
+                self.logger.info(f"🔴 出现卖出信号")
+                self.logger.info(f"   日期: {date}")
+                self.logger.info(f"   股价: {price:.2f}")
+
+        if signal == Signal.BUY and self.capital > 0:
+            # 买入逻辑，买入1手
+            share = 1
+            trade_amount = share * price
+            commission = trade_amount * self.commission_rate
+            self.position.quantity += share
+            total_cost = trade_amount + commission
+            self.position.total_cost += total_cost
+            self.position.max_toal_cost = max( self.position.total_cost, self.position.max_toal_cost)
+            self.position.cost_price =  ((self.position.cost_price * (self.position.quantity - share) + total_cost)
+                                        / self.position.quantity)
+            self.capital -= total_cost
+
                 
-                self.position.quantity = max_shares
-                self.position.total_cost = trade_amount + commission
-                self.position.cost_price = self.position.total_cost / max_shares
-                self.capital -= self.position.total_cost
+            # 记录日志
+            if self.logger:
+                self.logger.info(f"🔴 买入信号执行")
+                self.logger.info(f"   日期: {date}")
+                self.logger.info(f"   股价: {price:.2f}")
+                self.logger.info(f"   数量: {share}股")
+                self.logger.info(f"   持股数量: {self.position.quantity}股")
+                self.logger.info(f"   金额: {trade_amount:.2f}")
+                self.logger.info(f"   手续费: {commission:.2f}")
+                self.logger.info(f"   成本价: {self.position.cost_price:.2f}")
+                self.logger.info(f"   最大成本: {self.position.max_toal_cost:.2f}")
+                self.logger.info(f"   剩余资金: {self.capital:.2f}")
+                self.logger.info(f"   持仓市值: {self.position.quantity * price:.2f}")
+                self.logger.info(f"   总资产: {self.position.quantity * price + self.capital:.2f}")
                 
-                # 记录日志
-                if self.logger:
-                    self.logger.info(f"🔴 买入信号执行")
-                    self.logger.info(f"   日期: {date}")
-                    self.logger.info(f"   股价: {price:.2f}")
-                    self.logger.info(f"   数量: {max_shares}股")
-                    self.logger.info(f"   金额: {trade_amount:.2f}")
-                    self.logger.info(f"   手续费: {commission:.2f}")
-                    self.logger.info(f"   成本价: {self.position.cost_price:.2f}")
-                    self.logger.info(f"   剩余资金: {self.capital:.2f}")
-                    self.logger.info(f"   持仓市值: {self.position.quantity * price:.2f}")
-                
-                self.trades.append({
-                    'date': date,
-                    'action': '买入',
-                    'price': price,
-                    'quantity': max_shares,
-                    'amount': trade_amount,
-                    'commission': commission,
-                    'capital_after': self.capital
-                })
+            self.trades.append({
+                'date': date,
+                'action': '买入',
+                'price': price,
+                'quantity': self.position.quantity,
+                'amount': trade_amount,
+                'commission': commission,
+                'capital_after': self.capital
+            })
                 
         elif signal == Signal.SELL and self.position.quantity > 0:
-            # 卖出逻辑
-            trade_amount = self.position.quantity * price
+            # 卖出逻辑,卖出1手
+            share = 1
+            trade_amount = share * price
             commission = trade_amount * self.commission_rate
-            
-            self.capital += trade_amount - commission
-            profit = trade_amount - commission - self.position.total_cost
-            profit_rate = profit / self.position.total_cost if self.position.total_cost > 0 else 0
+
+            self.position.quantity -= share
+            total_cost = trade_amount - commission
+            self.position.total_cost -= total_cost
+            self.position.cost_price =  ((self.position.cost_price * (self.position.quantity + share) - total_cost)
+                                        / self.position.quantity)
+            self.capital += total_cost
             
             # 记录日志
             if self.logger:
                 self.logger.info(f"🟢 卖出信号执行")
                 self.logger.info(f"   日期: {date}")
                 self.logger.info(f"   股价: {price:.2f}")
-                self.logger.info(f"   数量: {self.position.quantity}股")
+                self.logger.info(f"   数量: {share}股")
+                self.logger.info(f"   持股数量: {self.position.quantity}股")
                 self.logger.info(f"   金额: {trade_amount:.2f}")
                 self.logger.info(f"   手续费: {commission:.2f}")
                 self.logger.info(f"   成本价: {self.position.cost_price:.2f}")
-                self.logger.info(f"   利润: {profit:.2f}")
-                self.logger.info(f"   收益率: {profit_rate:.2%}")
+                self.logger.info(f"   最大成本: {self.position.max_toal_cost:.2f}")
                 self.logger.info(f"   剩余资金: {self.capital:.2f}")
+                self.logger.info(f"   持仓市值: {self.position.quantity * price:.2f}")
+                self.logger.info(f"   总资产: {self.position.quantity * price + self.capital:.2f}")
             
             self.trades.append({
                 'date': date,
@@ -299,14 +339,8 @@ class BacktestEngine:
                 'quantity': self.position.quantity,
                 'amount': trade_amount,
                 'commission': commission,
-                'profit': profit,
-                'profit_rate': profit_rate,
                 'capital_after': self.capital
             })
-            
-            self.position.quantity = 0
-            self.position.cost_price = 0
-            self.position.total_cost = 0
             
     def run_backtest(self, strategy: BaseStrategy, data: pd.DataFrame, stock_code: str = None) -> Dict:
         """运行回测"""
@@ -363,6 +397,7 @@ class BacktestEngine:
             if self.logger and i % 20 == 0:
                 self.logger.info(f"📊 第{i+1}天 ({date})")
                 self.logger.info(f"   收盘价: {current_price:.2f}")
+                self.logger.info(f"   成本价: {self.position.cost_price:.2f}")
                 self.logger.info(f"   持仓数量: {self.position.quantity}股")
                 self.logger.info(f"   现金余额: {self.capital:.2f}")
                 self.logger.info(f"   组合价值: {total_value:.2f}")
@@ -381,7 +416,6 @@ class BacktestEngine:
             self.logger.info(f"夏普比率: {results['sharpe_ratio']:.2f}")
             self.logger.info(f"最大回撤: {results['max_drawdown']:.2%}")
             self.logger.info(f"总交易次数: {results['total_trades']}")
-            self.logger.info(f"胜率: {results['win_rate']:.2%}")
             self.logger.info("=" * 60)
             self.logger.info("回测结束")
         
@@ -394,6 +428,7 @@ class BacktestEngine:
             
         final_value = self.portfolio_values[-1]
         total_return = (final_value - self.initial_capital) / self.initial_capital
+        #total_return = (final_value - self.capital - self.position.max_toal_cost)/ self.position.max_toal_cost
         
         # 计算年化收益率
         trading_days = len(data)
@@ -413,10 +448,6 @@ class BacktestEngine:
         drawdown = (peak - self.portfolio_values) / peak
         max_drawdown = np.max(drawdown) if len(drawdown) > 0 else 0
         
-        # 胜率统计
-        profitable_trades = [t for t in self.trades if 'profit' in t and t['profit'] > 0]
-        win_rate = len(profitable_trades) / len(self.trades) if self.trades else 0
-        
         return {
             'strategy_name': strategy.name,
             'initial_capital': self.initial_capital,
@@ -426,7 +457,6 @@ class BacktestEngine:
             'sharpe_ratio': sharpe_ratio,
             'max_drawdown': max_drawdown,
             'total_trades': len(self.trades),
-            'win_rate': win_rate,
             'trades': self.trades,
             'portfolio_values': self.portfolio_values,
             'returns': self.returns,
@@ -487,8 +517,7 @@ class BacktestEngine:
             年化收益率: {results['annual_return']:.2%}
             夏普比率: {results['sharpe_ratio']:.2f}
             最大回撤: {results['max_drawdown']:.2%}
-            交易次数: {results['total_trades']}
-            胜率: {results['win_rate']:.2%}"""
+            交易次数: {results['total_trades']}"""
         
         plt.figtext(0.02, 0.02, info_text, fontsize=10, 
                    bbox=dict(boxstyle="round,pad=0.5", facecolor="lightblue", alpha=0.8))
@@ -521,12 +550,13 @@ def get_akshare_data(stock_code: str, start_date: str = None, end_date: str = No
     Returns:
         pd.DataFrame: 包含OHLCV数据的DataFrame
     """
+    full_stock_code = add_stock_prefix(stock_code)
     if not AKSHARE_AVAILABLE:
         print("❌ akshare未安装，无法获取真实股票数据")
         return None
         
     try:
-        print(f"📊 正在获取股票 {stock_code} 的数据...")
+        print(f"📊 正在获取股票 {full_stock_code} 的数据...")
         
         # 转换日期格式
         start_str = start_date.replace("-", "") if start_date else None
@@ -536,27 +566,20 @@ def get_akshare_data(stock_code: str, start_date: str = None, end_date: str = No
         
         # 使用稳定的ak.stock_zh_a_hist函数
         if start_str and end_str:
-            data = ak.stock_zh_a_hist(
-                symbol=stock_code, 
-                period="daily", 
+            data = ak.stock_zh_a_daily(
+                symbol=full_stock_code, 
                 start_date=start_str, 
                 end_date=end_str, 
-                adjust="qfq"
-            )
-        else:
-            # 如果没有指定日期，获取最近数据
-            data = ak.stock_zh_a_hist(
-                symbol=stock_code, 
-                period="daily", 
-                adjust="qfq"
+                adjust="hfq"
             )
         
         if data.empty:
-            print(f"⚠️  警告: 未获取到股票 {stock_code} 的数据")
+            print(f"⚠️  警告: 未获取到股票 {full_stock_code} 的数据")
             return None
         
         print(f"✅ 获取到数据，列名: {list(data.columns)}")
             
+        '''
         # ak.stock_zh_a_hist 返回中文列名，直接映射
         column_mapping = {
             '日期': 'date',
@@ -572,6 +595,7 @@ def get_akshare_data(stock_code: str, start_date: str = None, end_date: str = No
         
         # 重命名列
         data = data.rename(columns=column_mapping)
+        '''
         
         # 设置日期索引
         if 'date' in data.columns:
@@ -630,14 +654,14 @@ def generate_sample_data(days=252) -> pd.DataFrame:
     data = pd.DataFrame({
         'close': prices[1:],
         'open': [p * (1 + np.random.normal(0, 0.005)) for p in prices[1:]],
-        'high': [p * (1 + abs(np.random.normal(0, 0.01))) for p in prices[1:]],
-        'low': [p * (1 - abs(np.random.normal(0, 0.01))) for p in prices[1:]],
+        'high': [p * (1 + abs(np.random.normal(0, 0.04))) for p in prices[1:]],
+        'low': [p * (1 - abs(np.random.normal(0, 0.03))) for p in prices[1:]],
         'volume': np.random.randint(1000000, 10000000, days)
     }, index=dates)
     
     return data
 
-def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-02-31"):
+def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-12-15"):
     """使用真实股票数据演示回测框架"""
     print("=" * 50)
     print(f"股票回测框架演示 - 真实数据")
@@ -667,7 +691,7 @@ def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-
     ]
     
     # 创建回测引擎
-    engine = BacktestEngine(initial_capital=100000, commission_rate=0.001)
+    engine = BacktestEngine(initial_capital=240000, commission_rate=0.001)
     
 # 对每个策略进行回测
     results_list = []
@@ -682,7 +706,6 @@ def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-
         print(f"夏普比率: {results['sharpe_ratio']:.2f}")
         print(f"最大回撤: {results['max_drawdown']:.2%}")
         print(f"交易次数: {results['total_trades']}")
-        print(f"胜率: {results['win_rate']:.2%}")
         
         # 绘制结果
         engine.plot_results(results, data, save_path="backtest_charts")
@@ -691,16 +714,15 @@ def demo_real_data(stock_code="600519", start_date="2020-01-01", end_date="2020-
     print(f"\n{'='*50}")
     print("策略对比")
     print(f"{'='*50}")
-    print(f"{'策略名称':<20} {'总收益率':<10} {'年化收益率':<10} {'夏普比率':<10} {'最大回撤':<10} {'胜率':<10}")
+    print(f"{'策略名称':<30} {'总收益率':<15} {'年化收益率':<15} {'夏普比率':<15} {'最大回撤':<15} ")
     print("-" * 80)
     
     for results in results_list:
-        print(f"{results['strategy_name']:<20} "
-              f"{results['total_return']:<10.2%} "
-              f"{results['annual_return']:<10.2%} "
-              f"{results['sharpe_ratio']:<10.2f} "
-              f"{results['max_drawdown']:<10.2%} "
-              f"{results['win_rate']:<10.2%}")
+        print(f"{results['strategy_name']:<30} "
+              f"{results['total_return']:<15.2%} "
+              f"{results['annual_return']:<15.2%} "
+              f"{results['sharpe_ratio']:<15.2f} "
+              f"{results['max_drawdown']:<15.2%} ")
 
 def demo():
     """演示回测框架 - 使用模拟数据（保留作为备用）"""
@@ -710,7 +732,7 @@ def demo():
     
     # 生成示例数据
     print("生成示例股票数据...")
-    data = generate_sample_data(60)
+    data = generate_sample_data(260)
     print(f"数据期间: {data.index[0]} 到 {data.index[-1]}")
     print(f"数据行数: {len(data)}")
     
@@ -737,7 +759,6 @@ def demo():
         print(f"夏普比率: {results['sharpe_ratio']:.2f}")
         print(f"最大回撤: {results['max_drawdown']:.2%}")
         print(f"交易次数: {results['total_trades']}")
-        print(f"胜率: {results['win_rate']:.2%}")
         
         # 绘制结果
         engine.plot_results(results, data, save_path="backtest_charts")
@@ -746,16 +767,15 @@ def demo():
     print(f"\n{'='*50}")
     print("策略对比")
     print(f"{'='*50}")
-    print(f"{'策略名称':<20} {'总收益率':<10} {'年化收益率':<10} {'夏普比率':<10} {'最大回撤':<10} {'胜率':<10}")
+    print(f"{'策略名称':<30} {'总收益率':<15} {'年化收益率':<15} {'夏普比率':<15} {'最大回撤':<15}")
     print("-" * 80)
     
     for results in results_list:
-        print(f"{results['strategy_name']:<20} "
-              f"{results['total_return']:<10.2%} "
-              f"{results['annual_return']:<10.2%} "
-              f"{results['sharpe_ratio']:<10.2f} "
-              f"{results['max_drawdown']:<10.2%} "
-              f"{results['win_rate']:<10.2%}")
+        print(f"{results['strategy_name']:<30} "
+              f"{results['total_return']:<15.2%} "
+              f"{results['annual_return']:<15.2%} "
+              f"{results['sharpe_ratio']:<15.2f} "
+              f"{results['max_drawdown']:<15.2%} ")
 
 if __name__ == "__main__":
     # 默认使用真实数据进行演示
