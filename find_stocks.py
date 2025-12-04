@@ -9,6 +9,9 @@ import logging
 import statistics
 import akshare as ak
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+import os
 from datetime import datetime, timedelta
 
 def add_stock_prefix(stock_code):
@@ -21,6 +24,108 @@ def add_stock_prefix(stock_code):
         return f"sz{code_str}"      # 深证
     else:
         return code_str
+
+def save_compact_format(stock_data):
+    compact_data = {}
+    
+    for stock_code, data_list in stock_data.items():
+        # 转换为紧凑格式: [[日期, 价格], ...]
+        compact_data[stock_code] = [
+            [item['date'], item['price']] 
+            for item in data_list
+        ]
+    
+    with open("stocks_prices_compact.json", 'w', encoding='utf-8') as f:
+        json.dump(compact_data, f, separators=(',', ':'))
+    
+    print(f"紧凑格式数据已保存到 stocks_prices_compact.json")
+
+def load_compact_format(filename):
+    """加载紧凑格式数据并还原"""
+    with open(filename, 'r', encoding='utf-8') as f:
+        compact_data = json.load(f)
+    
+    # 还原为原始格式
+    restored_data = {}
+    for stock_code, compact_list in compact_data.items():
+        restored_data[stock_code] = [
+            {'date': item[0], 'price': item[1]} 
+            for item in compact_list
+        ]
+    
+    return restored_data
+
+def save_to_csv(stock_data, filename="stock_prices_MA5.csv"):
+    """保存为CSV格式（文件最小）"""
+    all_data = []
+    
+    for stock_code, data_list in stock_data.items():
+        for item in data_list:
+            all_data.append({
+                'code': stock_code,
+                'date': item['date'],
+                'MA5': item['MA5']
+            })
+    
+    df = pd.DataFrame(all_data)
+    df.to_csv(filename, index=False)
+    
+    file_size = os.path.getsize(filename) / (1024 * 1024)  # MB
+    print(f"CSV数据已保存到 {filename}, 大小: {file_size:.2f} MB")
+    return df
+
+def load_from_csv(filename):
+    """从CSV加载数据"""
+    df = pd.read_csv(filename)
+    
+    # 转换回字典格式
+    stock_data = {}
+    for stock_code in df['code'].unique():
+        stock_df = df[df['code'] == stock_code]
+        stock_data[stock_code] = [
+            {'date': row['date'], 'price': row['MA5']}
+            for _, row in stock_df.iterrows()
+        ]
+    
+    return stock_data
+ 
+def save_to_parquet(stock_data, filename="stock_prices.parquet"):
+    """保存为Parquet格式（高性能压缩）"""
+    all_data = []
+    
+    for stock_code, data_list in stock_data.items():
+        for item in data_list:
+            all_data.append({
+                'stock_code': stock_code,
+                'date': item['date'],
+                'price': item['price']
+            })
+    
+    df = pd.DataFrame(all_data)
+    df['date'] = pd.to_datetime(df['date'])
+    
+    # 保存为Parquet（自动压缩）
+    df.to_parquet(filename, index=False, compression='snappy')
+    
+    file_size = os.path.getsize(filename) / (1024 * 1024)
+    print(f"Parquet数据已保存到 {filename}, 大小: {file_size:.2f} MB")
+    return df
+
+def load_from_parquet(filename):
+    """从Parquet加载数据"""
+    df = pd.read_parquet(filename)
+    df['date'] = df['date'].dt.strftime('%Y-%m-%d')
+    
+    stock_data = {}
+    for stock_code in df['stock_code'].unique():
+        stock_df = df[df['stock_code'] == stock_code]
+        stock_data[stock_code] = [
+            {'date': row['date'], 'price': row['price']}
+            for _, row in stock_df.iterrows()
+        ]
+    
+    return stock_data
+
 
 def load_existing_stocks(file = 'analysis_results.json'):
     """加载现有的analysis_results.json文件，返回所有股票代码列表"""
@@ -176,7 +281,7 @@ def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
             continue
         
         # 提取收盘价
-        close_prices = [item['price'] for item in weekly_data]
+        close_prices = [item['MA5_price'] for item in weekly_data]
         dates = [item['date'] for item in weekly_data]
         
         # 查找所有连续上涨的序列
@@ -262,8 +367,16 @@ def display_results(rising_stocks, consecutive_weeks=4):
             
             print(f"     详细周数据:")
             for week_data in period['period_data']:
-                trend = "↑" if week_data['week_number'] == 1 or period['period_data'][week_data['week_number']-2]['close_price'] < week_data['close_price'] else "→"
-                print(f"       第{week_data['week_number']}周({week_data['date']}): {week_data['close_price']} {trend}")
+                #print(week_data)
+                if week_data['week_number'] == 1:
+                    print(f"       第{week_data['week_number']}周({week_data['date']}): {week_data['close_price']}")
+                    continue
+                
+                last_week_price = period['period_data'][week_data['week_number']-2]['close_price']
+                pct = (week_data['close_price'] - last_week_price) / last_week_price * 100
+                pct = round(pct, 2)
+                trend = "↑" if week_data['week_number'] == 1 or last_week_price < week_data['close_price'] else "→"
+                print(f"       第{week_data['week_number']}周({week_data['date']}): {week_data['close_price']} {trend} {pct}%")
 
         max_pct = max(future_pct_list)
         min_pct = min(future_pct_list)
@@ -296,8 +409,8 @@ def save_analysis_results(rising_stocks, consecutive_weeks=4, filename=None):
 def analysis_price():
     """主函数"""
     # 配置参数
-    JSON_FILENAME = "stocks_prices.json"  # 修改为你的JSON文件名
-    CONSECUTIVE_WEEKS = 4
+    JSON_FILENAME = "stocks_prices_MA5.json"  # 修改为你的JSON文件名
+    CONSECUTIVE_WEEKS = 5
     
     print("开始分析连续上涨股票...")
     print(f"目标: 连续{CONSECUTIVE_WEEKS}周股价上涨")
@@ -336,9 +449,14 @@ def analysis_price():
         rising_stocks_3 = find_consecutive_rising_stocks(stock_data, 3)
         display_results(rising_stocks_3, 3)
 
+
 def main():
     #analysis_price()
-    collect_stocks_price()
+    #collect_stocks_price()
+    stock_data = load_existing_stocks("stocks_prices.json")
+    #save_compact_format(stock_data)
+    #save_to_csv(stock_data)
+    save_to_parquet(stock_data)
 
 if __name__ == "__main__":
     main()
