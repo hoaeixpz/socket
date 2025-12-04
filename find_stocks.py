@@ -60,7 +60,7 @@ def get_weekly_monday_prices():
     获取A股股票从2023年初至今的每周一收盘价
     """
     # 定义时间范围
-    start_date = "20230101"
+    start_date = "20200101"
     end_date = "20251130"
     
     
@@ -69,8 +69,6 @@ def get_weekly_monday_prices():
     stock_codes = list(all_stocks.keys())
     
     for i, stock_code in enumerate(stock_codes, 1):
-        if stock_code != '600021':
-            continue
         stock_code = add_stock_prefix(stock_code)
         try:
             print(f"正在获取股票 {stock_code} 的数据...")
@@ -97,7 +95,7 @@ def get_weekly_monday_prices():
             for date, row in monday_data.iterrows():
                 weekly_data.append({
                     "date": date.strftime("%Y-%m-%d"),
-                    "MA5_price": round(float(row['MA5']), 2)
+                    "MA5": round(float(row['MA5']), 2)
                 })
             
             result_dict[stock_code] = weekly_data
@@ -106,7 +104,7 @@ def get_weekly_monday_prices():
             print(f"股票 {stock_code} 获取完成，共 {len(weekly_data)} 个周一数据点")
 
             # 添加延迟避免请求过于频繁
-            time.sleep(3)
+            time.sleep(1)
             
         except Exception as e:
             print(f"获取股票 {stock_code} 数据时出错: {e}")
@@ -151,7 +149,7 @@ def collect_stocks_price():
         sample_stock = list(weekly_data.keys())[0]
         print(f"\n示例数据（股票 {sample_stock} 的前5个数据点）:")
         for i, item in enumerate(weekly_data[sample_stock][:5]):
-            print(f"  {i+1}. 日期: {item['date']}, 收盘价: {item['MA5_price']}")
+            print(f"  {i+1}. 日期: {item['date']}, 收盘价: {item['MA5']}")
 
 def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
     """
@@ -167,6 +165,8 @@ def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
     rising_stocks = {}
     
     for stock_code, weekly_data in stock_data.items():
+        if stock_code != "sh600021":
+            continue
         # 确保数据按日期排序
         weekly_data.sort(key=lambda x: x['date'])
         
@@ -184,6 +184,7 @@ def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
         
         for i in range(len(close_prices) - consecutive_weeks + 1):
             # 检查从i开始的连续consecutive_weeks周是否都上涨
+            # 第一周上涨幅度不能大于3%，最后一周上涨幅度>3%且<10%
             is_consecutive_rising = True
             
             for j in range(i, i + consecutive_weeks - 1):
@@ -194,9 +195,14 @@ def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
             if is_consecutive_rising:
                 # 计算涨幅和百分比
                 start_price = close_prices[i]
+                first_week_pct = (close_prices[i+1] - start_price)/start_price  * 100
+                #if first_week_pct >= 3.0:
+                #    continue
                 end_price = close_prices[i + consecutive_weeks - 1]
-                price_change = end_price - start_price
-                price_change_pct = (price_change / start_price) * 100
+                last_week_pct = ((end_price - close_prices[i + consecutive_weeks - 2]) /
+                                 close_prices[i + consecutive_weeks - 2] * 100)
+                #if last_week_pct < 3.0 or last_week_pct > 10.0:
+                #    continue
                 future_pct = 0
                 if i + consecutive_weeks + 4 < len(close_prices):
                     future_price = close_prices[i + consecutive_weeks + 3]
@@ -216,8 +222,8 @@ def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
                     'end_date': dates[i + consecutive_weeks - 1],
                     'start_price': round(start_price, 2),
                     'end_price': round(end_price, 2),
-                    'price_change': round(price_change, 2),
-                    'price_change_pct': round(price_change_pct, 2),
+                    'first_pct': round(first_week_pct, 2),
+                    'last_pct': round(last_week_pct, 2),
                     'period_data': period_data,
                     'future_pct': round(future_pct, 2)
                 })
@@ -249,7 +255,8 @@ def display_results(rising_stocks, consecutive_weeks=4):
             print(f"     时间段: {period['start_date']} 至 {period['end_date']}")
             print(f"     起始价: {period['start_price']}")
             print(f"     结束价: {period['end_price']}")
-            print(f"     涨幅: {period['price_change']} ({period['price_change_pct']}%)")
+            print(f"     第一周涨幅: {period['first_pct']}%")
+            print(f"     末一周涨幅: {period['last_pct']}%")
             print(f"     未来一月涨幅: {period['future_pct']}%")
             future_pct_list.append(period['future_pct'])
             
