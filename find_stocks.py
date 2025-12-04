@@ -35,6 +35,25 @@ def load_existing_stocks(file = 'analysis_results.json'):
         print(f"错误：JSON文件格式错误 - {e}")
         return {}
 
+def get_5_day_ma(stock_code, start_date, end_date):
+    """
+    获取股票5日均线数据
+    """
+    # 定义时间范围
+    #start_date = "20230101"
+    #end_date = "20251130"
+    
+    # 获取日线数据
+    stock_df = ak.stock_zh_a_daily(symbol=stock_code, start_date=start_date, end_date=end_date, adjust = 'hfq')
+    
+    # 确保数据按日期排序
+    stock_df['date'] = pd.to_datetime(stock_df['date'])
+    stock_df = stock_df.sort_values('date')
+    
+    # 计算5日均线
+    stock_df['MA5'] = stock_df['close'].rolling(window=5, min_periods=1).mean()
+    
+    return stock_df[['date', 'open', 'high', 'low', 'close', 'volume', 'MA5']]
 
 def get_weekly_monday_prices():
     """
@@ -50,13 +69,16 @@ def get_weekly_monday_prices():
     stock_codes = list(all_stocks.keys())
     
     for i, stock_code in enumerate(stock_codes, 1):
+        if stock_code != '600021':
+            continue
         stock_code = add_stock_prefix(stock_code)
         try:
             print(f"正在获取股票 {stock_code} 的数据...")
             
             # 获取日线数据
-            stock_df = ak.stock_zh_a_daily(symbol=stock_code, start_date=start_date, end_date=end_date, adjust="hfq")
-            
+            #stock_df = ak.stock_zh_a_daily(symbol=stock_code, start_date=start_date, end_date=end_date, adjust="hfq")
+            stock_df = get_5_day_ma(stock_code, start_date, end_date)
+
             # 确保日期列为datetime类型
             stock_df['date'] = pd.to_datetime(stock_df['date'])
             
@@ -75,14 +97,14 @@ def get_weekly_monday_prices():
             for date, row in monday_data.iterrows():
                 weekly_data.append({
                     "date": date.strftime("%Y-%m-%d"),
-                    "close_price": round(float(row['close']), 2)
+                    "MA5_price": round(float(row['MA5']), 2)
                 })
             
             result_dict[stock_code] = weekly_data
             save_to_json(result_dict)
             
             print(f"股票 {stock_code} 获取完成，共 {len(weekly_data)} 个周一数据点")
-            
+
             # 添加延迟避免请求过于频繁
             time.sleep(3)
             
@@ -97,7 +119,7 @@ def save_to_json(data_dict, filename=None):
     将数据保存为JSON文件
     """
     if filename is None:
-        filename = f"stocks_prices.json"
+        filename = f"stocks_prices_MA5.json"
     
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data_dict, f, ensure_ascii=False, indent=2)
@@ -129,7 +151,7 @@ def collect_stocks_price():
         sample_stock = list(weekly_data.keys())[0]
         print(f"\n示例数据（股票 {sample_stock} 的前5个数据点）:")
         for i, item in enumerate(weekly_data[sample_stock][:5]):
-            print(f"  {i+1}. 日期: {item['date']}, 收盘价: {item['close_price']}")
+            print(f"  {i+1}. 日期: {item['date']}, 收盘价: {item['MA5_price']}")
 
 def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
     """
@@ -264,7 +286,7 @@ def save_analysis_results(rising_stocks, consecutive_weeks=4, filename=None):
         print(f"保存结果时出错: {e}")
         return None
 
-def main():
+def analysis_price():
     """主函数"""
     # 配置参数
     JSON_FILENAME = "stocks_prices.json"  # 修改为你的JSON文件名
@@ -306,6 +328,10 @@ def main():
         print(f"\n未找到连续{CONSECUTIVE_WEEKS}周上涨的股票，尝试分析连续3周上涨的股票...")
         rising_stocks_3 = find_consecutive_rising_stocks(stock_data, 3)
         display_results(rising_stocks_3, 3)
+
+def main():
+    #analysis_price()
+    collect_stocks_price()
 
 if __name__ == "__main__":
     main()
