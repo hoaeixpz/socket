@@ -319,8 +319,6 @@ def analyze_single_stock(stock_item, consecutive_weeks):
                     'end_date': dates[i + consecutive_weeks - 1],
                     'start_price': round(start_price, 2),
                     'end_price': round(end_price, 2),
-                    'first_pct': round(first_week_pct, 2),
-                    'last_pct': round(last_week_pct, 2),
                     'period_data': period_data,
                     'future_pct': round(future_pct, 2)
                 })
@@ -378,6 +376,44 @@ def analyze_stocks_multithread(stock_data, consecutive_weeks = 5, max_workers=No
     
     return rising_stocks
 
+def trend_requirement(week_index, close_prices, consecutive_weeks, six_month_weeks = 25):
+    # 检查过去半年内是否出现过巨大波动
+    # 检查从week_index开始的连续consecutive_weeks周是否都上涨
+    # 第一周上涨幅度不能大于3%，最后一周上涨幅度>3%且<10%
+
+    is_consecutive_rising = True
+    if week_index <= six_month_weeks:
+        return False, 0
+
+    for j in range(week_index, week_index + consecutive_weeks - 1):
+        if close_prices[j + 1] <= close_prices[j]:
+            return False, 0
+
+    last_six_month_prices = []
+    for w in range(week_index - six_month_weeks, week_index):
+        last_six_month_prices.append(close_prices[w])
+
+    max_price = max(last_six_month_prices)
+    min_price = min(last_six_month_prices)
+    six_month_r = (max_price - min_price) / min_price * 100
+
+    if six_month_r > 20:
+        return False, 0
+
+    start_price = close_prices[week_index]
+    first_week_pct = (close_prices[week_index+1] - start_price)/start_price  * 100
+    #if first_week_pct >= 3.0:
+    #    return False, 0
+    
+    end_price = close_prices[week_index + consecutive_weeks - 1]
+    last_week_pct = ((end_price - close_prices[week_index + consecutive_weeks - 2]) /
+                    close_prices[week_index + consecutive_weeks - 2] * 100)
+    #if last_week_pct < 6.0 or last_week_pct > 12.0:
+    #    return False, 0
+
+    return is_consecutive_rising, six_month_r
+
+
 def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
     """
     找出连续N周股价都上涨的股票
@@ -392,8 +428,7 @@ def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
     rising_stocks = {}
     
     for stock_code, weekly_data in stock_data.items():
-        #if stock_code != "sh600021":
-        #if stock_code != "sh601216":
+        #if not (stock_code == "sh600021" or stock_code == "sh601216" or stock_code == "sz000554"):
         #   continue
         # 确保数据按日期排序
         weekly_data.sort(key=lambda x: x['date'])
@@ -415,16 +450,7 @@ def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
 
             # 检查从i开始的连续consecutive_weeks周是否都上涨
             # 第一周上涨幅度不能大于3%，最后一周上涨幅度>3%且<10%
-            six_month_weeks = 25
-            if i <= six_month_weeks:
-                continue
-            is_consecutive_rising = True
-            
-            for j in range(i, i + consecutive_weeks - 1):
-                if close_prices[j + 1] <= close_prices[j]:
-                    is_consecutive_rising = False
-                    break
-
+            '''
             if i > 3:
                 is_pre_rising = True
                 for j in range(i - 3, i):
@@ -433,41 +459,30 @@ def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
                         break
                 if is_pre_rising:
                     is_consecutive_rising = False
+            '''
+            six_month_weeks = 13
+            is_consecutive_rising, six_month_r =\
+            trend_requirement(i, close_prices, consecutive_weeks, six_month_weeks)
             
             if is_consecutive_rising:
                 # 计算涨幅和百分比
+
                 start_price = close_prices[i]
-                first_week_pct = (close_prices[i+1] - start_price)/start_price  * 100
-                #if first_week_pct >= 3.0:
-                #    continue
                 end_price = close_prices[i + consecutive_weeks - 1]
-                last_week_pct = ((end_price - close_prices[i + consecutive_weeks - 2]) /
-                                 close_prices[i + consecutive_weeks - 2] * 100)
-                #if last_week_pct < 6.0 or last_week_pct > 12.0:
-                #    continue
                 future_pct = 0
                 if i + consecutive_weeks + 4 < len(close_prices):
                     future_price = close_prices[i + consecutive_weeks + 3]
                     future_pct = (future_price - end_price) / end_price * 100
-                
-                six_month_r = 0
-                if i > six_month_weeks:
+                '''
+                if future_pct < 10:
+                    print(f"stock_code {stock_code} {future_pct}")
                     last_six_month_prices = []
                     for w in range(i - six_month_weeks, i):
                         last_six_month_prices.append(close_prices[w])
-
-                    max_price = max(last_six_month_prices)
-                    min_price = min(last_six_month_prices)
-                    six_month_r = (max_price - min_price) / min_price * 100
-
-                    if six_month_r > 20:
-                        continue
-
-                    #if future_pct > 200:
-                    #    print(f"stock_code {stock_code} {future_pct}")
-                    #   print(last_six_month_prices)
-                    #    print(dates[i-25])
-                    #    print(close_prices[i-25])
+                    print(last_six_month_prices)
+                    print(dates[i-25])
+                    print(close_prices[i-25])
+                '''
                 # 收集这个连续上涨期的详细数据
                 period_data = []
                 for k in range(i, i + consecutive_weeks):
@@ -482,8 +497,6 @@ def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
                     'end_date': dates[i + consecutive_weeks - 1],
                     'start_price': round(start_price, 2),
                     'end_price': round(end_price, 2),
-                    'first_pct': round(first_week_pct, 2),
-                    'last_pct': round(last_week_pct, 2),
                     'period_data': period_data,
                     'future_pct': round(future_pct, 2),
                     'six_month_pct': round(six_month_r, 2)
@@ -634,8 +647,6 @@ def display_results(rising_stocks, consecutive_weeks=4):
             print(f"     时间段: {period['start_date']} 至 {period['end_date']}")
             print(f"     起始价: {period['start_price']}")
             print(f"     结束价: {period['end_price']}")
-            print(f"     第一周涨幅: {period['first_pct']}%")
-            print(f"     末一周涨幅: {period['last_pct']}%")
             print(f"     未来一月涨幅: {period['future_pct']}%")
             print(f"     过去六个月波动: {period['six_month_pct']}%")
             
@@ -656,8 +667,8 @@ def display_results(rising_stocks, consecutive_weeks=4):
     min_pct = min(future_pct_list)
     mean_pct = statistics.mean(future_pct_list)
     print(f"max涨幅{max_pct}\nmin涨幅{min_pct}\n平均涨幅{mean_pct}")
-    categorize_and_plot_histogram(future_pct_list)
-    categorize_and_plot_histogram(six_month_pct_list,50)
+    categorize_and_plot_histogram(future_pct_list,10)
+    categorize_and_plot_histogram(six_month_pct_list,2)
     plot_scatter(six_month_pct_list, future_pct_list)
 
 def save_analysis_results(rising_stocks, consecutive_weeks=4, filename=None):
@@ -724,8 +735,8 @@ def analysis_price():
         print(f"   总连续上涨期数: {sum(len(periods) for periods in rising_stocks.values())}")
     else:
         print(f"\n未找到连续{CONSECUTIVE_WEEKS}周上涨的股票，尝试分析连续3周上涨的股票...")
-        #rising_stocks_3 = find_consecutive_rising_stocks(stock_data, 3)
-        rising_stocks_3 = analyze_stocks_multithread(stock_data, 3)
+        rising_stocks_3 = find_consecutive_rising_stocks(stock_data, 3)
+        #rising_stocks_3 = analyze_stocks_multithread(stock_data, 3)
         display_results(rising_stocks_3, 3)
 
 
