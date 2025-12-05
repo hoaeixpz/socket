@@ -93,7 +93,7 @@ def load_from_csv(filename):
     print("load csv finish")
     return stock_data
  
-def save_to_parquet(stock_data, filename="stock_prices.parquet"):
+def save_to_parquet(stock_data, filename="stock_prices_MA5.parquet"):
     """保存为Parquet格式（高性能压缩）"""
     all_data = []
     
@@ -102,7 +102,7 @@ def save_to_parquet(stock_data, filename="stock_prices.parquet"):
             all_data.append({
                 'stock_code': stock_code,
                 'date': item['date'],
-                'price': item['price']
+                'MA5': item['MA5']
             })
     
     df = pd.DataFrame(all_data)
@@ -120,13 +120,17 @@ def load_from_parquet(filename):
     df = pd.read_parquet(filename)
     df['date'] = df['date'].dt.strftime('%Y-%m-%d')
     
-    stock_data = {}
+    stock_data = df.groupby('stock_code')[['date', 'MA5']].apply(
+        lambda x: x.to_dict('records'), include_groups=False
+    ).to_dict()
+    '''
     for stock_code in df['stock_code'].unique():
         stock_df = df[df['stock_code'] == stock_code]
         stock_data[stock_code] = [
             {'date': row['date'], 'price': row['price']}
             for _, row in stock_df.iterrows()
         ]
+    '''
     
     return stock_data
 
@@ -704,7 +708,8 @@ def analysis_price():
     print(f"目标: 连续{CONSECUTIVE_WEEKS}周股价上涨")
     
     # 1. 加载数据
-    stock_data = load_existing_stocks(JSON_FILENAME)
+    #stock_data = load_existing_stocks(JSON_FILENAME)
+    stock_data = load_from_parquet("stock_prices_MA5.parquet")
     #stock_data = load_from_csv('stock_prices_MA5.csv')
     if stock_data is None:
         print("未找到可用的股票数据文件，请检查文件路径")
@@ -741,12 +746,14 @@ def analysis_price():
 
 
 def main():
-    analysis_price()
+    #analysis_price()
     #collect_stocks_price()
-    #stock_data = load_existing_stocks("stocks_prices.json")
+    #stock_data = load_existing_stocks("stocks_prices_MA5.json")
     #save_compact_format(stock_data)
     #save_to_csv(stock_data)
     #save_to_parquet(stock_data)
+    #load_from_parquet("stock_prices_MA5.parquet")
+    analysis_price()
 
 if __name__ == "__main__":
     main()
