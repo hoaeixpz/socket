@@ -102,11 +102,13 @@ def save_to_parquet(stock_data, filename="stock_prices_MA5.parquet"):
             all_data.append({
                 'stock_code': stock_code,
                 'date': item['date'],
-                'MA5': item['MA5']
+                'MA5': item['MA5'],
+                'MA5_vol': item['MA5_vol']
             })
     
     df = pd.DataFrame(all_data)
     df['date'] = pd.to_datetime(df['date'])
+    #print(df)
     
     # 保存为Parquet（自动压缩）
     df.to_parquet(filename, index=False, compression='snappy')
@@ -120,17 +122,9 @@ def load_from_parquet(filename):
     df = pd.read_parquet(filename)
     df['date'] = df['date'].dt.strftime('%Y-%m-%d')
     
-    stock_data = df.groupby('stock_code')[['date', 'MA5']].apply(
+    stock_data = df.groupby('stock_code')[['date', 'MA5', 'MA5_vol']].apply(
         lambda x: x.to_dict('records'), include_groups=False
     ).to_dict()
-    '''
-    for stock_code in df['stock_code'].unique():
-        stock_df = df[df['stock_code'] == stock_code]
-        stock_data[stock_code] = [
-            {'date': row['date'], 'price': row['price']}
-            for _, row in stock_df.iterrows()
-        ]
-    '''
     
     return stock_data
 
@@ -165,8 +159,9 @@ def get_5_day_ma(stock_code, start_date, end_date):
     
     # 计算5日均线
     stock_df['MA5'] = stock_df['close'].rolling(window=5, min_periods=1).mean()
+    stock_df['MA5_vol'] = stock_df['volume'].rolling(window=5, min_periods=1).mean()
     
-    return stock_df[['date', 'open', 'high', 'low', 'close', 'volume', 'MA5']]
+    return stock_df[['date', 'open', 'high', 'low', 'close', 'volume', 'MA5', 'MA5_vol']]
 
 def get_weekly_monday_prices():
     """
@@ -208,7 +203,8 @@ def get_weekly_monday_prices():
             for date, row in monday_data.iterrows():
                 weekly_data.append({
                     "date": date.strftime("%Y-%m-%d"),
-                    "MA5": round(float(row['MA5']), 2)
+                    "MA5": round(float(row['MA5']), 2),
+                    "MA5_vol": round(float(row['MA5_vol']), 2)
                 })
             
             result_dict[stock_code] = weekly_data
@@ -708,9 +704,12 @@ def analysis_price():
     print(f"目标: 连续{CONSECUTIVE_WEEKS}周股价上涨")
     
     # 1. 加载数据
+    start_time = time.time()
     #stock_data = load_existing_stocks(JSON_FILENAME)
     stock_data = load_from_parquet("stock_prices_MA5.parquet")
     #stock_data = load_from_csv('stock_prices_MA5.csv')
+    end_time = time.time()
+    print(f"load parquet {end_time - start_time}s")
     if stock_data is None:
         print("未找到可用的股票数据文件，请检查文件路径")
         return
@@ -721,6 +720,9 @@ def analysis_price():
         if data:
             dates = [item['date'] for item in data]
             print(f"  {stock_code}: {len(data)}周数据, 时间范围: {min(dates)} 至 {max(dates)}")
+            MA5 = [item['MA5'] for item in data]
+            print(f"  {stock_code}: MA5{MA5[0:4]}")
+
     
     # 2. 分析连续上涨的股票
     print(f"\n正在分析连续{CONSECUTIVE_WEEKS}周上涨的股票...")
@@ -731,7 +733,7 @@ def analysis_price():
     
     # 4. 保存结果
     if rising_stocks:
-        result_file = save_analysis_results(rising_stocks, CONSECUTIVE_WEEKS)
+        #result_file = save_analysis_results(rising_stocks, CONSECUTIVE_WEEKS)
         
         # 显示统计信息
         print(f"\n📊 分析统计:")
@@ -746,6 +748,7 @@ def analysis_price():
 
 
 def main():
+    #start_time = time.time()
     #analysis_price()
     #collect_stocks_price()
     #stock_data = load_existing_stocks("stocks_prices_MA5.json")
@@ -753,6 +756,8 @@ def main():
     #save_to_csv(stock_data)
     #save_to_parquet(stock_data)
     #load_from_parquet("stock_prices_MA5.parquet")
+    #end_time = time.time()
+    #print(f"load parquet {end_time - start_time}s")
     analysis_price()
 
 if __name__ == "__main__":
