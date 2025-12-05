@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import concurrent.futures
 import os
 import numpy as np
+import math
 from datetime import datetime, timedelta
 
 def add_stock_prefix(stock_code):
@@ -332,8 +333,8 @@ def trend_requirement(week_index, close_prices, consecutive_weeks, six_month_wee
     min_price = min(last_six_month_prices)
     six_month_r = (max_price - min_price) / min_price * 100
 
-    if six_month_r > 20:
-        return False, 0
+    #if six_month_r > 20:
+    #    return False, 0
 
     start_price = close_prices[week_index]
     first_week_pct = (close_prices[week_index+1] - start_price)/start_price  * 100
@@ -361,10 +362,13 @@ def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
     符合条件的股票字典
     """
     rising_stocks = {}
+    stock_indicator = load_existing_stocks()
     
     for stock_code, weekly_data in stock_data.items():
         #if not (stock_code == "sh600021" or stock_code == "sh601216" or stock_code == "sz000554"):
         #   continue
+        #if not (stock_code == "sh600132"):
+        #    continue
         # 确保数据按日期排序
         weekly_data.sort(key=lambda x: x['date'])
         
@@ -376,6 +380,7 @@ def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
         # 提取收盘价
         close_prices = [item['MA5'] for item in weekly_data]
         dates = [item['date'] for item in weekly_data]
+        volume = [item['MA5_vol'] for item in weekly_data]
         
         # 查找所有连续上涨的序列
         consecutive_periods = []
@@ -418,6 +423,52 @@ def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
                     print(dates[i-25])
                     print(close_prices[i-25])
                 '''
+                
+                #分析上涨期间成交量与半年前成交量对比
+                current_vol = []
+                last_six_month_vol = []
+                for w in range(i, i + consecutive_weeks - 1):
+                    current_vol.append(volume[w])
+
+                for w in range(i - six_month_weeks, i):
+                    last_six_month_vol.append(volume[w])
+
+                vol_ratio = statistics.mean(current_vol) / statistics.mean(last_six_month_vol)
+
+
+                #分析这只股票近3年的扣非ROE
+                date = dates[i]
+                year = date[0:4]
+                #print(f"year {date}")
+                clean_code = stock_code[2:]
+                #print(clean_code)
+                stock_info = stock_indicator.get(clean_code)
+                roe_dict = stock_info.get('roe_details').get('kf_roe')
+                last_3year_roe = {}
+                for year, roe_list in roe_dict.items():
+                    if int(year) >= int(date[0:4]) or int(year) < int(date[0:4]) - 3:
+                        continue
+                    if roe_list[3] is None or math.isnan(roe_list[3]) or abs(roe_list[3]) > 200:
+                        continue
+                    last_3year_roe[int(year)] = roe_list[3]
+
+                last_3year_roe = dict(sorted(last_3year_roe.items()))
+                roe_list = list(last_3year_roe.values())
+                #print(roe_list)
+
+                roe_ava = 0
+                roe_rising = 0
+                if len(roe_list) > 1:
+                    roe_ava = sum(roe_list) / len(roe_list)
+                    roe_rising = (roe_list[-1] - roe_list[0]) / (len(roe_list) - 1)
+                elif len(roe_list) == 1:
+                    roe_ava = roe_list[0]
+
+                if abs(roe_rising) > 50:
+                    continue
+                #print(f"mean {roe_ava} rising {roe_rising}")
+
+
                 # 收集这个连续上涨期的详细数据
                 period_data = []
                 for k in range(i, i + consecutive_weeks):
@@ -434,7 +485,10 @@ def find_consecutive_rising_stocks(stock_data, consecutive_weeks=4):
                     'end_price': round(end_price, 2),
                     'period_data': period_data,
                     'future_pct': round(future_pct, 2),
-                    'six_month_pct': round(six_month_r, 2)
+                    'six_month_pct': round(six_month_r, 2),
+                    'vol_ratio': round(vol_ratio, 2),
+                    'roe_mean': round(roe_ava, 2),
+                    'roe_rising': round(roe_rising, 2)
                 })
         
         if consecutive_periods:
@@ -479,9 +533,9 @@ def plot_scatter(x_data, y_data, title="散点图", xlabel="X轴", ylabel="Y轴"
     plt.tight_layout()
     
     # 显示图表
-    plt.show()
+    plt.show(block=False)
 
-def categorize_and_plot_histogram(data_list, bin_width=20, block=False):
+def categorize_and_plot_histogram(data_list, title, bin_width=20, block=False):
     """
     绘制单个直方图（不包含子图）
     
@@ -497,6 +551,7 @@ def categorize_and_plot_histogram(data_list, bin_width=20, block=False):
     max_val = np.ceil(data.max() / bin_width) * bin_width
     
     # 创建分档边界
+    #print(f"min max {min_val} {max_val} {bin_width}")
     bins = np.arange(min_val, max_val + bin_width, bin_width)
     
     # 设置中文字体
@@ -513,7 +568,7 @@ def categorize_and_plot_histogram(data_list, bin_width=20, block=False):
     # 设置图表属性
     plt.xlabel('数值范围', fontsize=12)
     plt.ylabel('频次', fontsize=12)
-    plt.title(f'数值分布直方图 (分档宽度: {bin_width})', fontsize=14, fontweight='bold')
+    plt.title(f'{title} (分档宽度: {bin_width})', fontsize=14, fontweight='bold')
     plt.grid(True, alpha=0.3, linestyle='--')
     
     # 设置x轴刻度标签
@@ -564,6 +619,9 @@ def display_results(rising_stocks, consecutive_weeks=4):
 
     future_pct_list = []
     six_month_pct_list = []
+    vol_ratio_list = []
+    roe_mean_list = []
+    roe_rising_list = []
     
     for stock_code, periods in rising_stocks.items():
         #print(f"\n📈 股票代码: {stock_code}")
@@ -574,6 +632,9 @@ def display_results(rising_stocks, consecutive_weeks=4):
             #    continue
             future_pct_list.append(period['future_pct'])
             six_month_pct_list.append(period['six_month_pct'])
+            vol_ratio_list.append(period['vol_ratio'])
+            roe_mean_list.append(period['roe_mean'])
+            roe_rising_list.append(period['roe_rising'])
             continue
             #if len(future_pct_list) > 200:
             #    break
@@ -584,6 +645,9 @@ def display_results(rising_stocks, consecutive_weeks=4):
             print(f"     结束价: {period['end_price']}")
             print(f"     未来一月涨幅: {period['future_pct']}%")
             print(f"     过去六个月波动: {period['six_month_pct']}%")
+            print(f"     成交比: {period['vol_ratio']}")
+            print(f"     ROE平均: {period['roe_mean']}")
+            print(f"     ROE涨幅: {period['roe_rising']}")
             
             print(f"     详细周数据:")
             for week_data in period['period_data']:
@@ -602,9 +666,17 @@ def display_results(rising_stocks, consecutive_weeks=4):
     min_pct = min(future_pct_list)
     mean_pct = statistics.mean(future_pct_list)
     print(f"max涨幅{max_pct}\nmin涨幅{min_pct}\n平均涨幅{mean_pct}")
-    categorize_and_plot_histogram(future_pct_list,10)
-    categorize_and_plot_histogram(six_month_pct_list,2)
-    plot_scatter(six_month_pct_list, future_pct_list)
+    
+    plot_scatter(six_month_pct_list, future_pct_list, '涨幅 - 股价')
+    plot_scatter(roe_mean_list, future_pct_list, 'ROE_m - 股价')
+    plot_scatter(roe_rising_list, future_pct_list, 'ROE_r - 股价')
+    #plot_scatter(vol_ratio_list, future_pct_list, 'Vol - Price')
+
+    categorize_and_plot_histogram(future_pct_list,'股价分布', 10)
+    categorize_and_plot_histogram(roe_mean_list,'ROE 平均')
+    categorize_and_plot_histogram(roe_rising_list,'ROE 涨幅', 3)
+    categorize_and_plot_histogram(six_month_pct_list,'过去六月涨幅',20, True)
+    #categorize_and_plot_histogram(vol_ratio_list,'成交量比值',2, True)
 
 def save_analysis_results(rising_stocks, consecutive_weeks=4, filename=None):
     """保存分析结果到JSON文件"""
@@ -640,11 +712,11 @@ def analysis_price():
     
     # 1. 加载数据
     start_time = time.time()
-    #stock_data = load_existing_stocks(JSON_FILENAME)
-    stock_data = load_from_parquet("stock_prices_MA5.parquet")
+    stock_data = load_existing_stocks(JSON_FILENAME)
+    #stock_data = load_from_parquet("stock_prices_MA5.parquet")
     #stock_data = load_from_csv('stock_prices_MA5.csv')
     end_time = time.time()
-    print(f"load parquet {end_time - start_time}s")
+    print(f"load data {end_time - start_time}s")
     if stock_data is None:
         print("未找到可用的股票数据文件，请检查文件路径")
         return
@@ -683,20 +755,22 @@ def analysis_price():
 
 
 def main():
-    start_time = time.time()
+
+    file_path = "stocks_prices_MA5.json"
+    if not os.path.exists(file_path):
+        df = load_from_parquet("stock_prices_MA5.parquet")
+        save_to_json(df)
+    #start_time = time.time()
     #analysis_price()
     #collect_stocks_price()
-    stock_data = load_existing_stocks("stocks_prices_MA5.json")
-    end_time = time.time()
-    print(f"load json {end_time - start_time}s")
-    start_time = end_time
+    #stock_data = load_existing_stocks("stocks_prices_MA5.json")
     #save_compact_format(stock_data)
     #save_to_csv(stock_data)
     #save_to_parquet(stock_data)
-    load_from_parquet("stock_prices_MA5.parquet")
-    end_time = time.time()
-    print(f"load parquet {end_time - start_time}s")
-    #analysis_price()
+    #load_from_parquet("stock_prices_MA5.parquet")
+    #end_time = time.time()
+    #print(f"load parquet {end_time - start_time}s")
+    analysis_price()
 
 if __name__ == "__main__":
     main()
