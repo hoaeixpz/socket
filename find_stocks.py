@@ -28,71 +28,6 @@ def add_stock_prefix(stock_code):
     else:
         return code_str
 
-def save_compact_format(stock_data):
-    compact_data = {}
-    
-    for stock_code, data_list in stock_data.items():
-        # 转换为紧凑格式: [[日期, 价格], ...]
-        compact_data[stock_code] = [
-            [item['date'], item['price']] 
-            for item in data_list
-        ]
-    
-    with open("stocks_prices_compact.json", 'w', encoding='utf-8') as f:
-        json.dump(compact_data, f, separators=(',', ':'))
-    
-    print(f"紧凑格式数据已保存到 stocks_prices_compact.json")
-
-def load_compact_format(filename):
-    """加载紧凑格式数据并还原"""
-    with open(filename, 'r', encoding='utf-8') as f:
-        compact_data = json.load(f)
-    
-    # 还原为原始格式
-    restored_data = {}
-    for stock_code, compact_list in compact_data.items():
-        restored_data[stock_code] = [
-            {'date': item[0], 'price': item[1]} 
-            for item in compact_list
-        ]
-    
-    return restored_data
-
-def save_to_csv(stock_data, filename="stock_prices_MA5.csv"):
-    """保存为CSV格式（文件最小）"""
-    all_data = []
-    
-    for stock_code, data_list in stock_data.items():
-        for item in data_list:
-            all_data.append({
-                'code': stock_code,
-                'date': item['date'],
-                'MA5': item['MA5']
-            })
-    
-    df = pd.DataFrame(all_data)
-    df.to_csv(filename, index=False)
-    
-    file_size = os.path.getsize(filename) / (1024 * 1024)  # MB
-    print(f"CSV数据已保存到 {filename}, 大小: {file_size:.2f} MB")
-    return df
-
-def load_from_csv(filename):
-    """从CSV加载数据"""
-    df = pd.read_csv(filename)
-    print(df.head())
-    # 转换回字典格式
-    stock_data = {}
-    for stock_code in df['code'].unique():
-        print(stock_code)
-        stock_df = df[df['code'] == stock_code]
-        stock_data[stock_code] = [
-            {'date': row['date'], 'price': row['MA5']}
-            for _, row in stock_df.iterrows()
-        ]
-    print("load csv finish")
-    return stock_data
- 
 def save_to_parquet(stock_data, filename="stock_prices_MA5.parquet"):
     """保存为Parquet格式（高性能压缩）"""
     all_data = []
@@ -748,17 +683,20 @@ def analysis_price():
 
 
 def main():
-    #start_time = time.time()
+    start_time = time.time()
     #analysis_price()
     #collect_stocks_price()
-    #stock_data = load_existing_stocks("stocks_prices_MA5.json")
+    stock_data = load_existing_stocks("stocks_prices_MA5.json")
+    end_time = time.time()
+    print(f"load json {end_time - start_time}s")
+    start_time = end_time
     #save_compact_format(stock_data)
     #save_to_csv(stock_data)
     #save_to_parquet(stock_data)
-    #load_from_parquet("stock_prices_MA5.parquet")
-    #end_time = time.time()
-    #print(f"load parquet {end_time - start_time}s")
-    analysis_price()
+    load_from_parquet("stock_prices_MA5.parquet")
+    end_time = time.time()
+    print(f"load parquet {end_time - start_time}s")
+    #analysis_price()
 
 if __name__ == "__main__":
     main()
