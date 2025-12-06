@@ -110,7 +110,7 @@ def get_daily_prices():
     """
     # 定义时间范围
     start_date = "20200101"
-    end_date = "20251130"
+    end_date = "20251205"
     
     
     result_dict = {}
@@ -130,12 +130,11 @@ def get_daily_prices():
             stock_df = stock_df.sort_values('date')
 
             stock_df = stock_df[['date', 'close']]
-            filename = f"{stock_code}_daily_hfq.parquet"
+            filename = f"stock_price/{stock_code}_daily_hfq.parquet"
             stock_df.to_parquet(filename, index=False, compression='snappy')
     
             file_size = os.path.getsize(filename) / (1024 * 1024)
-            print(f"Parquet数据已保存到 {filename}, 大小: {file_size:.2f} MB")
-            break
+            print(f"Parquet数据已保存到 {filename}, 大小: {file_size:.2f} MB {datetime.now()}")
         except Exception as e:
             print(f"获取股票 {stock_code} 数据时出错: {e}")
             continue
