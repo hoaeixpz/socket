@@ -267,11 +267,11 @@ def analyze_single_stock(stock_code, consecutive_days):
             #if dates[i] != "2025-08-14":
             #if dates[i] != "2022-02-07":
             #if dates[i] != "2020-06-12":
-            if dates[i] != "2024-11-22":
+            if dates[i] != "2024-07-01":
                 continue
 
-            sue = pead.cal_SUE(stock_code, "20241122")
-            #print(f"sue {sue}")
+            sue = pead.cal_SUE(stock_code, "20240701")
+            print(f"sue {sue}")
             if sue is not None:
                 # 计算涨幅和百分比
                 future_pct = 0
@@ -668,17 +668,15 @@ def categorize_and_plot_histogram(data_list, title, bin_width=20, block=False):
     bin_width: 档次宽度，默认为10
     """
     # 转换为numpy数组
+    print(data_list)
     data = np.array(data_list)
-    if bin_width < 1:
-        data = data * 10
-        bin_width = bin_width * 10
     
     # 确定分档范围
     min_val = np.floor(data.min() / bin_width) * bin_width
     max_val = np.ceil(data.max() / bin_width) * bin_width
     
     # 创建分档边界
-    #print(f"min max {min_val} {max_val} {bin_width}")
+    print(f"min max {min_val} {max_val} {bin_width}")
     bins = np.arange(min_val, max_val + bin_width, bin_width)
     
     # 设置中文字体
@@ -916,9 +914,9 @@ def analysis_daily_price():
         #if stock_code != "000411":
         #if stock_code != "000506":
         #if stock_code != "000001":
-        if i > 500:
+        if i < 500:
             continue
-        #print(stock_code)
+        print(stock_code)
         
         code, result = analyze_single_stock(stock_code, 20)
         rising_stocks[code] = result
@@ -937,11 +935,13 @@ def analysis_daily_price():
 
 
     if len(future_pct_list) != 0:
+        #print(sue_list)
+        #print(future_pct_list)
         plot_scatter(sue_list, future_pct_list, 'sue - 股价')
         #plot_3D_sactter(k_list, pct_se_list, future_pct_list, '', '斜率', '标准差', 'pct')
 
         categorize_and_plot_histogram(future_pct_list,'股价分布', 10)
-        categorize_and_plot_histogram(sue_list,'SUE',1, True)
+        categorize_and_plot_histogram(sue_list,'SUE',10, True)
         exit()
 
 def main():

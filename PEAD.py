@@ -3,6 +3,7 @@ import datetime
 from financial_data import FinancialData
 import pandas as pd
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 
 # 设置中文字体
@@ -26,6 +27,9 @@ def check_profit(profits):
 	year_profits = []
 	year_profits.append(profit_list)
 	for date, p in profits[1:]:
+		if math.isnan(p):
+			result = False
+			break
 		year = int(date[0:4])
 		if year != last_year:
 			year_profits.append([])
@@ -63,7 +67,7 @@ def check_profit(profits):
 	return result, profits_diff
 
 
-def get_last_12_quater_indiator(stock_code, target_date, indiator = "净利润"):
+def get_last_12_quater_indiator(stock_code, target_date, indiator = "扣非净利润"):
 	df = stock_data.get_indicator_data(stock_code, indiator)
 	date_columns = []
 	for col in df.columns:
@@ -105,7 +109,7 @@ def cal_SUE(stock_code, target_date):
 		print(last_profit)
 		return None
 
-	#print(last_profit)
+	print(last_profit)
 	current_profit = quater_profit[0]
 	profit_Y2Y = []
 	for i in range(1,9):
@@ -114,12 +118,13 @@ def cal_SUE(stock_code, target_date):
 	mean_Y2Y = np.mean(profit_Y2Y)
 	se = np.std(profit_Y2Y, ddof=1)
 	estimate_profit = quater_profit[4] + mean_Y2Y
-	#print(f"estimate_profit {estimate_profit} {quater_profit[4]}")
+	print(f"estimate_profit {estimate_profit} {quater_profit[4]}")
 
 	SUE = (current_profit - estimate_profit) / se
-	#print(f"SUE {SUE}")
-
 	'''
+	print(f"SUE {SUE}")
+
+	
 	X = list(range(0, len(profit_Y2Y)))
 	plt.scatter(X, profit_Y2Y, alpha=0.6, s=50, c='blue', edgecolors='black', linewidth=0.5)
 	plt.show()
@@ -127,6 +132,6 @@ def cal_SUE(stock_code, target_date):
 	return SUE
 
 def test():
-	cal_SUE("000001", "20241122")
+	cal_SUE("001217", "20240701")
 
 #test()
