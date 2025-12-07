@@ -43,7 +43,7 @@ class StockDataCache:
         
         # 如果不需要强制更新且缓存有效
         if not force_update and self._is_cache_valid(cache_file):
-            print("📁 从本地缓存加载股票列表...")
+            #print("📁 从本地缓存加载股票列表...")
             with open(cache_file, 'rb') as f:
                 return pickle.load(f)
         
@@ -108,7 +108,7 @@ class StockDataCache:
         
         # 如果不需要强制更新且缓存有效
         if not force_update and self._is_cache_valid(cache_file):
-            print("📁 从本地缓存加载股票指标...")
+            #print("📁 从本地缓存加载股票指标...")
             with open(cache_file, 'rb') as f:
                 return pickle.load(f)
         

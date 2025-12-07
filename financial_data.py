@@ -51,7 +51,7 @@ class FinancialData:
 			return None
 		
 		try:
-			print(f"正在获取 {symbol} 的财务数据...")
+			#print(f"正在获取 {symbol} 的财务数据...")
 			# 调用akshare接口获取财务摘要数据
 			df = self.data_cache.get_stock_indicator(symbol)
 			#print(df)
@@ -61,7 +61,7 @@ class FinancialData:
 				return None
 			
 			
-			print(f"成功获取 {symbol} 的财务数据，共 {len(df)} 行")
+			#print(f"成功获取 {symbol} 的财务数据，共 {len(df)} 行")
 			return df
 			
 		except Exception as e:

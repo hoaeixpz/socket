@@ -19,6 +19,7 @@ import numpy as np
 import math
 from datetime import datetime, timedelta
 import least_squares_mothod as lsq
+import PEAD as pead
 
 # 设置中文字体
 plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS', 'DejaVu Sans']
@@ -242,8 +243,8 @@ def collect_stocks_price():
 
 def analyze_single_stock(stock_code, consecutive_days):
     try:
-        stock_code = add_stock_prefix(stock_code)
-        filename = f"stock_price/{stock_code}_daily_hfq.parquet"
+        full_stock_code = add_stock_prefix(stock_code)
+        filename = f"stock_price/{full_stock_code}_daily_hfq.parquet"
         stock_df = pd.read_parquet(filename)
         stock_df['date'] = stock_df['date'].dt.strftime('%Y-%m-%d')
         #print(stock_df)
@@ -266,49 +267,20 @@ def analyze_single_stock(stock_code, consecutive_days):
             #if dates[i] != "2025-08-14":
             #if dates[i] != "2022-02-07":
             #if dates[i] != "2020-06-12":
-            #if dates[i] != "2023-12-15":
-            #    continue    
-            period_data = close_prices[i: i + consecutive_days]
-            pct_change = np.diff(period_data) / period_data[:-1] * 100
-            #print(period_data)
-            k, b, se = lsq.simple_linear_regression(period_data)
-            k2, b2, se2 = lsq.simple_linear_regression(pct_change)
-            '''
-            print(f"y = {k:.2f} x + {b:.2f} + e({se:.2f})")
-            
-            X = list(range(0, consecutive_days+15))
-            #print(X)
-            x_line = np.linspace(0, consecutive_days, 100)
-            y_line = b + k * x_line
+            if dates[i] != "2024-11-22":
+                continue
 
-            plt.plot(x_line, y_line, 'r-', linewidth=2, label=f'y = {b:.2f} + {k:.2f}x')
-            plt.scatter(X, close_prices[i: i + consecutive_days+15], alpha=0.6, s=50, c='blue', edgecolors='black', linewidth=0.5)
-            plt.show()
-            
-            print(f"y = {k2:.2f} x + {b2:.2f} + e({se2:.2f})")
-            X = list(range(0, consecutive_days-1))
-            x_line = np.linspace(0, consecutive_days, 100)
-            y_line = b2 + k2 * x_line
-            plt.plot(x_line, y_line, 'r-', linewidth=2, label=f'y = {b2:.2f} + {k2:.2f}x')
-            plt.scatter(X, pct_change, alpha=0.6, s=50, c='blue', edgecolors='black', linewidth=0.5)
-            plt.show()
-            
-            exit()
-            '''
-            
-            is_consecutive_rising = True
-            is_consecutive_rising = k > 0.1 and k < 1 and se < 1 and se2 < 0.5 and b2 < 1
-            #is_consecutive_rising = k > 0.1 and k < 1
-            
-            if is_consecutive_rising:
+            sue = pead.cal_SUE(stock_code, "20241122")
+            #print(f"sue {sue}")
+            if sue is not None:
                 # 计算涨幅和百分比
                 future_pct = 0
-                future_day = 15
+                future_day = 120
                 future_price = future_date = None
                 if i + consecutive_days + future_day < len(close_prices):
                     future_date = dates[i + consecutive_days + future_day]
-                    future_price = close_prices[i + consecutive_days + future_day]
-                    future_pct = (future_price - period_data[-1]) / period_data[-1] * 100
+                    future_price = close_prices[i + future_day]
+                    future_pct = (future_price - close_prices[i]) / close_prices[i] * 100
 
                 '''
                 if future_pct < -25 and b2 < 0.25:
@@ -317,18 +289,13 @@ def analyze_single_stock(stock_code, consecutive_days):
                 '''
                 # 收集这个连续上涨期的详细数据                
                 consecutive_periods.append({
-                    'period_data': period_data,
                     'start_date': dates[i],
-                    'end_date': dates[i + consecutive_days - 1],
-                    'start_price': round(period_data[0], 2),
-                    'end_price': round(period_data[-1], 2),
+                    'end_date': dates[i + future_day],
+                    'start_price': round(close_prices[i], 2),
                     "future_date": future_date,
                     "future_price": future_price,
                     'future_pct': round(future_pct, 2),
-                    'slope': k,
-                    'se': se,
-                    'pct_se': se2,
-                    'pct_b': b2
+                    'sue': round(sue,2)
                 })
         
         return  stock_code, consecutive_periods
@@ -940,17 +907,17 @@ def analysis_daily_price():
 
     rising_stocks = {}
     start_time = time.time()
-    rising_stocks = analyze_stocks_multithread(stock_codes, 20)
+    #rising_stocks = analyze_stocks_multithread(stock_codes, 20)
 
     for i, stock_code in enumerate(stock_codes, 1):
-        break
         #if stock_code != "600000":
         #if stock_code != "000017":
         #if stock_code != "000010":
         #if stock_code != "000411":
         #if stock_code != "000506":
-        #if stock_code != "000655":
-        #    continue
+        #if stock_code != "000001":
+        if i > 500:
+            continue
         #print(stock_code)
         
         code, result = analyze_single_stock(stock_code, 20)
@@ -960,32 +927,21 @@ def analysis_daily_price():
     end_time = time.time()
     print(f"\n分析完成! 耗时: {end_time - start_time:.2f}秒")
 
-    k_list = []
-    se_list = []
-    pct_se_list = []
-    pct_b_list = []
     future_pct_list = []
+    sue_list = []
 
     for code, result in rising_stocks.items():
         for i, period in enumerate(result, 1):
             future_pct_list.append(period['future_pct'])
-            k_list.append(period['slope'])
-            se_list.append(period['se'])
-            pct_se_list.append(period['pct_se'])
-            pct_b_list.append(period['pct_b'])
+            sue_list.append(period['sue'])
+
 
     if len(future_pct_list) != 0:
-        plot_scatter(k_list, future_pct_list, 'slope - 股价')
-        plot_scatter(se_list, future_pct_list, '标准差 - 股价')
-        plot_scatter(pct_b_list, future_pct_list, 'pct平均 - 股价')
-        plot_scatter(pct_se_list, future_pct_list, 'pct标准差 - 股价')
+        plot_scatter(sue_list, future_pct_list, 'sue - 股价')
         #plot_3D_sactter(k_list, pct_se_list, future_pct_list, '', '斜率', '标准差', 'pct')
 
         categorize_and_plot_histogram(future_pct_list,'股价分布', 10)
-        categorize_and_plot_histogram(k_list,'斜率',0.1)
-        categorize_and_plot_histogram(pct_se_list,'pct标准差',0.1)
-        categorize_and_plot_histogram(pct_b_list,'pct平均',0.1)
-        categorize_and_plot_histogram(se_list,'标准差',0.1, True)
+        categorize_and_plot_histogram(sue_list,'SUE',1, True)
         exit()
 
 def main():
@@ -996,7 +952,7 @@ def main():
     #    save_to_json(df)
     #start_time = time.time()
     #analysis_price()
-    collect_stocks_price()
+    #collect_stocks_price()
     #stock_data = load_existing_stocks("stocks_prices_MA5.json")
     #save_compact_format(stock_data)
     #save_to_csv(stock_data)
@@ -1005,7 +961,7 @@ def main():
     #end_time = time.time()
     #print(f"load parquet {end_time - start_time}s")
     #analysis_price()
-    #analysis_daily_price()
+    analysis_daily_price()
 
 if __name__ == "__main__":
     main()
