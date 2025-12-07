@@ -110,8 +110,8 @@ def get_daily_prices():
     获取A股股票从2023年初至今的收盘价
     """
     # 定义时间范围
-    start_date = "20200101"
-    end_date = "20251205"
+    start_date = "20170101"
+    end_date = "20200101"
     
     
     result_dict = {}
@@ -131,7 +131,7 @@ def get_daily_prices():
             stock_df = stock_df.sort_values('date')
 
             stock_df = stock_df[['date', 'close']]
-            filename = f"stock_price/{stock_code}_daily_hfq.parquet"
+            filename = f"test_stock_price/{stock_code}_daily_hfq.parquet"
             stock_df.to_parquet(filename, index=False, compression='snappy')
     
             file_size = os.path.getsize(filename) / (1024 * 1024)
@@ -996,7 +996,7 @@ def main():
     #    save_to_json(df)
     #start_time = time.time()
     #analysis_price()
-    #collect_stocks_price()
+    collect_stocks_price()
     #stock_data = load_existing_stocks("stocks_prices_MA5.json")
     #save_compact_format(stock_data)
     #save_to_csv(stock_data)
@@ -1005,7 +1005,7 @@ def main():
     #end_time = time.time()
     #print(f"load parquet {end_time - start_time}s")
     #analysis_price()
-    analysis_daily_price()
+    #analysis_daily_price()
 
 if __name__ == "__main__":
     main()
