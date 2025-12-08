@@ -1,13 +1,19 @@
 import akshare as ak
+import tushare as ts
 import json
 import time
 import pandas as pd
 import random
+import os
+import pickle
+import pyarrow as pa
+import pyarrow.parquet as pq
 from datetime import datetime
 from financial_data import FinancialData
 #from test_proxy import HybridProxyCrawler
 
 stock_data = FinancialData()
+pro = ts.pro_api()
 
 def get_stock_listing_date(symbol):
     """
@@ -104,8 +110,27 @@ def test_stock_board_industry_summary_ths():
           stock_dict[row[col]] = code
     break
 
+def test_sz_index():
+  df = ak.stock_zh_index_daily("sh000001")
+  filename = f"stock_price/sz000001_index_daily.parquet"
+  df.to_parquet(filename, index=False, compression='snappy')
+    
+  file_size = os.path.getsize(filename) / (1024 * 1024)
+  print(f"Parquet数据已保存到 {filename}, 大小: {file_size:.2f} MB {datetime.now()}")
+
+  cache_file = f"stock_price/sz000001_index_daily.pkl"
+  with open(cache_file, 'wb') as f:
+    pickle.dump(df, f)
+    
+    file_size = os.path.getsize(cache_file) / (1024 * 1024)
+    print(f"💾 股票列表已缓存到: {cache_file} 大小 {file_size:.2f} MB")
+
+
+
 # 使用示例
 symbol = "600180"  # 平安银行
+test_sz_index()
+exit()
 #test_stock_individual_basic_info_xq(symbol)
 #test_stock_board_industry_name_em()
 #test_stock_board_industry_summary_ths()
