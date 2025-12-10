@@ -89,13 +89,16 @@ class FinancialData:
 		if df is None:
 			return None
 
-		row = 0
+		row = None
 		index_list = {}
 		if '指标' in df.columns:
 			for idx, value in df['指标'].items():
 				if indicator == value:
 					row = idx
-
+		
+		if row is None:
+			print("Error: 指标 ", indicator, " 不存在")
+			return None
 		#print(df.iloc[[row]])
 		return df.iloc[[row]]
 

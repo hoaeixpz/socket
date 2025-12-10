@@ -17,11 +17,16 @@ stock_data = FinancialData()
 def check_profit(profits):
 	#检查季度数据是否连续，有无断档
 	#并返回每个季度的净利润增量
+	result = True
+
 	today, last_p = profits[0]
+	if math.isnan(last_p):
+		result = False
+		return result, []
+
 	last_month = int(today[4:6])
 	last_year = int(today[0:4])
 
-	result = True
 	profit_list = []
 	profit_list.append((today, last_p))
 	year_profits = []
@@ -56,6 +61,7 @@ def check_profit(profits):
 		profits_diff.append(profit_list[-1][1])
 
 	profits_diff = profits_diff[0:-1]
+	#print(profits_diff)
 	'''
 	print(profits_diff)
 	
@@ -66,8 +72,11 @@ def check_profit(profits):
 	return result, profits_diff
 
 
-def get_last_12_quater_indiator(stock_code, target_date, indiator = "净利润"):
+def get_last_12_quater_indiator(stock_code, target_date, indiator):
 	df = stock_data.get_indicator_data(stock_code, indiator)
+	if df is None:
+		return None
+
 	date_columns = []
 	for col in df.columns:
 		# 检查列名是否为日期格式（YYYYMMDD）
@@ -90,21 +99,22 @@ def get_last_12_quater_indiator(stock_code, target_date, indiator = "净利润")
 	values = []
 	for date_col in recent_date_columns:
 		if date_col in df.columns:
-			value = df[date_col].iloc[0] / 1000000  # 取第一行的数据
+			value = df[date_col].iloc[0]          # 取第一行的数据
 			values.append((date_col, value))
 
 	return values
 
-def cal_SUE(stock_code, target_date):
+def cal_SUE(stock_code, target_date, indicator = "净资产收益率_平均_扣除非经常损益"):
 	#获取前12个季度的净利润数据，
 	#来估算下当前季度的差额收益因子SUE
 
-	last_profit = get_last_12_quater_indiator(stock_code, target_date)
+	last_profit = get_last_12_quater_indiator(stock_code, target_date, indicator)
 	#for year, p in last_profit:
 	#	print(year, round(p,2))
 
 	if last_profit is None:
 		return None
+	
 	valid, quater_profit = check_profit(last_profit)
 	if valid is False:
 		print(f"{stock_code} 近12个季度数据出现断档")
@@ -114,23 +124,25 @@ def cal_SUE(stock_code, target_date):
 	#for p in quater_profit:
 	#	print(p)
 	#print(last_profit)
-	#quater_profit = [3.2, 2.2, 1.2, 4.2, 3.2, 2.1, 1.1, 4.1, 3.1, 2, 1, 4, 3]
+	#quater_profit = [38, 27, 17, 47, 37, 23, 13, 43, 33, 20, 10, 40, 30]
 	current_profit = quater_profit[0]
 	profit_Y2Y = []
 	for i in range(1,9):
-		profit_Y2Y.append(quater_profit[i] - quater_profit[i+4])
+		profit_Y2Y.append(round((quater_profit[i] / quater_profit[i+4] - 1),2))
+		#profit_Y2Y.append(quater_profit[i] - quater_profit[i+4])
 
-
+	#print(profit_Y2Y)
 	mean_Y2Y = np.mean(profit_Y2Y)
 	se = np.std(profit_Y2Y, ddof=1)
 	se = max(se, 0.000001)
-	estimate_profit = quater_profit[4] + mean_Y2Y
+	estimate_profit = quater_profit[4] * (1 + mean_Y2Y)
+	#estimate_profit = quater_profit[4] + mean_Y2Y
 	#print(f"estimate_profit {estimate_profit} {current_profit} se {se}")
 
 
-	SUE = (current_profit - estimate_profit) / se
-	#print(f"SUE {SUE}")
-	
+	#SUE = (current_profit - estimate_profit) / se
+	SUE = (current_profit - estimate_profit) / se / quater_profit[4]
+		
 	'''
 	print(f"SUE {SUE}")
 	X = list(range(0, len(profit_Y2Y)))

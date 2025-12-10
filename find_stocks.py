@@ -141,25 +141,6 @@ def get_daily_prices():
             print(f"获取股票 {stock_code} 数据时出错: {e}")
             continue
 
-
-def compact_daily_prices():
-    all_stocks = load_existing_stocks()
-    stock_codes = list(all_stocks.keys())
-    
-    for i, stock_code in enumerate(stock_codes, 1):
-        full_stock_code = add_stock_prefix(stock_code)
-        filename = f"stock_price/{full_stock_code}_daily_hfq.parquet"
-        stock_df = pd.read_parquet(filename)
-
-        filename = f"test_stock_price/{full_stock_code}_daily_hfq.parquet"
-        stock_df2 = pd.read_parquet(filename)
-
-        merge_df = pd.concat([stock_df2, stock_df], ignore_index=True)
-        filename = f"stock_price/{full_stock_code}_daily_hfq.parquet"
-        merge_df.to_parquet(filename, index=False, compression='snappy')
-        file_size = os.path.getsize(filename) / (1024 * 1024)
-        print(f"Parquet数据已保存到 {filename}, 大小: {file_size:.2f} MB {datetime.now()}")
-
 def get_weekly_monday_prices():
     """
     获取A股股票从2023年初至今的每周一收盘价
@@ -301,16 +282,16 @@ def analyze_single_stock(stock_code, consecutive_days):
             #if dates[i] != "2025-08-14":
             #if dates[i] != "2022-02-07":
             #if dates[i] != "2020-06-12":
-            #if dates[i] != "2024-07-03":
+            #if dates[i] != "2017-10-30":
             #    continue
 
-            sue = pead.cal_SUE(stock_code, dates[i].replace('-', ''))
-            #print(f"{stock_code} {dates[i]}")
+            sue = pead.cal_SUE(stock_code, dates[i].replace('-', ''), "扣非净利润")
+
             #print(f"sue {sue}")
-            if sue is not None:
+            if sue is not None and -1000 < sue and sue < 1000:
                 # 计算涨幅和百分比
                 future_pct = 0
-                future_day = 12
+                future_day = 252
                 future_price = future_date = None
                 if i + consecutive_days + future_day < len(close_prices):
                     future_date = dates[i + consecutive_days + future_day]
@@ -322,24 +303,30 @@ def analyze_single_stock(stock_code, consecutive_days):
                     sz_pct = (sz_future_price / sz_price - 1) * 100
 
                     future_pct = future_pct - sz_pct
-                    #print(future_pct)
+                    '''
+                    print(f"{stock_code} {dates[i]} -> {future_date}")
+                    print(f"sue {sue}")
+                    print(f"{close_prices[i]} {future_price}")
+                    print(future_pct, sz_pct)
+                    print("")
+                    '''
+                    
 
-
-                '''
-                if sue < -8:
-                    print(f"{stock_code} {dates[i]}")
-                    exit()
-                '''
-                # 收集这个连续上涨期的详细数据                
-                consecutive_periods.append({
-                    'start_date': dates[i],
-                    'end_date': dates[i + future_day],
-                    'start_price': round(close_prices[i], 2),
-                    "future_date": future_date,
-                    "future_price": future_price,
-                    'future_pct': round(future_pct, 2),
-                    'sue': round(sue,2)
-                })
+                    '''
+                    if future_pct > 500:
+                        print(f"{stock_code} {dates[i]}")
+                        exit()
+                    '''
+                    # 收集这个连续上涨期的详细数据                
+                    consecutive_periods.append({
+                        'start_date': dates[i],
+                        'end_date': dates[i + future_day],
+                        'start_price': round(close_prices[i], 2),
+                        "future_date": future_date,
+                        "future_price": future_price,
+                        'future_pct': round(future_pct, 2),
+                        'sue': round(sue,2)
+                    })
         
         return  stock_code, consecutive_periods
     
@@ -718,6 +705,7 @@ def categorize_and_plot_histogram(data_list, title, bin_width=20, block=False):
     max_val = np.ceil(data.max() / bin_width) * bin_width
     
     # 创建分档边界
+    #print(data_list)
     #print(f"min max {min_val} {max_val} {bin_width}")
     bins = np.arange(min_val, max_val + bin_width, bin_width)
     
@@ -943,7 +931,7 @@ def analysis_price():
 def analysis_daily_price():
     all_stocks = load_existing_stocks()
     stock_codes = list(all_stocks.keys())
-    stock_codes = stock_codes[0:600]
+    #stock_codes = stock_codes[0:600]
 
     rising_stocks = {}
     start_time = time.time()
@@ -956,10 +944,12 @@ def analysis_daily_price():
         #if stock_code != "000411":
         #if stock_code != "000506":
         #if stock_code != "000001":
-        if i > 1000:
-            break
-        if i % 50 == 0:
-            print(stock_code)
+        #if stock_code != "000410":
+        #    continue
+        #if i > 2000:
+        #    break
+        #if i % 50 == 0:
+        print(stock_code)
         
         code, result = analyze_single_stock(stock_code, 0)
         rising_stocks[code] = result
@@ -976,6 +966,24 @@ def analysis_daily_price():
             future_pct_list.append(period['future_pct'])
             sue_list.append(period['sue'])
 
+    max_su = max(sue_list)
+    min_su = min(sue_list)
+    Range = (max_su - min_su ) / 30
+    bar_list = []
+    for i in range(0,30):
+        bar_list.append([])
+    #print(len(bar_list))
+    i = 0
+    for sue in sue_list:
+        index = int((sue - min_su - 0.1) / Range)
+        #print(index)
+        bar_list[index].append(future_pct_list[i])
+        i = i + 1
+    for li in bar_list:
+        print(f"{min_su:.2f} ____ {min_su + Range:.2f}:")
+        min_su += Range
+        print(np.mean(li))
+        print("")
 
     if len(future_pct_list) != 0:
         #print(sue_list)
@@ -983,8 +991,8 @@ def analysis_daily_price():
         plot_scatter(sue_list, future_pct_list, 'sue - 股价')
         #plot_3D_sactter(k_list, pct_se_list, future_pct_list, '', '斜率', '标准差', 'pct')
 
-        categorize_and_plot_histogram(future_pct_list,'股价分布', 5)
-        categorize_and_plot_histogram(sue_list,'SUE',2, True)
+        #categorize_and_plot_histogram(future_pct_list,'股价分布', 10)
+        #categorize_and_plot_histogram(sue_list,'SUE',5, True)
         exit()
 
 def main():
@@ -1004,8 +1012,7 @@ def main():
     #end_time = time.time()
     #print(f"load parquet {end_time - start_time}s")
     #analysis_price()
-    #analysis_daily_price()
-    compact_daily_prices()
+    analysis_daily_price()
 
 if __name__ == "__main__":
     main()
