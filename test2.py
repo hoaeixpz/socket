@@ -10,6 +10,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from datetime import datetime
 from financial_data import FinancialData
+import efinance as ef
+
 #from test_proxy import HybridProxyCrawler
 
 stock_data = FinancialData()
@@ -110,26 +112,57 @@ def test_stock_board_industry_summary_ths():
           stock_dict[row[col]] = code
     break
 
-def test_sz_index():
-  df = ak.stock_zh_index_daily("sh000001")
-  filename = f"stock_price/sz000001_index_daily.parquet"
+def test_sz_index(symbol):
+  
+  df = ak.stock_zh_index_daily(f"sh{symbol}")
+  filename = f"stock_price/sh{symbol}_index_daily.parquet"
   df.to_parquet(filename, index=False, compression='snappy')
+  print(df)
     
   file_size = os.path.getsize(filename) / (1024 * 1024)
   print(f"Parquet数据已保存到 {filename}, 大小: {file_size:.2f} MB {datetime.now()}")
+  
+  #index_file = f"stock_price/sh{symbol}_index_daily.parquet"
+  #df = pd.read_parquet(index_file)
+  #return df
 
+  '''
   cache_file = f"stock_price/sz000001_index_daily.pkl"
   with open(cache_file, 'wb') as f:
     pickle.dump(df, f)
     
     file_size = os.path.getsize(cache_file) / (1024 * 1024)
     print(f"💾 股票列表已缓存到: {cache_file} 大小 {file_size:.2f} MB")
+  '''
 
+def test_get_price():
+  #df = ak.stock_zh_a_daily("sh510300", start_date="20201201", end_date="20210406", adjust = 'hfq')
+  #df = ak.stock_zh_index_daily("sh510300")
+  #df = ak.stock_zh_index_daily("sh511260")
+  #df = ak.stock_zh_index_daily("sh511010")
+  #df = ak.stock_zh_index_daily("sh518800")
+  #test_sz_index("510300")
+  #test_sz_index("511260")
+  #test_sz_index("511010")
+  #test_sz_index("518800")
+  test_sz_index("511090")
+  exit()
+  print(test_sz_index("510300"))
+  print(test_sz_index("511260"))
+  print(test_sz_index("511010"))
+  print(test_sz_index("518800"))
+  
+  # 首先需要获取基金的唯一代码，通常为6位数字
+  #fund_code = '160416'  # 请替换为“华安标普全球石油指数”的正确代码
+  #df = ef.fund.get_quote_history(fund_code)
+  #df = ak.stock_zh_index_daily("sh160416​")
+  #print(df)
 
 
 # 使用示例
 symbol = "600180"  # 平安银行
-test_sz_index()
+#test_sz_index()
+test_get_price()
 exit()
 #test_stock_individual_basic_info_xq(symbol)
 #test_stock_board_industry_name_em()
