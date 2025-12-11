@@ -104,6 +104,7 @@ class StockDataCache:
         :param force_update: 强制更新缓存
         :return: DataFrame
         """
+        stock_code = stock_code.replace('sz', '').replace('sh', '')
         cache_file = self._get_cache_path(f"stock_{stock_code}_indicator")
         
         # 如果不需要强制更新且缓存有效

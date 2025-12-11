@@ -10,8 +10,14 @@ import numpy as np
 
 from financial_data import FinancialData
 from stock_data_cache import StockDataCache
+from stock_price_cache import StockPriceCache
 # 创建全局实例
-stock_data = FinancialData()
+stock_data = FinancialData() 
+stock_price = StockPriceCache()
+
+all_industry = {}
+with open("industry.json", 'r', encoding='utf-8') as f:
+    all_industry = json.load(f)
 
 def add_stock_prefix(stock_code):
     """为股票代码添加市场前缀"""
@@ -56,13 +62,10 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 class StockDataCollector:
     """股票数据收集器"""
-    
-    def __init__(self, result_file='analysis_results.json', 
-                 progress_file='analysis_progress.json',
+    def __init__(self, result_file='analysis_results2.json', 
                  max_retries=3, retry_delay=2):
         """初始化分析器"""
         self.result_file = result_file
-        self.progress_file = progress_file
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.logger = logging.getLogger(__name__)
@@ -97,7 +100,6 @@ class StockDataCollector:
         
         # 加载已有结果和进度
         self.results = self._load_results()
-        self.progress = self._load_progress()
     
     def _load_results(self) -> Dict:
         """加载已有分析结果"""
@@ -109,16 +111,6 @@ class StockDataCollector:
                 self.logger.warning(f"加载结果文件失败: {e}")
         return {}
     
-    def _load_progress(self) -> Dict:
-        """加载分析进度"""
-        if os.path.exists(self.progress_file):
-            try:
-                with open(self.progress_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except Exception as e:
-                self.logger.warning(f"加载进度文件失败: {e}")
-        return {'analyzed_stocks': [], 'last_analyzed_index': 0}
-    
     def _save_results(self):
         """保存分析结果"""
         try:
@@ -127,15 +119,7 @@ class StockDataCollector:
             self.logger.info(f"分析结果已保存到: {self.result_file}")
         except Exception as e:
             self.logger.error(f"保存结果失败: {e}")
-    
-    def _save_progress(self):
-        """保存分析进度"""
-        try:
-            with open(self.progress_file, 'w', encoding='utf-8') as f:
-                json.dump(self.progress, f, ensure_ascii=False, indent=2, cls=CustomJSONEncoder)
-        except Exception as e:
-            self.logger.error(f"保存进度失败: {e}")
-    
+        
     def get_filtered_stock_list(self) -> Optional[pd.DataFrame]:
         """获取过滤后的股票列表（排除科创板、北交所、ST股等）"""
         try:
@@ -205,7 +189,7 @@ class StockDataCollector:
                     if price is not None and eps is not None:
                         pe_ratio = price / eps
                         #print(f"date {date} eps {eps} price {price} pe_ratio {pe_ratio}")
-                        pe_result[date[0:4]] = pe_ratio
+                        pe_result[date[0:4]] = round(pe_ratio, 2)
                         price_result[date[0:4]] = price
             print("获取历史市盈率数据结束")
             
@@ -266,9 +250,9 @@ class StockDataCollector:
             #print(f"静态市盈率: {pe_j:.2f}")
             #print(f"TTM市盈率: {pe_TTM:.2f}")
             #for date, eps in hist_eps:
-            result.append(pe_d)
-            result.append(pe_j)
-            result.append(pe_TTM)
+            result.append(round(pe_d,2))
+            result.append(round(pe_j,2))
+            result.append(round(pe_TTM,2))
 
             # 计算动态市盈率
             self.logger.info(f"手动计算 {stock_code} 动态市盈率: {pe_d:.2f} 静态市盈率: {pe_j:.2f} TTM市盈率: {pe_TTM:.2f}")
@@ -281,7 +265,7 @@ class StockDataCollector:
     def get_current_price(self, stock_code):
         """获取当前股价"""
         
-        today = "20250930"
+        today = datetime.datetime.now().strftime('%Y%m%d')
         return [today, self.get_price(stock_code, today)]
 
     def get_price(self, stock_code, target_date, adjust = ""):
@@ -298,6 +282,13 @@ class StockDataCollector:
             self.logger.warning(f"获取{stock_code} {target_date} 的股价日期早于上市日期 {listing_date}")
             return None
         '''
+        if adjust == 'hfq':
+            df = stock_price.get_stock_hfq_price(stock_code)
+            if df is not None and not df.empty:
+                price = stock_price.get_specify_date_price(df, target_date)
+                if price is not None:
+                    return price
+
 
         startdate = target_date
         day = int(startdate[6:]) - 2
@@ -380,7 +371,7 @@ class StockDataCollector:
             # 获取后复权历史股价
             now = datetime.datetime.now()
             history_price_hfq = {}
-            for year in range(now.year - years, now.year):
+            for year in range(now.year - years, now.year + 1):
                 date = str(year) + "1231"
                 history_price_hfq[year] = self.get_price(stock_code, date, adjust = "hfq")
             
@@ -409,8 +400,6 @@ class StockDataCollector:
                 'current_pe': current_pe,
                 'historical_pe': pe_data,
                 #'historical_peg': historical_peg,
-                'analysis_time': time.strftime('%Y-%m-%d %H:%M:%S'),
-                'error': None
             }
 
             
@@ -418,6 +407,9 @@ class StockDataCollector:
             roe_detail = {}
             roe_detail['kf_roe'] = hist_kf_roe
             roe_detail['roe'] = hist_roe
+
+            clean_code = stock_code.replace('sz', '').replace('sh', '')
+            industry = all_industry[clean_code]
             result = {
                 'stock_code': stock_code,
                 'stock_name': stock_name,
@@ -426,6 +418,7 @@ class StockDataCollector:
                 'current_price': current_price,
                 'roe_details': roe_detail,
                 'pe_analysis': pe_analysis_data,
+                'industry': industry,
                 'analysis_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
             
@@ -454,15 +447,10 @@ class StockDataCollector:
         total_stocks = len(stock_list)
         self.logger.info(f"开始批量分析，总共 {total_stocks} 只股票")
         
-        # 获取已分析的股票
-        analyzed_stocks = set(self.progress.get('analyzed_stocks', []))
-        last_index = self.progress.get('last_analyzed_index', 0)
-        
         # 从上次中断的位置继续
         stocks_to_analyze = []
         for i, (_, row) in enumerate(stock_list.iterrows()):
-            if i >= last_index and row['code'] not in analyzed_stocks:
-                stocks_to_analyze.append((row['code'], row['name']))
+            stocks_to_analyze.append((row['code'], row['name']))
         
         self.logger.info(f"需要分析的股票数量: {len(stocks_to_analyze)}")
         
@@ -475,22 +463,16 @@ class StockDataCollector:
             for stock_code, stock_name in batch:
                 try:
                     # 分析股票
-                    if stock_code in self.results:
-                        continue
+                    #if stock_code in self.results:
+                    #    continue
                     result = self.analyze_stock(stock_code, stock_name)
                     
                     # 保存结果
                     self.results[stock_code] = result
-                    analyzed_stocks.add(stock_code)
-                    
-                    # 更新进度
-                    current_index = stock_list[stock_list['code'] == stock_code].index[0]
-                    self.progress['last_analyzed_index'] = current_index
-                    self.progress['analyzed_stocks'] = list(analyzed_stocks)
                     
                     # 保存进度和结果
                     self._save_results()
-                    self._save_progress()
+                    exit()
                     
                     # 延迟避免频繁请求
                     #time.sleep(delay)
@@ -504,9 +486,7 @@ class StockDataCollector:
                         'status': 'failed',
                         'reason': str(e)
                     }
-                    analyzed_stocks.add(stock_code)
                     self._save_results()
-                    self._save_progress()
             
             #self.logger.info(f"第 {i//batch_size + 1} 批分析完成")
         
@@ -525,7 +505,7 @@ def demo_test():
     print("=== 上市公司ROE分析器 Demo测试 ===\n")
     
     # 创建分析器
-    analyzer = StockDataCollector('analysis_results.json', '')
+    analyzer = StockDataCollector('analysis_results2.json', '')
     
     # 测试几只股票
     test_stocks = [

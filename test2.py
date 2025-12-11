@@ -113,18 +113,17 @@ def test_stock_board_industry_summary_ths():
     break
 
 def test_sz_index(symbol):
-  
+  '''
   df = ak.stock_zh_index_daily(f"sh{symbol}")
   filename = f"stock_price/sh{symbol}_index_daily.parquet"
   df.to_parquet(filename, index=False, compression='snappy')
-  print(df)
     
   file_size = os.path.getsize(filename) / (1024 * 1024)
   print(f"Parquet数据已保存到 {filename}, 大小: {file_size:.2f} MB {datetime.now()}")
-  
-  #index_file = f"stock_price/sh{symbol}_index_daily.parquet"
-  #df = pd.read_parquet(index_file)
-  #return df
+  '''
+  index_file = f"stock_price/sh{symbol}_index_daily.parquet"
+  df = pd.read_parquet(index_file)
+  return df
 
   '''
   cache_file = f"stock_price/sz000001_index_daily.pkl"
@@ -145,12 +144,10 @@ def test_get_price():
   #test_sz_index("511260")
   #test_sz_index("511010")
   #test_sz_index("518800")
-  test_sz_index("511090")
-  exit()
   print(test_sz_index("510300"))
   print(test_sz_index("511260"))
   print(test_sz_index("511010"))
-  print(test_sz_index("518800"))
+  print(test_sz_index("510300"))
   
   # 首先需要获取基金的唯一代码，通常为6位数字
   #fund_code = '160416'  # 请替换为“华安标普全球石油指数”的正确代码
