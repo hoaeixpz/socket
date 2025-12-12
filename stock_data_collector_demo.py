@@ -7,6 +7,7 @@ import datetime
 import logging
 import os
 import numpy as np
+import math
 
 from financial_data import FinancialData
 from stock_data_cache import StockDataCache
@@ -359,24 +360,62 @@ class StockDataCollector:
 
         print(f"获取{stock_code} 历史ROE结束")
 
-    def clear_invalid_data(self, stock_code: str, stock_name):
+    def clear_invalid_data(self, stock_code: str):
         clean_code = stock_code.replace('sz', '').replace('sh', '')
         result = self.results.get(clean_code)
         if result is None:
             return
             
-        first_year = None
-        last_year = None
         history_price_hfq = result.get('history_price_hfq')
         years = list(sorted(history_price_hfq.keys()))
-        print(years)
-        exit()
+        first_year = None
+        last_year = None
+        if history_price_hfq[years[0]] is not None:
+            return
+            
+        first_year = int(years[0])
         for year, price in history_price_hfq.items():
-            if price is None:
-                if first_year is None:
-                    first_year == int(year)
+            year = int(year)
+            if year == first_year:
+                last_year = year
+                continue
+            if price is None and year - last_year == 1:
+                last_year = year
+            else:
+                break
 
-                last_year = first_year
+        history_price_bfq = result.get('history_price_bfq')
+        hist_roe = result.get('roe_details')['roe']
+        hist_kf_roe = result.get('roe_details')['kf_roe']
+
+        for year in range(first_year, last_year + 1):
+            year = str(year)
+            history_price_hfq.pop(year)
+            history_price_bfq.pop(year, None)
+            
+            roe = hist_roe.get(year)
+            roe_need_pop = False
+            if roe is not None:
+                for i in range(0,4):
+                    if roe[i] is None or math.isnan(roe[i]):
+                        roe_need_pop = True
+                        break
+            
+            if roe_need_pop:
+                hist_roe.pop(year, None)
+
+            roe = hist_kf_roe.get(year)
+            roe_need_pop = False
+            if roe is not None:
+                for i in range(0,4):
+                    if roe[i] is None or math.isnan(roe[i]):
+                        roe_need_pop = True
+                        break
+            
+            if roe_need_pop:
+                hist_kf_roe.pop(year, None)
+
+        self._save_results()
 
     def analyze_stock(self, stock_code: str, stock_name: str, years: int = 15) -> Dict:
         """分析单只股票，记录近15年每年末的股价、ROE和PE数据"""
@@ -552,16 +591,15 @@ def demo_test():
     ]
     
     print("开始测试分析单只股票...")
+    i = 0
     for stock_code, value in all_stocks.items():
-        print(f"\n分析 {stock_code}:")
+        print(f"分析 {stock_code}:")
         stock_name = value.get('stock_name')
-        if stock_code != "688396":
-            continue
-
     #for stock_code, stock_name in test_stocks:
     #    print(f"\n分析 {stock_code} {stock_name}:")
         
-        analyzer.clear_invalid_data(stock_code, stock_name)
+        analyzer.clear_invalid_data(stock_code)
+        continue
         #result = analyzer.analyze_stock(stock_code, stock_name, 15)
         
         # 将结果保存到分析器中
