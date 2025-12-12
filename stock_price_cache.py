@@ -51,7 +51,7 @@ class StockPriceCache:
         
         # 如果不需要强制更新且缓存有效
         if not force_update and self._is_cache_valid(cache_file):
-            print("📁 从本地缓存加载股票价格...")
+            #print("📁 从本地缓存加载股票价格...")
             return pd.read_parquet(cache_file)
 
         
@@ -94,7 +94,7 @@ class StockPriceCache:
         
         # 如果不需要强制更新且缓存有效
         if not force_update and self._is_cache_valid(cache_file):
-            print("📁 从本地缓存加载指数价格...")
+            #print("📁 从本地缓存加载指数价格...")
             return pd.read_parquet(cache_file)
         
         # 从AkShare获取最新数据
@@ -128,7 +128,7 @@ class StockPriceCache:
             first_date = pd.to_datetime(df['date'].iloc[0])
             last_date = pd.to_datetime(df['date'].iloc[-1])
             if target_date < first_date or target_date > last_date:
-                print(f"缓存只包含从 {first_date} 到 {last_date} 期间股价，请执行stock_zh_a_daily获取股价")
+                print(f"请求日期 {target_date}  缓存只包含从 {first_date} 到 {last_date} 期间股价，请执行stock_zh_a_daily获取股价")
                 return None
 
             df = df.copy()
@@ -145,7 +145,6 @@ class StockPriceCache:
             all_days_in_month = pd.date_range(start=first_day_of_month, end=target_date, freq='D')
             for current_date in reversed(all_days_in_month):
                 try:
-                    print(current_date)
                     return df.at[current_date, 'close']
                 except KeyError:
                     continue

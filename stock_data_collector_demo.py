@@ -163,7 +163,7 @@ class StockDataCollector:
             self.logger.error(f"获取过滤股票列表失败: {e}")
             return None
     
-    def get_historical_pe_ratios(self, stock_code, years=15):
+    def get_historical_pe_ratios(self, stock_code, pe_result, price_result, years=15):
         """
         获取历史市盈率数据
         
@@ -175,8 +175,8 @@ class StockDataCollector:
             dict: 年份到市盈率的映射
         """
         
-        pe_result = {}
-        price_result = {}
+        #pe_result = {}
+        #price_result = {}
         try:
             # 获取历史市盈率数据
             hist_eps = self.get_history_eps(stock_code, years)
@@ -193,7 +193,7 @@ class StockDataCollector:
                         price_result[date[0:4]] = price
             print("获取历史市盈率数据结束")
             
-            return pe_result, price_result
+            #return pe_result, price_result
             
         except Exception as e:
             self.logger.error(f"获取历史市盈率失败: {e}")
@@ -334,14 +334,13 @@ class StockDataCollector:
         print(f"获取{stock_code} 历史每股收益结束")
         return result_list
 
-    def get_ROE(self, stock_code: str, stock_name: str, indicator: str, year : int = 15) -> Dict:
+    def get_ROE(self, stock_code: str, stock_name: str, indicator: str, history_roe, year : int = 15) -> Dict:
         """获取ROE"""
         df = stock_data.get_indicator_data(stock_code, indicator)
         result_list = stock_data.get_indicator_recent_year(df, year)
         kf_roe = stock_data.get_indicator_recent_year(df, year)
         #print(kf_roe)
         
-        history_roe = {}
         last_year = None
         for date, kf_roe_v in kf_roe:
             year = date[0:4]
@@ -360,8 +359,6 @@ class StockDataCollector:
 
         print(f"获取{stock_code} 历史ROE结束")
 
-        return history_roe
-
     def analyze_stock(self, stock_code: str, stock_name: str, years: int = 15) -> Dict:
         """分析单只股票，记录近15年每年末的股价、ROE和PE数据"""
         stock_code = add_stock_prefix(stock_code)
@@ -369,16 +366,31 @@ class StockDataCollector:
         
         try:
             # 获取后复权历史股价
+            clean_code = stock_code.replace('sz', '').replace('sh', '')
+            result = self.results.get(clean_code)
+            if result is not None:
+                years = 2
+                history_price_hfq = result.get('history_price_hfq')
+                history_price_bfq = result.get('history_price_bfq')
+                hist_roe = result.get('roe_details')['roe']
+                hist_kf_roe = result.get('roe_details')['kf_roe']
+                pe_data = result.get('pe_analysis')['historical_pe']
+            else:
+                history_price_hfq = {}
+                history_price_bfq = {}
+                hist_roe = {}
+                hist_kf_roe = {}
+                pe_data = {}
+
             now = datetime.datetime.now()
-            history_price_hfq = {}
             for year in range(now.year - years, now.year + 1):
-                date = str(year) + "1231"
-                history_price_hfq[year] = self.get_price(stock_code, date, adjust = "hfq")
-            
+                year = str(year)
+                date = year + "1231"
+                history_price_hfq[year] = self.get_price(stock_code, date, adjust = "hfq")            
 
             # 1. 获取ROE数据
-            hist_roe = self.get_ROE(stock_code, stock_name, "净资产收益率(ROE)", years)
-            hist_kf_roe = self.get_ROE(stock_code, stock_name, "净资产收益率_平均_扣除非经常损益", years)
+            self.get_ROE(stock_code, stock_name, "净资产收益率(ROE)", hist_roe, years)
+            self.get_ROE(stock_code, stock_name, "净资产收益率_平均_扣除非经常损益", hist_kf_roe, years)
             sorted_kfroe = dict(sorted(hist_kf_roe.items(), key=lambda x: int(x[0])))
             sorted_roe = dict(sorted(hist_roe.items(), key=lambda x: int(x[0])))
 
@@ -386,11 +398,11 @@ class StockDataCollector:
             hist_roe = sorted_roe
             
             # 2. 获取PE数据,和股价
-            pe_data, price_data = self.get_historical_pe_ratios(stock_code, years)
+            self.get_historical_pe_ratios(stock_code, pe_data, history_price_bfq, years)
             sorted_pe = dict(sorted(pe_data.items(), key=lambda x: int(x[0])))
             pe_data = sorted_pe
-            sorted_dates = dict(sorted(price_data.items(), key=lambda x: int(x[0])))
-            price_data = sorted_dates
+            sorted_dates = dict(sorted(history_price_bfq.items(), key=lambda x: int(x[0])))
+            history_price_bfq = sorted_dates
             
             # 3. 获取当前股价和PE
             current_price = self.get_current_price(stock_code)
@@ -408,13 +420,13 @@ class StockDataCollector:
             roe_detail['kf_roe'] = hist_kf_roe
             roe_detail['roe'] = hist_roe
 
-            clean_code = stock_code.replace('sz', '').replace('sh', '')
+            
             industry = all_industry[clean_code]
             result = {
                 'stock_code': stock_code,
                 'stock_name': stock_name,
                 'history_price_hfq': history_price_hfq,
-                'history_price_bfq': price_data,
+                'history_price_bfq': history_price_bfq,
                 'current_price': current_price,
                 'roe_details': roe_detail,
                 'pe_analysis': pe_analysis_data,
@@ -439,18 +451,25 @@ class StockDataCollector:
         """批量分析股票"""
         
         # 获取股票列表
-        stock_list = self.get_filtered_stock_list()
-        if stock_list is None:
-            self.logger.error("无法获取股票列表")
-            return
+        #stock_list = self.get_filtered_stock_list()
+        #if stock_list is None:
+        #    self.logger.error("无法获取股票列表")
+        #    return
+
+        with open("hs_300_code.txt", 'r', encoding='utf-8') as f:
+        # 读取所有行，并去除每行的换行符
+            stocks_to_analyze = [line.strip() for line in f.readlines()]
         
-        total_stocks = len(stock_list)
+        total_stocks = len(stocks_to_analyze)
         self.logger.info(f"开始批量分析，总共 {total_stocks} 只股票")
+
         
+        stocks_to_analyze = stocks_to_analyze[5:]
         # 从上次中断的位置继续
-        stocks_to_analyze = []
-        for i, (_, row) in enumerate(stock_list.iterrows()):
-            stocks_to_analyze.append((row['code'], row['name']))
+        #stocks_to_analyze =[]
+        #for i, (_, row) in enumerate(stock_list.iterrows()):
+        #    stocks_to_analyze.append((row['code'], row['name']))
+
         
         self.logger.info(f"需要分析的股票数量: {len(stocks_to_analyze)}")
         
@@ -459,8 +478,10 @@ class StockDataCollector:
             batch = stocks_to_analyze[i:i + batch_size]
             
             #self.logger.info(f"分析第 {i//batch_size + 1} 批，共 {len(batch)} 只股票")
-            
-            for stock_code, stock_name in batch:
+            #for stock_code, stock_name in batch:
+            for stock_item in batch:
+                stock_code = stock_item.split()[0]
+                stock_name = stock_item.split()[1]
                 try:
                     # 分析股票
                     #if stock_code in self.results:
@@ -472,8 +493,7 @@ class StockDataCollector:
                     
                     # 保存进度和结果
                     self._save_results()
-                    exit()
-                    
+
                     # 延迟避免频繁请求
                     #time.sleep(delay)
                     
@@ -559,3 +579,18 @@ def batch_analyze_main():
 if __name__ == "__main__":
     #demo_test()
     batch_analyze_main()
+
+    '''
+    hs300_df = ak.index_stock_cons_sina(symbol="000300")
+    hs300_df = hs300_df[['code', 'name']]
+    stock_list = []
+
+    for i, (_, row) in enumerate(hs300_df.iterrows()):
+        stock_list.append((row['code'], row['name']))
+    with open("hs_300_code.txt", 'w', encoding='utf-8') as f:
+        # 读取所有行，并去除每行的换行符
+        for item in stock_list:
+            f.write(f"{item[0]} {item[1]}\n")
+    #print(stock_list)
+    '''
+
