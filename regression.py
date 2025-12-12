@@ -10,8 +10,7 @@ import math
 import pandas as pd
 import numpy as np
 from datetime import datetime
-import simple_stock_plotter
-from simple_stock_plotter import SimpleStockPlotter
+
 
 class StockAnalyzer:
     """股票分析器"""
@@ -24,7 +23,7 @@ class StockAnalyzer:
             'max_bad_years': 1      # 最多不良年份数
         }
     
-    def load_stock_data(self, file_path='analysis_results.json'):
+    def load_stock_data(self, file_path='stock_info.json'):
         """加载股票数据"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -93,7 +92,7 @@ class StockAnalyzer:
         '''
         扣非ROE连续5年上涨，且有3年 > 5
         '''
-        roe_values = stock_info.get('roe_details').get('history_roe')
+        roe_values = stock_info.get('roe_details').get('kf_roe')
         this_year = int(datetime.now().year)
         count = 0
         last_roe = None
@@ -117,7 +116,7 @@ class StockAnalyzer:
         return True
 
     def roe_distrub(sel, YEAR, stock_info):
-        roe_values = stock_info.get('roe_details').get('history_roe')
+        roe_values = stock_info.get('roe_details').get('kf_roe')
         this_year = int(datetime.now().year)
         roe_list = []
         if YEAR < this_year:
@@ -161,7 +160,7 @@ class StockAnalyzer:
         if r > 30:
             return False
 
-        roe_values = stock_info.get('roe_details').get('history_roe')
+        roe_values = stock_info.get('roe_details').get('kf_roe')
         success, roelist = self.roe_distrub(YEAR, stock_info)
         if success:
             print(roelist)
@@ -228,7 +227,6 @@ class StockAnalyzer:
     def analyze_all_stocks(self, year:int):
         """分析某年所有股票"""
         stock_data = self.load_stock_data()
-        plottor = simple_stock_plotter.SimpleStockPlotter()
         
         if not stock_data:
             print("没有找到股票数据")

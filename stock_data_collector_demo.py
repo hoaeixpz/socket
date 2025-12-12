@@ -63,7 +63,7 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 class StockDataCollector:
     """股票数据收集器"""
-    def __init__(self, result_file='analysis_results.json', 
+    def __init__(self, result_file='stock_info.json', 
                  max_retries=3, retry_delay=2):
         """初始化分析器"""
         self.result_file = result_file
@@ -576,7 +576,7 @@ def demo_test():
     print("=== 上市公司ROE分析器 Demo测试 ===\n")
     
     # 创建分析器
-    analyzer = StockDataCollector('analysis_results.json', '')
+    analyzer = StockDataCollector('stock_info.json', '')
     all_stocks = analyzer.results
     # 测试几只股票
     test_stocks = [
@@ -628,26 +628,11 @@ def demo_test():
 def batch_analyze_main():
     #analysis all stocks
 
-    analyzer = StockDataCollector('analysis_results.json', '')
+    analyzer = StockDataCollector('stock_info.json', '')
     analyzer.batch_analyze_stocks(15,3)
 
     analyzer.get_summary()
 
 if __name__ == "__main__":
-    demo_test()
-    #batch_analyze_main()
-
-    '''
-    hs300_df = ak.index_stock_cons_sina(symbol="000300")
-    hs300_df = hs300_df[['code', 'name']]
-    stock_list = []
-
-    for i, (_, row) in enumerate(hs300_df.iterrows()):
-        stock_list.append((row['code'], row['name']))
-    with open("hs_300_code.txt", 'w', encoding='utf-8') as f:
-        # 读取所有行，并去除每行的换行符
-        for item in stock_list:
-            f.write(f"{item[0]} {item[1]}\n")
-    #print(stock_list)
-    '''
-
+    #demo_test()
+    batch_analyze_main()

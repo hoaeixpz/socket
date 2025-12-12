@@ -72,8 +72,8 @@ def load_from_parquet(filename):
     return stock_data
 
 
-def load_existing_stocks(file = 'analysis_results.json'):
-    """加载现有的analysis_results.json文件，返回所有股票代码列表"""
+def load_existing_stocks(file = 'stock_info.json'):
+    """加载现有的stock_info.json文件，返回所有股票代码列表"""
     try:
         with open(file, 'r', encoding='utf-8') as f:
             stocks = json.load(f)
@@ -240,11 +240,12 @@ def collect_stocks_price():
         for i, item in enumerate(weekly_data[sample_stock][:5]):
             print(f"  {i+1}. 日期: {item['date']}, 收盘价: {item['MA5']}")
 
-def analyze_single_stock(stock_code, consecutive_days):
+def analyze_single_stock(stock_code):
     try:
         full_stock_code = add_stock_prefix(stock_code)
         filename = f"stock_price/{full_stock_code}_daily_hfq.parquet"
         stock_df = pd.read_parquet(filename)
+        stock_df['date'] = pd.to_datetime(stock_df['date'])
         stock_df['date'] = stock_df['date'].dt.strftime('%Y-%m-%d')
 
         close_prices = stock_df['close'].tolist()
@@ -255,18 +256,11 @@ def analyze_single_stock(stock_code, consecutive_days):
         sz_index_df['date'] = pd.to_datetime(sz_index_df['date'])
         sz_index_df['date'] = sz_index_df['date'].dt.strftime('%Y-%m-%d')
         sz_index_df.set_index('date', inplace=True)
-
-        # 确保有足够的数据点进行分析
-        if len(close_prices) < consecutive_days:
-            print(f"股票 {stock_code} 数据点不足({len(close_prices)}个)，跳过分析")
-            return stock_code, []
-        
-
-        # 查找所有连续上涨的序列
+ 
         consecutive_periods = []
-
+        
         last_month = None
-        for i in range(len(close_prices) - consecutive_days - 1):
+        for i in range(len(close_prices) - 1):
             month = int(dates[i][5:7])
             if month == last_month:
                 continue
@@ -291,10 +285,10 @@ def analyze_single_stock(stock_code, consecutive_days):
             if sue is not None and -1000 < sue and sue < 1000:
                 # 计算涨幅和百分比
                 future_pct = 0
-                future_day = 252
+                future_day = 100
                 future_price = future_date = None
-                if i + consecutive_days + future_day < len(close_prices):
-                    future_date = dates[i + consecutive_days + future_day]
+                if i + future_day < len(close_prices):
+                    future_date = dates[i + future_day]
                     future_price = close_prices[i + future_day]
                     future_pct = (future_price - close_prices[i]) / close_prices[i] * 100
 
@@ -334,15 +328,15 @@ def analyze_single_stock(stock_code, consecutive_days):
         print(f"分析股票 {stock_code} 时出错: {e}")
         return stock_code, []
 
-def multi_task(stock_code_list, consecutive_days):
+def multi_task(stock_code_list):
     rising_stocks = []
     for stock_code in stock_code_list:
-        code, result = analyze_single_stock(stock_code, consecutive_days)
+        code, result = analyze_single_stock(stock_code)
         rising_stocks.append((code, result))
 
     return rising_stocks
 
-def analyze_stocks_multithread(stock_codes, consecutive_days, max_workers=2):
+def analyze_stocks_multithread(stock_codes, max_workers=2):
     """使用多线程分析股票"""
     
     total_stocks = len(stock_codes)
@@ -373,7 +367,7 @@ def analyze_stocks_multithread(stock_codes, consecutive_days, max_workers=2):
             code_num += task_num
 
         for task_list in stock_list:
-            task_func = partial(multi_task, task_list, consecutive_days)
+            task_func = partial(multi_task, task_list)
             future = executor.submit(task_func)
             future_to_stock.append(future)
         
@@ -448,7 +442,6 @@ def trend_requirement(week_index, close_prices, consecutive_weeks, six_month_wee
     #    return False, 0
 
     return is_consecutive_rising, six_month_r
-
 
 def find_consecutive_rising_stocks(stock_data, industry, consecutive_weeks=4):
     """
@@ -687,7 +680,6 @@ def plot_3D_sactter(x_data, y_data, z_data, title="三维散点图", xlabel="X�
 
     plt.tight_layout()
     plt.show()
-
 
 def categorize_and_plot_histogram(data_list, title, bin_width=20, block=False):
     """
@@ -929,7 +921,7 @@ def analysis_price():
         print(f"   总连续上涨期数: {sum(len(periods) for periods in rising_stocks.values())}")
 
 def analysis_daily_price():
-    all_stocks = load_existing_stocks()
+    all_stocks = load_existing_stocks('HS300.json')
     stock_codes = list(all_stocks.keys())
     #stock_codes = stock_codes[0:600]
 
@@ -951,8 +943,9 @@ def analysis_daily_price():
         #if i % 50 == 0:
         print(stock_code)
         
-        code, result = analyze_single_stock(stock_code, 0)
+        code, result = analyze_single_stock(stock_code)
         rising_stocks[code] = result
+
         #print(result)
 
     end_time = time.time()
@@ -968,13 +961,17 @@ def analysis_daily_price():
 
     max_su = max(sue_list)
     min_su = min(sue_list)
-    Range = (max_su - min_su ) / 30
+    max_su = 20
+    min_su = -20
+    Range = (max_su - min_su ) / 20
     bar_list = []
-    for i in range(0,30):
+    for i in range(0,20):
         bar_list.append([])
     #print(len(bar_list))
     i = 0
     for sue in sue_list:
+        if sue > 20 or sue < -20:
+            continue
         index = int((sue - min_su - 0.1) / Range)
         #print(index)
         bar_list[index].append(future_pct_list[i])
@@ -991,8 +988,8 @@ def analysis_daily_price():
         plot_scatter(sue_list, future_pct_list, 'sue - 股价')
         #plot_3D_sactter(k_list, pct_se_list, future_pct_list, '', '斜率', '标准差', 'pct')
 
-        #categorize_and_plot_histogram(future_pct_list,'股价分布', 10)
-        #categorize_and_plot_histogram(sue_list,'SUE',5, True)
+        categorize_and_plot_histogram(future_pct_list,'股价分布', 10)
+        categorize_and_plot_histogram(sue_list,'SUE',5, True)
         exit()
 
 def main():

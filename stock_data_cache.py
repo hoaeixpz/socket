@@ -9,8 +9,11 @@ from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
+current_dir = os.path.dirname(__file__)
+file_path = os.path.join(current_dir, "stock_data")
+
 class StockDataCache:
-    def __init__(self, cache_dir="./stock_data", cache_expire_days=70):
+    def __init__(self, cache_dir=file_path, cache_expire_days=70):
         """
         :param cache_dir: 缓存目录
         :param cache_expire_days: 缓存过期天数（默认70天）

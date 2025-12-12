@@ -121,7 +121,11 @@ class StockPriceCache:
 
     def get_specify_date_price(self, df, target_date_str:str, force_update=False):
         if df is None or df.empty:
+            print("input df is None")
             return None
+
+        if df.index.name == 'date':
+            df['date'] = df.index
 
         if 'date' in df.columns:
             target_date = pd.to_datetime(target_date_str)
@@ -152,6 +156,7 @@ class StockPriceCache:
             print(f"警告：目标日期所在月份 {first_day_of_month.date()} 没有任何数据。")
             return None
         else:
+            print("df not has cloumn date")
             return None
 
 # 使用示例

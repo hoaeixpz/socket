@@ -6,7 +6,7 @@ import math
 from stock_data_collector_demo import CustomJSONEncoder
 
 def load_existing_stocks(file = 'industry.json'):
-    """加载现有的analysis_results.json文件，返回所有股票代码列表"""
+    """加载现有的stock_info.json文件，返回所有股票代码列表"""
     try:
         with open(file, 'r', encoding='utf-8') as f:
             stocks = json.load(f)
@@ -99,7 +99,7 @@ def main():
     industry_map = load_existing_stocks()
     industry_dict = load_existing_stocks("industry_info.json")
 
-    all_stocks = load_existing_stocks("analysis_results.json")
+    all_stocks = load_existing_stocks("stock_info.json")
     for code, industry in industry_map.items():
         if industry_dict.get(industry) is None:
             industry_dict[industry] = {}

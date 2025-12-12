@@ -31,12 +31,12 @@ def setup_logging():
     )
 
 def load_good_stocks():
-    """加载analysis_results.json文件"""
+    """加载stock_info.json文件"""
     try:
-        with open('analysis_results.json', 'r', encoding='utf-8') as f:
+        with open('stock_info.json', 'r', encoding='utf-8') as f:
             return json.load(f)
     except FileNotFoundError:
-        print("错误：找不到analysis_results.json文件")
+        print("错误：找不到stock_info.json文件")
         return {}
     except json.JSONDecodeError as e:
         print(f"错误：JSON文件格式错误 - {e}")
@@ -53,8 +53,8 @@ def add_stock_prefix(stock_code):
     else:
         return code_str
 
-def load_existing_good_stocks(file = 'analysis_results.json'):
-    """加载现有的analysis_results.json文件，返回所有股票代码列表"""
+def load_existing_good_stocks(file = 'stock_info.json'):
+    """加载现有的stock_info.json文件，返回所有股票代码列表"""
     try:
         with open(file, 'r', encoding='utf-8') as f:
             stocks = json.load(f)
@@ -102,7 +102,7 @@ def save_single_stock_update(stock_code, analysis_data):
     """保存单只股票的更新到文件"""
     try:
         # 读取整个文件
-        with open('analysis_results.json', 'r', encoding='utf-8') as f:
+        with open('stock_info.json', 'r', encoding='utf-8') as f:
             all_stocks = json.load(f)
         
         # 更新当前股票的数据
@@ -116,7 +116,7 @@ def save_single_stock_update(stock_code, analysis_data):
                 all_stocks[stock_code]['history_price'][year] = price
         
         # 保存回文件
-        with open('analysis_results.json', 'w', encoding='utf-8') as f:
+        with open('stock_info.json', 'w', encoding='utf-8') as f:
             json.dump(all_stocks, f, ensure_ascii=False, indent=2)
         
         return True
@@ -292,24 +292,24 @@ def update_single_stock2(stock_code, stock_info):
 def save_single_stock(stock_code, stock_info):
     """保存分析结果"""
     try:
-        with open('analysis_results.json', 'r', encoding='utf-8') as f:
+        with open('stock_info.json', 'r', encoding='utf-8') as f:
             all_stocks = json.load(f)
 
         all_stocks[stock_code] = stock_info
         #all_stocks.pop(stock_code)
 
-        with open('analysis_results.json', 'w', encoding='utf-8') as f:
+        with open('stock_info.json', 'w', encoding='utf-8') as f:
             json.dump(all_stocks, f, ensure_ascii=False, indent=2, cls=CustomJSONEncoder)
-        print(f"分析结果已保存到: analysis_results.json")
+        print(f"分析结果已保存到: stock_info.json")
     except Exception as e:
         print(f"保存结果失败: {e}")
 
 def save_all_stocks(all_stocks):
     """保存分析结果"""
     try:
-        with open('analysis_results.json', 'w', encoding='utf-8') as f:
+        with open('stock_info.json', 'w', encoding='utf-8') as f:
             json.dump(all_stocks, f, ensure_ascii=False, indent=2, cls=CustomJSONEncoder)
-        print(f"分析结果已保存到: analysis_results.json")
+        print(f"分析结果已保存到: stock_info.json")
     except Exception as e:
         print(f"保存结果失败: {e}")
 

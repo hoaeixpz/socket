@@ -102,7 +102,7 @@ class FinancialData:
 		#print(df.iloc[[row]])
 		return df.iloc[[row]]
 
-	def get_indicator_recent_year(self, df: pd.DataFrame, years: int = 5):
+	def get_indicator_recent_year(self, df: pd.DataFrame, years: int = 5, current_year = None):
 		'''
 		输入：指标的所有年份数据
 		输出：个指标近几年的数据
@@ -113,17 +113,19 @@ class FinancialData:
 			if isinstance(col, str) and col.isdigit() and len(col) == 8:
 				date_columns.append(col)
 
-		current_year = datetime.datetime.now().year
+		if current_year is None:
+			current_year = datetime.datetime.now().year
+
 		cutoff_year = current_year - years
 
 		recent_date_columns = []
 		for date_col in date_columns:
 			year = int(date_col[:4])  # 提取年份
-			if year >= cutoff_year:
+			if year >= cutoff_year and year < current_year:
 				recent_date_columns.append(date_col)
 
-		if len(recent_date_columns) < years * 4:  # 每年4个季度
-			print(f"警告：近{years}年的数据不足，只找到{len(recent_date_columns)}个季度数据")
+		#if len(recent_date_columns) < years * 4:  # 每年4个季度
+		#	print(f"警告：近{years}年的数据不足，只找到{len(recent_date_columns)}个季度数据")
 
 		result_list = []
 		for date_col in recent_date_columns:
