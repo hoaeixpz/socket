@@ -62,7 +62,7 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 class StockDataCollector:
     """股票数据收集器"""
-    def __init__(self, result_file='analysis_results2.json', 
+    def __init__(self, result_file='analysis_results.json', 
                  max_retries=3, retry_delay=2):
         """初始化分析器"""
         self.result_file = result_file
@@ -359,6 +359,25 @@ class StockDataCollector:
 
         print(f"获取{stock_code} 历史ROE结束")
 
+    def clear_invalid_data(self, stock_code: str, stock_name):
+        clean_code = stock_code.replace('sz', '').replace('sh', '')
+        result = self.results.get(clean_code)
+        if result is None:
+            return
+            
+        first_year = None
+        last_year = None
+        history_price_hfq = result.get('history_price_hfq')
+        years = list(sorted(history_price_hfq.keys()))
+        print(years)
+        exit()
+        for year, price in history_price_hfq.items():
+            if price is None:
+                if first_year is None:
+                    first_year == int(year)
+
+                last_year = first_year
+
     def analyze_stock(self, stock_code: str, stock_name: str, years: int = 15) -> Dict:
         """分析单只股票，记录近15年每年末的股价、ROE和PE数据"""
         stock_code = add_stock_prefix(stock_code)
@@ -451,24 +470,20 @@ class StockDataCollector:
         """批量分析股票"""
         
         # 获取股票列表
-        #stock_list = self.get_filtered_stock_list()
-        #if stock_list is None:
-        #    self.logger.error("无法获取股票列表")
-        #    return
+        stock_list = self.get_filtered_stock_list()
+        if stock_list is None:
+            self.logger.error("无法获取股票列表")
+            return
 
-        with open("hs_300_code.txt", 'r', encoding='utf-8') as f:
+        #with open("hs_300_code.txt", 'r', encoding='utf-8') as f:
         # 读取所有行，并去除每行的换行符
-            stocks_to_analyze = [line.strip() for line in f.readlines()]
+        #    stocks_to_analyze = [line.strip() for line in f.readlines()]
         
-        total_stocks = len(stocks_to_analyze)
-        self.logger.info(f"开始批量分析，总共 {total_stocks} 只股票")
-
         
-        stocks_to_analyze = stocks_to_analyze[5:]
         # 从上次中断的位置继续
-        #stocks_to_analyze =[]
-        #for i, (_, row) in enumerate(stock_list.iterrows()):
-        #    stocks_to_analyze.append((row['code'], row['name']))
+        stocks_to_analyze =[]
+        for i, (_, row) in enumerate(stock_list.iterrows()):
+            stocks_to_analyze.append((row['code'], row['name']))
 
         
         self.logger.info(f"需要分析的股票数量: {len(stocks_to_analyze)}")
@@ -477,11 +492,8 @@ class StockDataCollector:
         for i in range(0, len(stocks_to_analyze), batch_size):
             batch = stocks_to_analyze[i:i + batch_size]
             
-            #self.logger.info(f"分析第 {i//batch_size + 1} 批，共 {len(batch)} 只股票")
-            #for stock_code, stock_name in batch:
-            for stock_item in batch:
-                stock_code = stock_item.split()[0]
-                stock_name = stock_item.split()[1]
+            self.logger.info(f"分析第 {i//batch_size + 1} 批，共 {len(batch)} 只股票")
+            for stock_code, stock_name in batch:
                 try:
                     # 分析股票
                     #if stock_code in self.results:
@@ -525,8 +537,8 @@ def demo_test():
     print("=== 上市公司ROE分析器 Demo测试 ===\n")
     
     # 创建分析器
-    analyzer = StockDataCollector('analysis_results2.json', '')
-    
+    analyzer = StockDataCollector('analysis_results.json', '')
+    all_stocks = analyzer.results
     # 测试几只股票
     test_stocks = [
         #('600519', '贵州茅台')
@@ -540,10 +552,17 @@ def demo_test():
     ]
     
     print("开始测试分析单只股票...")
-    for stock_code, stock_name in test_stocks:
-        print(f"\n分析 {stock_code} {stock_name}:")
+    for stock_code, value in all_stocks.items():
+        print(f"\n分析 {stock_code}:")
+        stock_name = value.get('stock_name')
+        if stock_code != "688396":
+            continue
+
+    #for stock_code, stock_name in test_stocks:
+    #    print(f"\n分析 {stock_code} {stock_name}:")
         
-        result = analyzer.analyze_stock(stock_code, stock_name, 15)
+        analyzer.clear_invalid_data(stock_code, stock_name)
+        #result = analyzer.analyze_stock(stock_code, stock_name, 15)
         
         # 将结果保存到分析器中
         analyzer.results[stock_code] = result
@@ -577,8 +596,8 @@ def batch_analyze_main():
     analyzer.get_summary()
 
 if __name__ == "__main__":
-    #demo_test()
-    batch_analyze_main()
+    demo_test()
+    #batch_analyze_main()
 
     '''
     hs300_df = ak.index_stock_cons_sina(symbol="000300")
