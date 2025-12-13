@@ -216,7 +216,7 @@ class StockAnalyzer:
     
     def get_promising_stocks(self, min_score=70):
         """获取有潜力的股票"""
-        for year in range(2023, 2025):
+        for year in range(2024, 2025):
             analysis_results = self.analyze_all_stocks(year)
             if len(analysis_results) == 0:
                 continue
@@ -262,7 +262,7 @@ class StockAnalyzer:
             #print(sorted_kfroe)
             psum = 0
             for result in sorted_result[:5]:
-                #print(result)
+                print(result)
                 #print(result[1]['profit'])
                 psum += result[1]['profit']
 

@@ -185,7 +185,6 @@ class StockDataCollector:
             for date, eps in hist_eps:
                 if date[4:6] == "12":
                     # 延迟避免频繁请求
-                    time.sleep(0.2)
                     price: Any | float | None = self.get_price(stock_code, date)
                     if price is not None and eps is not None:
                         pe_ratio = price / eps
@@ -432,6 +431,7 @@ class StockDataCollector:
         self._save_results()
 
     def analyze_stock(self, stock_code: str, stock_name: str, years: int = 15) -> Dict:
+
         """分析单只股票，记录近15年每年末的股价、ROE和PE数据"""
         stock_code = add_stock_prefix(stock_code)
         self.logger.info(f"开始分析 {stock_code} {stock_name} 的{ years}年历史数据")
@@ -441,24 +441,30 @@ class StockDataCollector:
             clean_code = stock_code.replace('sz', '').replace('sh', '')
             result = self.results.get(clean_code)
             if result is not None:
-                years = 2
+                years = 1
                 history_price_hfq = result.get('history_price_hfq')
                 history_price_bfq = result.get('history_price_bfq')
                 hist_roe = result.get('roe_details')['roe']
                 hist_kf_roe = result.get('roe_details')['kf_roe']
                 pe_data = result.get('pe_analysis')['historical_pe']
+                current_price = result.get('current_price')
+                pe_analysis_data = result.get('pe_analysis')
             else:
                 history_price_hfq = {}
                 history_price_bfq = {}
                 hist_roe = {}
                 hist_kf_roe = {}
                 pe_data = {}
+                current_price = []
+                pe_analysis_data = {}
 
             now = datetime.datetime.now()
             for year in range(now.year - years, now.year + 1):
                 year = str(year)
+                if history_price_hfq.get(year) is not None:
+                    continue
                 date = year + "1231"
-                history_price_hfq[year] = self.get_price(stock_code, date, adjust = "hfq")            
+                history_price_hfq[year] = self.get_price(stock_code, date, adjust = "hfq")      
 
             # 1. 获取ROE数据
             self.get_ROE(stock_code, stock_name, "净资产收益率(ROE)", hist_roe, years)
@@ -470,21 +476,25 @@ class StockDataCollector:
             hist_roe = sorted_roe
             
             # 2. 获取PE数据,和股价
-            self.get_historical_pe_ratios(stock_code, pe_data, history_price_bfq, years)
-            sorted_pe = dict(sorted(pe_data.items(), key=lambda x: int(x[0])))
-            pe_data = sorted_pe
-            sorted_dates = dict(sorted(history_price_bfq.items(), key=lambda x: int(x[0])))
-            history_price_bfq = sorted_dates
+            if history_price_bfq.get(str(now.year - years)) is None:
+                self.get_historical_pe_ratios(stock_code, pe_data, history_price_bfq, years)
+                sorted_pe = dict(sorted(pe_data.items(), key=lambda x: int(x[0])))
+                pe_data = sorted_pe
+                sorted_dates = dict(sorted(history_price_bfq.items(), key=lambda x: int(x[0])))
+                history_price_bfq = sorted_dates
             
             # 3. 获取当前股价和PE
+            '''
             current_price = self.get_current_price(stock_code)
             current_pe = self.get_current_pe_ratio(stock_code, current_price[1])
+            
             
             pe_analysis_data = {
                 'current_pe': current_pe,
                 'historical_pe': pe_data,
                 #'historical_peg': historical_peg,
             }
+            '''
 
             
             # 4. 汇总结果
@@ -611,13 +621,14 @@ def demo_test():
         stock_name = value.get('stock_name')
     #for stock_code, stock_name in test_stocks:
     #    print(f"\n分析 {stock_code} {stock_name}:")
-        analyzer.update_market_value(stock_code)
-        i += 1
+        #analyzer.update_market_value(stock_code)
+        i += 1            
         if i % 50 == 0:
             analyzer._save_results()
         #analyzer.clear_invalid_data(stock_code)
+        
+        result = analyzer.analyze_stock(stock_code, stock_name, 15)
         continue
-        #result = analyzer.analyze_stock(stock_code, stock_name, 15)
         
         # 将结果保存到分析器中
         analyzer.results[stock_code] = result
