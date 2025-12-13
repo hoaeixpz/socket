@@ -39,7 +39,7 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 import matplotlib.pyplot as plt
 
-def plot_scatter(x_data, y_data, title="散点图", xlabel="X轴", ylabel="Y轴"):
+def plot_scatter(x_data, y_data, title="散点图", xlabel="市值", ylabel="收益率"):
     """
     绘制散点图
     
@@ -139,6 +139,7 @@ class StockAnalyzer:
 
         count = 0
         for year, pct in zzl:
+            #print("year pct ", year, " ", pct)
             if year[4:6] == '12':
                 if pct < 20:
                     return False
@@ -170,23 +171,25 @@ class StockAnalyzer:
         print("选择市值最小的5个\n")
         for stock_code, stock_info in stock_data.items():
             stock_name = stock_info.get('stock_name', '')
-            #if stock_code != "002015":
-                #continue
+            #if stock_code != "000568":
+             #   continue
             #print(f"分析股票: {stock_code} {stock_name}")
             
             if self.find_good_stocks(year, stock_code):
-                print(f"分析股票: {stock_code} {stock_name}")
+                #print(f"分析股票: {stock_code} {stock_name}")
                 date = str(year) + "-01-31"
                 market_value = stock_data[stock_code].get('market_value')
                 mv = market_value.get(date)
                 if mv is None:
                     df = ak.stock_zh_valuation_baidu(symbol=stock_code, indicator="总市值", period="全部")
                     mv = stock_price.get_specify_date_price(df, date, head = 'value')
-                    if mv is not None:
-                        market_value[date] = mv
-                        self.save_results(stock_data)
+                    if mv is None:
+                        continue
+                    self.save_results(stock_data)
 
-                print(f"{date} 市值 {mv}")
+                market_value[date] = mv
+                #print(f"{date} 市值 {mv}")
+                
                 p, p2 = self.cal_profit(year, stock_info)
                 count = count + 1
                 #if p < 0:
@@ -205,6 +208,7 @@ class StockAnalyzer:
                     'market_value': mv
                 }
 
+
                 #if count == 6:
                 #    break
         
@@ -221,9 +225,10 @@ class StockAnalyzer:
             market_values = []
             for info in analysis_results.values():
                 profit = info['profit']
-                if profit is None:
-                    continue
                 market_value = info['market_value']
+                if profit is None or market_value is None:
+                    continue
+                #print(f"{market_value:.2f} -> {profit}")
                 profit_values.append(profit)
                 market_values.append(market_value)
 
@@ -233,10 +238,10 @@ class StockAnalyzer:
             profit2_values = [info['profit2'] for info in analysis_results.values() if 'profit2' in info and info['profit2'] is not None]
             #print(f"{profit_values}")
             if len(profit2_values) == 0 or profit2_values[0] is None:
-                print(f"{year} 平均增长率{profit_ava:.2f}")
+                print(f"{year} 平均增长率{profit_ava:.2f}%")
             else:
                 profit2_ava = sum(profit2_values) / len(profit2_values)
-                print(f"{year} 平均增长率{profit_ava:.2f},平均两年复合增长率{profit2_ava:.2f}")
+                print(f"{year} 平均增长率{profit_ava:.2f}%,平均两年复合增长率{profit2_ava:.2f}%")
 
             sz_index_file = "../../stock_price/sz000001_index_daily.parquet"
             sz_index_df = pd.read_parquet(sz_index_file)
@@ -253,8 +258,17 @@ class StockAnalyzer:
             # 筛选有潜力的股票
 
 
-            plot_scatter(market_values, profit_values)
-            exit()
+            sorted_result = list(sorted(analysis_results.items(), key=lambda x: x[1]['market_value']))
+            #print(sorted_kfroe)
+            psum = 0
+            for result in sorted_result[:5]:
+                #print(result)
+                #print(result[1]['profit'])
+                psum += result[1]['profit']
+
+            print(f"市值最小五家公司的平均涨幅为 {psum/5:.2f} %")
+            #plot_scatter(market_values, profit_values)
+            #exit()
         
         return None
     
