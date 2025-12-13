@@ -175,6 +175,10 @@ class StockAnalyzer:
         print("选择市值最小的5个\n")
         for stock_code, stock_info in stock_data.items():
             stock_name = stock_info.get('stock_name', '')
+            history_price = stock_info.get('history_price_hfq')
+            if str(year) not in history_price:
+                continue
+
             #if stock_code != "000404":
             #    continue
             #print(f"分析股票: {stock_code} {stock_name}")
@@ -228,13 +232,13 @@ class StockAnalyzer:
 
                 #if count == 16:
                 #    break
-                
+
         self.save_results(stock_data)
         return analysis_results
     
     def get_promising_stocks(self, min_score=70):
         """获取有潜力的股票"""
-        for year in range(2014, 2016):
+        for year in range(2017, 2024):
             analysis_results = self.analyze_all_stocks(year)
             if len(analysis_results) == 0:
                 continue
