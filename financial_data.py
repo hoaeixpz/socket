@@ -104,8 +104,8 @@ class FinancialData:
 
 	def get_indicator_recent_year(self, df: pd.DataFrame, years: int = 5, current_year = None):
 		'''
-		输入：指标的所有年份数据
-		输出：个指标近几年的数据
+		输入：指标的所有年份数据df, 当前年份current_year，以及就近几年years
+		输出：个指标近几年的数据,years年前到当前年的数据
 		'''
 		date_columns = []
 		for col in df.columns:
@@ -121,7 +121,7 @@ class FinancialData:
 		recent_date_columns = []
 		for date_col in date_columns:
 			year = int(date_col[:4])  # 提取年份
-			if year >= cutoff_year and year < current_year:
+			if year >= cutoff_year and year <= current_year:
 				recent_date_columns.append(date_col)
 
 		#if len(recent_date_columns) < years * 4:  # 每年4个季度

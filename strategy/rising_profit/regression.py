@@ -135,7 +135,7 @@ class StockAnalyzer:
         条件：净利润增长率连续3年大于20%
         '''
         df = finan_data.get_indicator_data(stock_code, "归属母公司净利润增长率")
-        zzl = finan_data.get_indicator_recent_year(df, self.criteria['good_years'], CURRENT_YEAR)
+        zzl = finan_data.get_indicator_recent_year(df, self.criteria['good_years'], CURRENT_YEAR-1)
 
         count = 0
         for year, pct in zzl:

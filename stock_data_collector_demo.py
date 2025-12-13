@@ -486,17 +486,15 @@ class StockDataCollector:
                 history_price_bfq = sorted_dates
             
             # 3. 获取当前股价和PE
-            '''
+            
             current_price = self.get_current_price(stock_code)
             current_pe = self.get_current_pe_ratio(stock_code, current_price[1])
-            
             
             pe_analysis_data = {
                 'current_pe': current_pe,
                 'historical_pe': pe_data,
                 #'historical_peg': historical_peg,
             }
-            '''
 
             
             # 4. 汇总结果
@@ -506,6 +504,10 @@ class StockDataCollector:
 
             
             industry = all_industry[clean_code]
+            result['current_price'] =  current_price
+            result['pe_analysis'] = pe_analysis_data
+            result['analysis_time'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            '''
             result = {
                 'stock_code': stock_code,
                 'stock_name': stock_name,
@@ -517,6 +519,7 @@ class StockDataCollector:
                 'industry': industry,
                 'analysis_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
+            '''
             
             self.logger.info(f"{stock_code} {stock_name} 分析完成")
             return result
@@ -619,7 +622,7 @@ def demo_test():
     print("开始测试分析单只股票...")
     i = 0
     for stock_code, value in all_stocks.items():
-        #if stock_code != "603072":
+        #if stock_code != "000006":
         #    continue
         print(f"分析 {stock_code}:")
         stock_name = value.get('stock_name')
@@ -627,13 +630,14 @@ def demo_test():
     #    print(f"\n分析 {stock_code} {stock_name}:")
         #analyzer.update_market_value(stock_code)
 
-        analyzer.clear_invalid_data(stock_code)
+        #analyzer.clear_invalid_data(stock_code)
         
-        #result = analyzer.analyze_stock(stock_code, stock_name, 15)
-        continue
+        result = analyzer.analyze_stock(stock_code, stock_name, 15)
+        
         
         # 将结果保存到分析器中
         analyzer.results[stock_code] = result
+        continue
         analyzer._save_results()
         
         if 'roe_details' in result:
