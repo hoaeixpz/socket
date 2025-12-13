@@ -184,7 +184,7 @@ class StockAnalyzer:
             #print(f"分析股票: {stock_code} {stock_name}")
             
             if self.find_good_stocks(year, stock_code):
-                print(f"---------分析股票: {stock_code} {stock_name}")
+                #print(f"---------分析股票: {stock_code} {stock_name}")
                 date = str(year) + "-01-31"
                 market_value = stock_data[stock_code].get('market_value')
                 mv = market_value.get(date)
@@ -207,8 +207,8 @@ class StockAnalyzer:
                                 market_value[next_date] = next_mv
 
                 market_value[date] = mv
-                print(f"{date} 市值 {mv}")
-                print(stock_data[stock_code].get('market_value'))
+                #print(f"{date} 市值 {mv}")
+                #print(stock_data[stock_code].get('market_value'))
                 
                 
                 p, p2 = self.cal_profit(year, stock_info)
@@ -216,12 +216,12 @@ class StockAnalyzer:
                 #if p < 0:
                 #    continue
                 
-                
+                '''
                 if p2 is not None and p is not None:
                     print(f"{stock_code}: {stock_name}自{year}年起一年增长率{p:.2f},两年复合增长率{p2:.2f}")
                 elif p is not None:
                     print(f"{stock_code}: {stock_name}自{year}年起一年增长率{p:.2f}")
-            
+                '''
                 analysis_results[stock_code] = {
                     'stock_name': stock_name,
                     'profit': p,
@@ -238,7 +238,7 @@ class StockAnalyzer:
     
     def get_promising_stocks(self, min_score=70):
         """获取有潜力的股票"""
-        for year in range(2017, 2024):
+        for year in range(2014, 2025):
             analysis_results = self.analyze_all_stocks(year)
             if len(analysis_results) == 0:
                 continue
@@ -255,16 +255,17 @@ class StockAnalyzer:
                 market_values.append(market_value)
 
 
-            print(f"{profit_values}")
+            #print(f"{profit_values}")
             profit_ava = sum(profit_values) / len(profit_values)
             profit2_values = [info['profit2'] for info in analysis_results.values() if 'profit2' in info and info['profit2'] is not None]
             #print(f"{profit_values}")
+            
             if len(profit2_values) == 0 or profit2_values[0] is None:
                 print(f"{year} 平均增长率{profit_ava:.2f}%")
             else:
                 profit2_ava = sum(profit2_values) / len(profit2_values)
                 print(f"{year} 平均增长率{profit_ava:.2f}%,平均两年复合增长率{profit2_ava:.2f}%")
-
+            
             sz_index_file = "../../stock_price/sz000001_index_daily.parquet"
             sz_index_df = pd.read_parquet(sz_index_file)
             sz_index_df.set_index('date', inplace=True)
