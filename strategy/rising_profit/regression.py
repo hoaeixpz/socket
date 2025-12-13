@@ -20,6 +20,63 @@ from stock_price_cache import StockPriceCache
 finan_data = FinancialData()
 stock_price = StockPriceCache()
 
+class CustomJSONEncoder(json.JSONEncoder):
+    """自定义JSON编码器，处理pandas和numpy数据类型"""
+    def default(self, obj):
+        if isinstance(obj, (np.integer, np.int64, np.int32)):
+            return int(obj)
+        elif isinstance(obj, (np.floating, np.float64, np.float32)):
+            obj = round(obj, 2)
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif pd.isna(obj):  # 处理NaN值
+            return None
+        elif isinstance(obj, datetime.datetime):
+            return obj.strftime('%Y-%m-%d')
+        # 让基类处理其他类型
+        return super().default(obj)
+
+import matplotlib.pyplot as plt
+
+def plot_scatter(x_data, y_data, title="散点图", xlabel="X轴", ylabel="Y轴"):
+    """
+    绘制散点图
+    
+    参数:
+    x_data: 横坐标数据列表
+    y_data: 纵坐标数据列表
+    title: 图表标题
+    xlabel: X轴标签
+    ylabel: Y轴标签
+    """
+    # 设置中文字体
+    plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS', 'DejaVu Sans']
+    plt.rcParams['axes.unicode_minus'] = False
+    
+    # 创建图形
+    plt.figure(figsize=(8, 6))
+    
+    # 绘制散点图
+    plt.scatter(x_data, y_data, alpha=0.6, s=50, c='blue', edgecolors='black', linewidth=0.5)
+    
+    # 设置图表属性
+    plt.xlabel(xlabel, fontsize=12)
+    plt.ylabel(ylabel, fontsize=12)
+    plt.title(title, fontsize=14, fontweight='bold')
+    plt.grid(True, alpha=0.3)
+    
+    # 添加趋势线（可选）
+    # z = np.polyfit(x_data, y_data, 1)
+    # p = np.poly1d(z)
+    # plt.plot(x_data, p(x_data), "r--", alpha=0.8, linewidth=2)
+    
+    # 调整布局
+    plt.tight_layout()
+    
+    # 显示图表
+    plt.show()
+
 class StockAnalyzer:
     """股票分析器"""
     
@@ -28,6 +85,15 @@ class StockAnalyzer:
             'profit_threshold': 0.2,  # 净利润增长率
             'good_years': 3,    # 最少增长年份数
         }
+
+    def save_results(self, stock_data, file_path='../../stock_info.json'):
+        """保存分析结果"""
+        try:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(stock_data, f, ensure_ascii=False, indent=2, cls=CustomJSONEncoder)
+            print(f"分析结果已保存到: {file_path}")
+        except Exception as e:
+            print(f"保存结果失败: {e}")
     
     def load_stock_data(self, file_path='../../stock_info.json'):
         """加载股票数据"""
@@ -106,16 +172,19 @@ class StockAnalyzer:
             stock_name = stock_info.get('stock_name', '')
             #if stock_code != "002015":
                 #continue
-            print(f"分析股票: {stock_code} {stock_name}")
+            #print(f"分析股票: {stock_code} {stock_name}")
             
             if self.find_good_stocks(year, stock_code):
-                date = str(year) + "0105"
-                market_value = stock_data.get('market_value')
+                print(f"分析股票: {stock_code} {stock_name}")
+                date = str(year) + "-01-31"
+                market_value = stock_data[stock_code].get('market_value')
                 mv = market_value.get(date)
                 if mv is None:
                     df = ak.stock_zh_valuation_baidu(symbol=stock_code, indicator="总市值", period="全部")
-                    mv = stock_price.get_specify_date_price(df, start_date)
-                    market_value[date] = mv
+                    mv = stock_price.get_specify_date_price(df, date, head = 'value')
+                    if mv is not None:
+                        market_value[date] = mv
+                        self.save_results(stock_data)
 
                 print(f"{date} 市值 {mv}")
                 p, p2 = self.cal_profit(year, stock_info)
@@ -159,7 +228,6 @@ class StockAnalyzer:
                 market_values.append(market_value)
 
 
-            exit()
             print(f"{profit_values}")
             profit_ava = sum(profit_values) / len(profit_values)
             profit2_values = [info['profit2'] for info in analysis_results.values() if 'profit2' in info and info['profit2'] is not None]
@@ -183,7 +251,10 @@ class StockAnalyzer:
             index_pct = (end_price / start_price - 1 ) * 100
             print(f"{year} 大盘增长{index_pct:.2f}")
             # 筛选有潜力的股票
-        
+
+
+            plot_scatter(market_values, profit_values)
+            exit()
         
         return None
     

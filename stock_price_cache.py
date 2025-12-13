@@ -119,7 +119,7 @@ class StockPriceCache:
                 return pd.read_parquet(cache_file)
             return None
 
-    def get_specify_date_price(self, df, target_date_str:str, force_update=False):
+    def get_specify_date_price(self, df, target_date_str:str, head = 'close', force_update=False):
         if df is None or df.empty:
             print("input df is None")
             return None
@@ -140,8 +140,8 @@ class StockPriceCache:
             df.set_index('date', inplace=True)
 
             try:
-                price_series = df.loc[[target_date], ['close']]
-                return price_series.iloc[0]['close']
+                price_series = df.loc[[target_date], [head]]
+                return price_series.iloc[0][head]
             except KeyError:
                 print(f"未找到目标日 {target_date.date()} 的数据，尝试查前几日数据。")
 
@@ -149,7 +149,7 @@ class StockPriceCache:
             all_days_in_month = pd.date_range(start=first_day_of_month, end=target_date, freq='D')
             for current_date in reversed(all_days_in_month):
                 try:
-                    return df.at[current_date, 'close']
+                    return df.at[current_date, head]
                 except KeyError:
                     continue
             
