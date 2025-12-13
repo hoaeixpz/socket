@@ -176,7 +176,7 @@ class StockAnalyzer:
         for stock_code, stock_info in stock_data.items():
             stock_name = stock_info.get('stock_name', '')
             history_price = stock_info.get('history_price_hfq')
-            if str(year) not in history_price:
+            if str(year-1) not in history_price:
                 continue
 
             #if stock_code != "000404":
@@ -211,7 +211,7 @@ class StockAnalyzer:
                 #print(stock_data[stock_code].get('market_value'))
                 
                 
-                p, p2 = self.cal_profit(year, stock_info)
+                p, p2 = self.cal_profit(year-1, stock_info)
                 count = count + 1
                 #if p < 0:
                 #    continue
@@ -293,7 +293,7 @@ class StockAnalyzer:
                 psum += result[1]['profit']
 
             print(f"市值最小五家公司的平均涨幅为 {psum/5:.2f} %")
-            plot_scatter(market_values, profit_values)
+            #plot_scatter(market_values, profit_values)
             #exit()
         
         return None

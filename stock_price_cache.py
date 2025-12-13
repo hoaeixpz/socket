@@ -132,7 +132,7 @@ class StockPriceCache:
             first_date = pd.to_datetime(df['date'].iloc[0])
             last_date = pd.to_datetime(df['date'].iloc[-1])
             if target_date < first_date or target_date > last_date:
-                print(f"请求日期 {target_date}  缓存只包含从 {first_date} 到 {last_date} 期间股价，请执行stock_zh_a_daily获取股价")
+                #print(f"请求日期 {target_date}  缓存只包含从 {first_date} 到 {last_date} 期间股价，请执行stock_zh_a_daily获取股价")
                 return None
 
             df = df.copy()
