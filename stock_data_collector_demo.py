@@ -380,14 +380,15 @@ class StockDataCollector:
             return
             
         history_price_hfq = result.get('history_price_hfq')
+        sorted_price_hfq = dict(sorted(history_price_hfq.items(), key=lambda x: int(x[0])))
         years = list(sorted(history_price_hfq.keys()))
         first_year = None
         last_year = None
-        if history_price_hfq[years[0]] is not None:
+        if sorted_price_hfq[years[0]] is not None:
             return
             
         first_year = int(years[0])
-        for year, price in history_price_hfq.items():
+        for year, price in sorted_price_hfq.items():
             year = int(year)
             if year == first_year:
                 last_year = year
@@ -396,6 +397,7 @@ class StockDataCollector:
                 last_year = year
             else:
                 break
+        print(first_year, " ", last_year)
 
         history_price_bfq = result.get('history_price_bfq')
         hist_roe = result.get('roe_details')['roe']
@@ -617,17 +619,17 @@ def demo_test():
     print("开始测试分析单只股票...")
     i = 0
     for stock_code, value in all_stocks.items():
+        #if stock_code != "603072":
+        #    continue
         print(f"分析 {stock_code}:")
         stock_name = value.get('stock_name')
     #for stock_code, stock_name in test_stocks:
     #    print(f"\n分析 {stock_code} {stock_name}:")
         #analyzer.update_market_value(stock_code)
-        i += 1            
-        if i % 50 == 0:
-            analyzer._save_results()
-        #analyzer.clear_invalid_data(stock_code)
+
+        analyzer.clear_invalid_data(stock_code)
         
-        result = analyzer.analyze_stock(stock_code, stock_name, 15)
+        #result = analyzer.analyze_stock(stock_code, stock_name, 15)
         continue
         
         # 将结果保存到分析器中
