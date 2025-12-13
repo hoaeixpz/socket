@@ -135,16 +135,20 @@ class StockAnalyzer:
         条件：净利润增长率连续3年大于20%
         '''
         df = finan_data.get_indicator_data(stock_code, "归属母公司净利润增长率")
-        zzl = finan_data.get_indicator_recent_year(df, self.criteria['good_years'], CURRENT_YEAR-1)
+        Y = self.criteria['good_years']
+        zzl = finan_data.get_indicator_recent_year(df, Y, CURRENT_YEAR-1)
 
         count = 0
-        for year, pct in zzl:
+        for date, pct in zzl:
+            year = int(date[0:4])
+            if CURRENT_YEAR - year > Y:
+                continue
             #print("year pct ", year, " ", pct)
-            if year[4:6] == '12':
+            if date[4:6] == '12':
                 if pct < 20:
                     return False
                 count += 1
-
+        #exit()
         if count != 3:
             return False
         '''
@@ -171,24 +175,37 @@ class StockAnalyzer:
         print("选择市值最小的5个\n")
         for stock_code, stock_info in stock_data.items():
             stock_name = stock_info.get('stock_name', '')
-            #if stock_code != "000568":
-             #   continue
+            #if stock_code != "000404":
+            #    continue
             #print(f"分析股票: {stock_code} {stock_name}")
             
             if self.find_good_stocks(year, stock_code):
-                #print(f"分析股票: {stock_code} {stock_name}")
+                print(f"---------分析股票: {stock_code} {stock_name}")
                 date = str(year) + "-01-31"
                 market_value = stock_data[stock_code].get('market_value')
                 mv = market_value.get(date)
+
                 if mv is None:
                     df = ak.stock_zh_valuation_baidu(symbol=stock_code, indicator="总市值", period="全部")
                     mv = stock_price.get_specify_date_price(df, date, head = 'value')
+
                     if mv is None:
                         continue
-                    self.save_results(stock_data)
+
+                    for i in range(1,3):
+                        next_date = str(year + i) + "-01-31"
+                        next_mv = market_value.get(next_date)
+                        print(next_date, " ", next_mv)
+                        if next_mv is None:
+                            next_mv = stock_price.get_specify_date_price(df, next_date, head = 'value')
+                            print("next_mv ", next_mv)
+                            if next_mv is not None:
+                                market_value[next_date] = next_mv
 
                 market_value[date] = mv
-                #print(f"{date} 市值 {mv}")
+                print(f"{date} 市值 {mv}")
+                print(stock_data[stock_code].get('market_value'))
+                
                 
                 p, p2 = self.cal_profit(year, stock_info)
                 count = count + 1
@@ -209,14 +226,15 @@ class StockAnalyzer:
                 }
 
 
-                #if count == 6:
+                #if count == 16:
                 #    break
-        
+                
+        self.save_results(stock_data)
         return analysis_results
     
     def get_promising_stocks(self, min_score=70):
         """获取有潜力的股票"""
-        for year in range(2024, 2025):
+        for year in range(2014, 2016):
             analysis_results = self.analyze_all_stocks(year)
             if len(analysis_results) == 0:
                 continue
@@ -263,11 +281,14 @@ class StockAnalyzer:
             psum = 0
             for result in sorted_result[:5]:
                 print(result)
+                profit = result[1]['profit']
+                if profit is None:
+                   print(f"=============error: bfq price is null==================") 
                 #print(result[1]['profit'])
                 psum += result[1]['profit']
 
             print(f"市值最小五家公司的平均涨幅为 {psum/5:.2f} %")
-            #plot_scatter(market_values, profit_values)
+            plot_scatter(market_values, profit_values)
             #exit()
         
         return None
