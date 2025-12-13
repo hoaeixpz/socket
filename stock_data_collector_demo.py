@@ -360,6 +360,20 @@ class StockDataCollector:
 
         print(f"获取{stock_code} 历史ROE结束")
 
+    def update_market_value(self, stock_code: str):
+        clean_code = stock_code.replace('sz', '').replace('sh', '')
+        result = self.results.get(clean_code)
+        if result is None:
+            return
+
+        df = ak.stock_zh_valuation_baidu(stock_code, indicator="总市值", period="近一年")
+        date = df.iloc[-1]['date']
+        market = df.iloc[-1]['value']
+        result['market_value'] = {}
+        result['market_value'][str(date)] = market
+
+        #self._save_results()
+
     def clear_invalid_data(self, stock_code: str):
         clean_code = stock_code.replace('sz', '').replace('sh', '')
         result = self.results.get(clean_code)
@@ -597,8 +611,11 @@ def demo_test():
         stock_name = value.get('stock_name')
     #for stock_code, stock_name in test_stocks:
     #    print(f"\n分析 {stock_code} {stock_name}:")
-        
-        analyzer.clear_invalid_data(stock_code)
+        analyzer.update_market_value(stock_code)
+        i += 1
+        if i % 50 == 0:
+            analyzer._save_results()
+        #analyzer.clear_invalid_data(stock_code)
         continue
         #result = analyzer.analyze_stock(stock_code, stock_name, 15)
         
@@ -618,7 +635,7 @@ def demo_test():
             print(f"  后复权历史股价: {result['history_price_hfq']}")
         print("-" * 50)
 
-    
+    analyzer._save_results()
     # 显示摘要
     analyzer.get_summary()
     
@@ -634,5 +651,5 @@ def batch_analyze_main():
     analyzer.get_summary()
 
 if __name__ == "__main__":
-    #demo_test()
-    batch_analyze_main()
+    demo_test()
+    #batch_analyze_main()

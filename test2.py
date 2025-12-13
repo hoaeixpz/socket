@@ -9,12 +9,16 @@ import pickle
 import pyarrow as pa
 import pyarrow.parquet as pq
 from datetime import datetime
+import inspect
+
 from financial_data import FinancialData
-import efinance as ef
+#import efinance as ef
 
 #from test_proxy import HybridProxyCrawler
 
 stock_data = FinancialData()
+
+ts.set_token('7bc87dd76b1cdfed7157ff2ef0d96f2918fbd3728292507939d9cc84')
 pro = ts.pro_api()
 
 def get_stock_listing_date(symbol):
@@ -159,8 +163,9 @@ def test_get_price():
 # 使用示例
 symbol = "600180"  # 平安银行
 #test_sz_index()
-test_get_price()
-exit()
+#test_get_price()
+#stock_info = ak.stock_individual_info_em(symbol="000001")
+#print(stock_info)
 #test_stock_individual_basic_info_xq(symbol)
 #test_stock_board_industry_name_em()
 #test_stock_board_industry_summary_ths()
@@ -192,6 +197,7 @@ for index, row in df.iterrows():
       print(type(col))
       print(row['value'])
 '''
+'''
 df = stock_data.get_financial_data(symbol)
 for index,row in df.iterrows():
   if "每股收益" in row['指标']:
@@ -200,23 +206,33 @@ for index,row in df.iterrows():
       if col[4:6] == "12":
         print(col, " ", row[col])
 #print(df)
+'''
 
 #df = ak.stock_zh_a_hist(symbol)
 #print(df)
+'''
+df = ak.stock_financial_analysis_indicator(symbol, "2025")
+#circulating_cap_df = df[["股票代码", "股票简称", "公告日期", "总市值", "流通市值"]]
+print(df)
+for col in df.columns:
+  print(col)
 
-df = ak.stock_financial_analysis_indicator(symbol, "2010")
-#print(df)
 for index,row in df.iterrows():
   if str(row['日期'])[5:7] == "12":
     for col in df.columns:
       if "每股收益" in col:
         print(str(row['日期']), col, " ", row[col])
 '''
-df = ak.stock_financial_abstract("000001")
-print(df)
-for row in range (0,79):
-  for col in df.columns:
-    if col == "指标" or col == "20221231":
-      print(df.loc[row, col])
-'''
+# 获取指定日期的市值数据
+# 获取财务指标
 
+df = ak.stock_zh_valuation_baidu(symbol="000001", indicator="总市值", period="近一年")
+the_nearest_value = df.iloc[-1]['date']
+print(the_nearest_value)
+#cache_file = f"stock_data/gdhs.pkl"
+#with open(cache_file, 'wb') as f:
+#  pickle.dump(df, f)
+
+print(df)
+for col in df.columns:
+  print(col)

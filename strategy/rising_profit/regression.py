@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 筛选3年净利润增长率高于20%的股票
+挑选其中市值最低的5个股票
 """
 
 import json
@@ -10,6 +11,7 @@ import pandas as pd
 import numpy as np
 import sys
 from datetime import datetime
+import akshare as ak
 
 sys.path.append("../..")
 from financial_data import FinancialData
@@ -98,17 +100,24 @@ class StockAnalyzer:
         analysis_results = {}
         
         count = 0
-        print("pe处于历史pe中前30%")
-        print("扣非ROE连续5年上涨")
-        print("扣非ROE连续5年中有3年>5\n")
+        print("净利润增长率连续3年 > 20%")
+        print("选择市值最小的5个\n")
         for stock_code, stock_info in stock_data.items():
             stock_name = stock_info.get('stock_name', '')
             #if stock_code != "002015":
                 #continue
-            #print(f"分析股票: {stock_code} {stock_name}")
+            print(f"分析股票: {stock_code} {stock_name}")
             
             if self.find_good_stocks(year, stock_code):
-                #print(f"{stock_code}: {stock_name} 符合标准")
+                date = str(year) + "0105"
+                market_value = stock_data.get('market_value')
+                mv = market_value.get(date)
+                if mv is None:
+                    df = ak.stock_zh_valuation_baidu(symbol=stock_code, indicator="总市值", period="全部")
+                    mv = stock_price.get_specify_date_price(df, start_date)
+                    market_value[date] = mv
+
+                print(f"{date} 市值 {mv}")
                 p, p2 = self.cal_profit(year, stock_info)
                 count = count + 1
                 #if p < 0:
@@ -123,7 +132,8 @@ class StockAnalyzer:
                 analysis_results[stock_code] = {
                     'stock_name': stock_name,
                     'profit': p,
-                    'profit2': p2
+                    'profit2': p2,
+                    'market_value': mv
                 }
 
                 #if count == 6:
@@ -133,12 +143,23 @@ class StockAnalyzer:
     
     def get_promising_stocks(self, min_score=70):
         """获取有潜力的股票"""
-        for year in range(2024, 2025):
+        for year in range(2023, 2025):
             analysis_results = self.analyze_all_stocks(year)
             if len(analysis_results) == 0:
                 continue
 
-            profit_values = [info['profit'] for info in analysis_results.values() if 'profit' in info and info['profit'] is not None]
+            profit_values = []
+            market_values = []
+            for info in analysis_results.values():
+                profit = info['profit']
+                if profit is None:
+                    continue
+                market_value = info['market_value']
+                profit_values.append(profit)
+                market_values.append(market_value)
+
+
+            exit()
             print(f"{profit_values}")
             profit_ava = sum(profit_values) / len(profit_values)
             profit2_values = [info['profit2'] for info in analysis_results.values() if 'profit2' in info and info['profit2'] is not None]
