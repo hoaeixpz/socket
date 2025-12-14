@@ -38,6 +38,23 @@ def load_stock_data(file_path='../../stock_info.json'):
             print(f"加载数据失败: {e}")
             return {}
 
+class CustomJSONEncoder(json.JSONEncoder):
+    """自定义JSON编码器，处理pandas和numpy数据类型"""
+    def default(self, obj):
+        if isinstance(obj, (np.integer, np.int64, np.int32)):
+            return int(obj)
+        elif isinstance(obj, (np.floating, np.float64, np.float32)):
+            obj = round(obj, 2)
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif pd.isna(obj):  # 处理NaN值
+            return None
+        elif isinstance(obj, datetime.datetime):
+            return obj.strftime('%Y-%m-%d')
+        # 让基类处理其他类型
+        return super().default(obj)
+        
 def save_results(stock_data, file_path='../../stock_info.json'):
     """保存分析结果"""
     try:
@@ -48,6 +65,7 @@ def save_results(stock_data, file_path='../../stock_info.json'):
         print(f"保存结果失败: {e}")
 
 stock_data = load_stock_data()
+
 
 def find_good_stocks(CURRENT_YEAR:int, stock_code):
     '''
