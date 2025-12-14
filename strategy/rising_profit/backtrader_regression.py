@@ -553,5 +553,5 @@ def run_backtest(CURRENT_YEAR):
 
 # 运行回测
 if __name__ == '__main__':
-    for CURRENT_YEAR in range(2021,2020,-1):
+    for CURRENT_YEAR in range(2024,2014,-1):
         run_backtest(CURRENT_YEAR)
