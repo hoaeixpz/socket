@@ -324,11 +324,25 @@ class MonthlyDCAStrategy(bt.Strategy):
                 date = str(year) + "-02-28"
 
             mv = market_value.get(date)
-            if mv is None:
+            if mv is None or month == "02":
                 df = ak.stock_zh_valuation_baidu(symbol=stock_code, indicator="总市值", period="全部")
                 mv = stock_price.get_specify_date_price(df, date, head = 'value')
                 if mv is None:
                     continue
+
+                for mon in range(3,13):
+                    if mon < 10:
+                        mon = "0"+ str(mon)
+                    else:
+                        mon = str(mon)
+                    next_date = str(year) + "-" + str(mon) + "-30"
+                    next_mv = market_value.get(next_date)
+                    print(next_date, " ", next_mv)
+                    if next_mv is None:
+                        next_mv = stock_price.get_specify_date_price(df, next_date, head = 'value')
+                        print("next_mv ", next_mv)
+                        if next_mv is not None:
+                            market_value[next_date] = next_mv
 
             market_dict[data] = mv
             market_value[date] = mv
