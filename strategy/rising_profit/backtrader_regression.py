@@ -21,24 +21,12 @@ plt.rcParams["font.sans-serif"] = ["SimHei"]
 plt.rcParams["axes.unicode_minus"] = False
 
 import sys
-sys.path.append("..")
+sys.path.append("../..")
 from financial_data import FinancialData
 from stock_price_cache import StockPriceCache
 
 finan_data = FinancialData()
 stock_price = StockPriceCache()
-
-def real_data():
-    df = stock_price.get_stock_hfq_price("002576")
-    df.index=pd.to_datetime(df['date'])
-    df = df[['close']]
-    df['open'] = df['close']      # 开盘价 = 收盘价
-    df['high'] = df['close']
-    df['low'] = df['close']
-    df['volume'] = 1000000000000              # 固定成交量
-    #print(df.iloc[705:750])
-    return df
-
 
 class MyStrategy(bt.Strategy):
     """
@@ -93,66 +81,77 @@ class SimpleBuyAndHoldStrategy(bt.Strategy):
     简单的买入持有策略 - 使用索引判断
     第一天买入，最后一天卖出
     """
-    params = (
-        ('verbose', True),
-    )
     
     def __init__(self):
-        self.has_bought = False
-        self.has_sold = False
-        self.buy_price = 0
-        self.buy_date = None
-        self.sell_date = None
+        self.record = {}
+        for data in self.datas:
+            self.record[data] = {
+                'name': data._name,
+                'has_bought': False,
+                'buy_price': 0,
+                'buy_date': None,
+                'sell_date': None
+            }
 
     def next(self):
-        current_bar = len(self.data)  # 当前bar的索引
+        cash = self.broker.getcash()
+        cash = cash / len(self.datas)
+
+        for data in self.datas:
+            name = data._name
+            record = self.record[data]
+            current_bar = len(data)  # 当前bar的索引
         
-        # 第一天买入（索引为0）
-        if not self.has_bought and current_bar == 1:            
-            self.order_target_percent(target=0.95)
-            self.has_bought = True
-            self.buy_date = self.data.datetime.date(0)
-                
-            if self.params.verbose:
-                print(f"第一天买入: {self.buy_date}")
-        
-        # 最后一天卖出（索引为总长度-1）
-        elif (self.has_bought and 
-              not self.has_sold and 
-              self.position and 
-              current_bar == self.data.buflen()-1):
+            # 第一天买入（索引为0）
+            if not record['has_bought'] and current_bar == 1:            
+                price = data.close[0]
+                size = int(cash / price / 101) * 100
+                if size > 0:
+                    self.buy(data=data, size=size)
+                    record['has_bought'] = True
+                    record['buy_date'] = data.datetime.date(0)
+                    #print(f" {name} 第一天买入: {record['buy_date']}")
+                    #print(f'  买入价格: {price:.2f}, 买入数量: {size} 总价 {price * size}')
+                else:
+                    print('  警告：现金不足，无法买入')
+            # 最后一天卖出（索引为总长度-1）
+            elif (record['has_bought'] and 
+                self.getposition(data) and 
+                current_bar == data.buflen()-1):
             
-            self.close()
-            self.has_sold = True
-            self.sell_date = self.data.datetime.date(0)
-            sell_price = self.data.close[0]
-            
-            if self.params.verbose:
-                days_held = (self.sell_date - self.buy_date).days
-                print(f"最后一天卖出: {self.sell_date}, 价格: {sell_price:.2f}")
+                self.close(data=data)
+                record['sell_date'] = data.datetime.date(0)
+                sell_price = data.close[0]
+
+                #print(f"最后一天卖出: {record['sell_date']}, 价格: {sell_price:.2f}")
 
     
     def notify_order(self, order):
         """基本的订单状态处理"""
+        data = order.data
+        name = data._name
+        trade_date = data.datetime.date(0)  # 获取当前Bar的日期（date对象
+        trade_date_str = data.datetime.date(0).strftime('%Y-%m-%d')
     
         # 1. 订单已提交/接受 - 无需特殊处理
         if order.status in [order.Submitted, order.Accepted]:
             # 订单正在处理中，等待后续状态
-            print(f"订单{order.getstatusname()} - 等待执行")
+            #print(f"{name} 订单{order.getstatusname()} - 等待执行")
             return
     
         # 2. 订单完成成交
         if order.status == order.Completed:
             if order.isbuy():
-                print(f"✅ 买入成交: {order.executed.size}股 @ {order.executed.price:.2f}")
+                print(f"✅ {name} {trade_date_str} 买入成交: {order.executed.size}股 @ {order.executed.price:.2f}")
                 print(f"   成本: {order.executed.value:.2f}, 佣金: {order.executed.comm:.2f}")
             else:  # 卖出订单
-                print(f"✅ 卖出成交: {order.executed.size}股 @ {order.executed.price:.2f}")
+                print(f"✅ {name} {trade_date_str} 卖出成交: {order.executed.size}股 @ {order.executed.price:.2f}")
                 print(f"   收入: {order.executed.value:.2f}, 佣金: {order.executed.comm:.2f}")
+            print("")
     
         # 3. 订单失败情况
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
-            print(f"❌ 订单失败: {order.getstatusname()}")
+            print(f"❌ {name} 订单失败: {order.getstatusname()}")
         
             # 根据不同失败原因处理
             if order.status == order.Canceled:
@@ -161,10 +160,11 @@ class SimpleBuyAndHoldStrategy(bt.Strategy):
                 print("   保证金不足")
             elif order.status == order.Rejected:
                 print("   订单被拒绝")
+            print("")
     
         # 4. 重置订单变量（重要！）
         self.order = None  # 允许提交新订单
-
+    
     '''
 
     def next(self):
@@ -185,7 +185,7 @@ class SimpleBuyAndHoldStrategy(bt.Strategy):
     '''
     def stop(self):
         """策略结束时的总结"""
-        if self.params.verbose and self.has_bought:
+        if True:
             final_value = self.broker.getvalue()
             initial_cash = self.broker.startingcash
             total_return = (final_value / initial_cash - 1) * 100
@@ -197,9 +197,6 @@ class SimpleBuyAndHoldStrategy(bt.Strategy):
             print(f"最终价值: {final_value:.2f}")
             print(f"总收益率: {total_return:.2f}%")
             
-            if self.has_sold:
-                print(f"买入日期: {self.buy_date}")
-                print(f"卖出日期: {self.sell_date}")
 
 class MonthlyDCAStrategy(bt.Strategy):
     """
@@ -207,7 +204,7 @@ class MonthlyDCAStrategy(bt.Strategy):
     规则：每月第一个交易日买入，最后一个交易日清仓。
     """
     params = (
-        ('monthly_cash', 8000),  # 每月定投金额
+        ('monthly_cash', 200000),  # 每月定投金额
     )
 
     def __init__(self):
@@ -307,47 +304,92 @@ class MonthlyDCAStrategy(bt.Strategy):
         print(f"最终价值: {final_value:.2f}")
         print(f"总收益率: {total_return:.2f}%")
 
-cerebro = bt.Cerebro()  # 初始化回测系统
-start_date = datetime(2020,12,31)  # 回测开始时间
-end_date = datetime(2021,12,31)  # 回测结束时间
-data = bt.feeds.PandasData(dataname=real_data(), fromdate=start_date, todate=end_date)  # 加载数据
-# data=bt.feeds.PandasData(dataname=df,fromdate=start_date,todate=end_date)#加银数据
-cerebro.adddata(data)  # 将数据传入回测系统
-
-#cerebro.addstrategy(MonthlyDCAStrategy)  # 将交易策略加载到回测系统中
-cerebro.addstrategy(SimpleBuyAndHoldStrategy)
 
 
-# 加入pyfolio分析者
-cerebro.addanalyzer(bt.analyzers.PyFolio, _name='pyfolio')
-start_cash = 100000
-cerebro.broker.setcash(start_cash)  # 设置初始资本为 100000
-cerebro.broker.setcommission(
-        commission=0.002,      # 佣金率
-        margin=0,           # 关键：设置为None禁用保证金
+def load_hfq_data(symbol="600519"):
+    print(symbol)
+    df = stock_price.get_stock_hfq_price(symbol)
+    df.index=pd.to_datetime(df['date'])
+    df = df[['close']]
+    df['open'] = df['close']      # 开盘价 = 收盘价
+    df['high'] = df['close']
+    df['low'] = df['close']
+    df['volume'] = 100000              # 固定成交量
+    #print(df.iloc[705:750])
+    return df
+
+
+# 主函数
+def run_backtest():
+    # 创建Cerebro引擎
+    cerebro = bt.Cerebro()
+    
+    # 设置初始资金
+    cerebro.broker.setcash(50000.0)
+    
+    # 设置佣金
+    cerebro.broker.setcommission(
+        commission=0.003,      # 佣金率
+        margin=None,           # 关键：设置为None禁用保证金
         mult=1.0,
         stocklike=True         # 股票模式
     )
+    
+    # 添加策略
+    cerebro.addstrategy(SimpleBuyAndHoldStrategy)
 
-result = cerebro.run()  # 运行回测系统
+    #code_list = ['600099','002112','002576','600234','002676']
+    #code_list = ['603088','600202','002278','603988','600731']
+    code_list = ['002243','002295','002006','603326','000859']
+    #code_list = ['002676']
+    for code in code_list:
+        # 创建示例数据（这里使用虚拟数据，实际使用时替换为真实数据）
+        data = bt.feeds.PandasData(
+            dataname=load_hfq_data(code),  # 创建示例数据
+            #fromdate=datetime(2019, 12, 31),
+            #todate=datetime(2020, 12 , 31)
+            fromdate=datetime(2017, 12, 31),
+            todate=datetime(2018, 12 , 31)
+        )
+        # 添加数据
+        cerebro.adddata(data, name=code)    
+    
+    
+    # 添加分析器
+    cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe')
+    cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
+    cerebro.addanalyzer(bt.analyzers.Returns, _name='returns')
+    
+    # 打印初始资金
+    print(f'初始投资组合价值: {cerebro.broker.getvalue():.2f}')
+    
+    # 运行回测
+    results = cerebro.run()
+    
+    # 打印最终资金
+    print(f'最终投资组合价值: {cerebro.broker.getvalue():.2f}')
+    
+    # 打印分析结果
+    strat = results[0]
+    if hasattr(strat, 'analyzers'):
+        if hasattr(strat.analyzers.returns.get_analysis(), 'rnorm100'):
+            print(f'年化收益率: {strat.analyzers.returns.get_analysis()["rnorm100"]:.2f}%')
+        
+        if hasattr(strat.analyzers.sharpe.get_analysis(), 'sharperatio'):
+            print(f'夏普比率: {strat.analyzers.sharpe.get_analysis()["sharperatio"]:.3f}')
+        
+        #if hasattr(strat.analyzers.drawdown.get_analysis(), 'max'):
+        #    print(f'最大回撤: {strat.analyzers.drawdown.get_analysis()["max"]:.2f}%')
+    
+    # 绘图
+    cerebro.plot()
+    #cerebro.plot(style='candlestick')
 
-port_value = cerebro.broker.getvalue()  # 获取回测结束后的总资金
-pnl = port_value - start_cash  # 盈亏统计
+    # Use quantstats to output backtrader backtest results
+    #qs.reports.html(returns, output='temp.html')
 
-print(f"初始资金: {start_cash}\n回测期间：{start_date.strftime('%Y%m%d')}:{end_date.strftime('%Y%m%d')}")
-print(f"总资金: {round(port_value, 2)}")
-print(f"净收益: {round(pnl, 2)}")
+    #stock = qs.utils.download_returns(returns)
 
-# cerebro.plot(style='candlestick')  # 画图
-
-cerebro.broker.getvalue()
-
-strat = result[0]
-pyfoliozer = strat.analyzers.getbyname('pyfolio')
-returns, positions, transactions, gross_lev = pyfoliozer.get_pf_items()
-cerebro.plot()
-
-# Use quantstats to output backtrader backtest results
-#qs.reports.html(returns, output='temp.html')
-
-#stock = qs.utils.download_returns(returns)
+# 运行回测
+if __name__ == '__main__':
+    run_backtest()
