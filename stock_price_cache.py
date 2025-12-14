@@ -19,8 +19,11 @@ def add_stock_prefix(stock_code):
     else:
         return code_str
 
+current_dir = os.path.dirname(__file__)
+file_path = os.path.join(current_dir, "stock_price")
+
 class StockPriceCache:
-    def __init__(self, cache_dir="./stock_price", cache_expire_days=30):
+    def __init__(self, cache_dir=file_path, cache_expire_days=30):
         """
         :param cache_dir: 缓存目录
         :param cache_expire_days: 缓存过期天数（默认70天）
