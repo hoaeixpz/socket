@@ -309,28 +309,31 @@ class MonthlyDCAStrategy(bt.Strategy):
         print("rebalance ", current_date)
         year = current_date.year
         month = current_date.month
-        if month > 2:
+        if month > 12:
             return
+
+
         if month < 10:
             month = "0"+ str(month)
         else:
             month = str(month)
+        date = str(year) + "-" + month + "-30"
+        if month == "02":
+            date = str(year) + "-02-28"
+
         market_dict = {}
         for data in self.datas:
             stock_code = data._name
             market_value = stock_data[stock_code].get('market_value')
-            date = str(year) + "-" + month + "-30"
-            if month == "02":
-                date = str(year) + "-02-28"
 
             mv = market_value.get(date)
-            if mv is None or month == "02":
+            if mv is None:
                 df = ak.stock_zh_valuation_baidu(symbol=stock_code, indicator="总市值", period="全部")
                 mv = stock_price.get_specify_date_price(df, date, head = 'value')
                 if mv is None:
                     continue
-
-                for mon in range(3,13):
+                '''
+                for mon in range(12,13):
                     if mon < 10:
                         mon = "0"+ str(mon)
                     else:
@@ -343,22 +346,25 @@ class MonthlyDCAStrategy(bt.Strategy):
                         print("next_mv ", next_mv)
                         if next_mv is not None:
                             market_value[next_date] = next_mv
+                '''
 
             market_dict[data] = mv
             market_value[date] = mv
 
-        save_results(stock_data)
+        #save_results(stock_data)
         market_dict = list(sorted(market_dict.items(), key=lambda x:float(x[1])))
 
         for data, mv in market_dict[0:5]:
             self.selected_codes.append(data)
-            print(data._name, " ", mv)
+            #print(data._name, " ", mv)
 
         for data in self.last_selected_codes:
-            self.close(data=data)
+            if data not in self.selected_codes:
+                self.close(data=data)
 
         for data in self.selected_codes:
-            self.execute_buy(data, current_date)
+            if data not in self.last_selected_codes:
+                self.execute_buy(data, current_date)
 
         self.last_selected_codes = self.selected_codes
         self.selected_codes = []
