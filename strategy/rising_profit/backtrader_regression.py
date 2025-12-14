@@ -309,17 +309,21 @@ class MonthlyDCAStrategy(bt.Strategy):
         print("rebalance ", current_date)
         year = current_date.year
         month = current_date.month
-        if month > 12:
-            return
+        #if month > 1:
+        #    return
 
-
-        if month < 10:
+        month = month - 1
+        if month == 0:
+            month = "12"
+            year = year - 1
+        elif month < 10:
             month = "0"+ str(month)
         else:
             month = str(month)
         date = str(year) + "-" + month + "-30"
         if month == "02":
             date = str(year) + "-02-28"
+        print(date)
 
         market_dict = {}
         for data in self.datas:
@@ -356,16 +360,22 @@ class MonthlyDCAStrategy(bt.Strategy):
 
         for data, mv in market_dict[0:5]:
             self.selected_codes.append(data)
-            #print(data._name, " ", mv)
 
+        rebalanced = False
         for data in self.last_selected_codes:
             if data not in self.selected_codes:
                 self.close(data=data)
+                rebalanced = True
 
         for data in self.selected_codes:
             if data not in self.last_selected_codes:
                 self.execute_buy(data, current_date)
+                rebalanced = True
 
+        if rebalanced:
+            for data, mv in market_dict[0:8]:
+                print(data._name, " ", mv)
+        
         self.last_selected_codes = self.selected_codes
         self.selected_codes = []
 
