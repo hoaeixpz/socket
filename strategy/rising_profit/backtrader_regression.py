@@ -360,7 +360,7 @@ class MonthlyDCAStrategy(bt.Strategy):
             market_dict[data] = mv
             market_value[date] = mv
 
-        #save_results(stock_data)
+        save_results(stock_data)
         market_dict = list(sorted(market_dict.items(), key=lambda x:float(x[1])))
 
         for data, mv in market_dict[0:5]:
@@ -466,7 +466,7 @@ def load_hfq_data(symbol="600519"):
 
 
 # 主函数
-def run_backtest():
+def run_backtest(CURRENT_YEAR):
     # 创建Cerebro引擎
     cerebro = bt.Cerebro()
     
@@ -486,7 +486,6 @@ def run_backtest():
     #code_list = ['002243','002295','002006','603326','000859']
     #code_list = ['002652','002316','002377','600322','600854']
     #code_list = ['002316']
-    CURRENT_YEAR = 2022
     code_list = load_stock_list(CURRENT_YEAR)
     #code_list = code_list[0:25]
     for code in code_list:
@@ -554,4 +553,5 @@ def run_backtest():
 
 # 运行回测
 if __name__ == '__main__':
-    run_backtest()
+    for CURRENT_YEAR in range(2021,2020,-1):
+        run_backtest(CURRENT_YEAR)
