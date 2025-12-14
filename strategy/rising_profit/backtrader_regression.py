@@ -313,14 +313,16 @@ class MonthlyDCAStrategy(bt.Strategy):
         #    return
 
         month = month - 1
+        date = ''
         if month == 0:
-            month = "12"
-            year = year - 1
+            date = str(year-1) + "-12-30"
         elif month < 10:
             month = "0"+ str(month)
+            date = str(year) + "-" + month + "-30"
         else:
             month = str(month)
-        date = str(year) + "-" + month + "-30"
+            date = str(year) + "-" + month + "-30"
+        
         if month == "02":
             date = str(year) + "-02-28"
         print(date)
@@ -350,7 +352,7 @@ class MonthlyDCAStrategy(bt.Strategy):
                     print(next_date, " ", next_mv)
                     if next_mv is None:
                         next_mv = stock_price.get_specify_date_price(df, next_date, head = 'value')
-                        print("next_mv ", next_mv)
+                        print(f"{stock_code} next_mv ", next_mv)
                         if next_mv is not None:
                             market_value[next_date] = next_mv
                 
@@ -358,7 +360,7 @@ class MonthlyDCAStrategy(bt.Strategy):
             market_dict[data] = mv
             market_value[date] = mv
 
-        save_results(stock_data)
+        #save_results(stock_data)
         market_dict = list(sorted(market_dict.items(), key=lambda x:float(x[1])))
 
         for data, mv in market_dict[0:5]:
@@ -484,7 +486,7 @@ def run_backtest():
     #code_list = ['002243','002295','002006','603326','000859']
     #code_list = ['002652','002316','002377','600322','600854']
     #code_list = ['002316']
-    CURRENT_YEAR = 2023
+    CURRENT_YEAR = 2022
     code_list = load_stock_list(CURRENT_YEAR)
     #code_list = code_list[0:25]
     for code in code_list:
