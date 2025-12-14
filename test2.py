@@ -226,13 +226,13 @@ for index,row in df.iterrows():
 # 获取指定日期的市值数据
 # 获取财务指标
 
-df = ak.stock_zh_valuation_baidu(symbol="000001", indicator="总市值", period="近一年")
+df = ak.stock_zh_valuation_baidu(symbol="600610", indicator="总市值", period="全部")
 the_nearest_value = df.iloc[-1]['date']
 print(the_nearest_value)
 #cache_file = f"stock_data/gdhs.pkl"
 #with open(cache_file, 'wb') as f:
 #  pickle.dump(df, f)
 
-print(df)
-for col in df.columns:
-  print(col)
+print(df.iloc[480:500])
+#for col in df.columns:
+#  print(col)

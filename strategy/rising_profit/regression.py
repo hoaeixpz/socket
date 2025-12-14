@@ -238,7 +238,7 @@ class StockAnalyzer:
     
     def get_promising_stocks(self, min_score=70):
         """获取有潜力的股票"""
-        for year in range(2014, 2025):
+        for year in range(2018, 2019):
             analysis_results = self.analyze_all_stocks(year)
             if len(analysis_results) == 0:
                 continue

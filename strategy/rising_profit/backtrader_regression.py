@@ -9,6 +9,7 @@
 '''
 
 from datetime import datetime
+import time
 
 import backtrader as bt  # 升级到最新版
 import matplotlib.pyplot as plt  # 由于 Backtrader 的问题，此处要求 pip install matplotlib==3.2.2
@@ -66,6 +67,7 @@ def save_results(stock_data, file_path='../../stock_info.json'):
 
 stock_data = load_stock_data()
 
+CY = 0
 
 def find_good_stocks(CURRENT_YEAR:int, stock_code):
     '''
@@ -109,7 +111,7 @@ def load_stock_list(CURRENT_YEAR):
             if find_good_stocks(CURRENT_YEAR, stock_code):
                 code_list.append(stock_code)
 
-    print(code_list)
+    #print(code_list)
     return code_list
 
 class MyStrategy(bt.Strategy):
@@ -172,9 +174,7 @@ class SimpleBuyAndHoldStrategy(bt.Strategy):
             self.record[data] = {
                 'name': data._name,
                 'has_bought': False,
-                'buy_price': 0,
-                'buy_date': None,
-                'sell_date': None
+                'buy_price': 0
             }
 
     def next(self):
@@ -193,8 +193,6 @@ class SimpleBuyAndHoldStrategy(bt.Strategy):
                 if size > 0:
                     self.buy(data=data, size=size)
                     record['has_bought'] = True
-                    record['buy_date'] = data.datetime.date(0)
-                    #print(f" {name} 第一天买入: {record['buy_date']}")
                     #print(f'  买入价格: {price:.2f}, 买入数量: {size} 总价 {price * size}')
                 else:
                     print(f'  警告：{name}至少需要 {price * 100} 现金不足，无法买入')
@@ -204,10 +202,8 @@ class SimpleBuyAndHoldStrategy(bt.Strategy):
                 current_bar == data.buflen()-1):
             
                 self.close(data=data)
-                record['sell_date'] = data.datetime.date(0)
-                sell_price = data.close[0]
 
-                #print(f"最后一天卖出: {record['sell_date']}, 价格: {sell_price:.2f}")
+
 
     def notify_order(self, order):
         """基本的订单状态处理"""
@@ -278,9 +274,7 @@ class MonthlyDCAStrategy(bt.Strategy):
             self.record[data] = {
                 'name': data._name,
                 'buy_executed_this_month': False,
-                'buy_price': 0,
-                'buy_date': None,
-                'sell_date': None
+                'buy_size': 0
             }
         self.each_cash = self.broker.getcash() / 5
 
@@ -288,6 +282,9 @@ class MonthlyDCAStrategy(bt.Strategy):
         # 获取当前交易日
         current_date = self.data.datetime.date(0)
         current_month = current_date.month
+        start_date = datetime(CY - 1, 12, 15).date()
+        if current_date < start_date:
+            return
         #print(current_date)
         
         # 初始化last_month（只在第一个交易日）
@@ -360,16 +357,25 @@ class MonthlyDCAStrategy(bt.Strategy):
             market_dict[data] = mv
             market_value[date] = mv
 
-        save_results(stock_data)
+        #save_results(stock_data)
         market_dict = list(sorted(market_dict.items(), key=lambda x:float(x[1])))
 
         for data, mv in market_dict[0:5]:
             self.selected_codes.append(data)
 
         rebalanced = False
+
+        cash = self.broker.getcash()
+        print(cash)
+        sell_num = 0
         for data in self.last_selected_codes:
             if data not in self.selected_codes:
                 self.close(data=data)
+                price = data.close[1]
+                size = self.record[data]['buy_size']
+                cash += price * size
+                #print(f"{price} * {size} {price * size}")
+                sell_num += 1
                 rebalanced = True
 
         for data in self.selected_codes:
@@ -378,6 +384,10 @@ class MonthlyDCAStrategy(bt.Strategy):
                 rebalanced = True
 
         if rebalanced:
+            #if sell_num > 0:
+                #print(self.each_cash)
+                #self.each_cash = (cash / sell_num)
+                #print(self.each_cash)
             for data, mv in market_dict[0:8]:
                 print(data._name, " ", mv)
         
@@ -394,6 +404,8 @@ class MonthlyDCAStrategy(bt.Strategy):
         size = int(self.each_cash / price / 105) * 100
         if size > 0:
             self.buy(data=data, size=size)
+            self.record[data]['buy_size'] = size
+            
             #print(f'  买入价格: {price:.2f}, 买入数量: {size}')
         else:
             name = data._name
@@ -479,6 +491,8 @@ def run_backtest(CURRENT_YEAR):
     )
     
     # 添加策略
+    global CY
+    CY = CURRENT_YEAR
     cerebro.addstrategy(MonthlyDCAStrategy)
 
     #code_list = ['600099','002112','002576','600234','002676']
@@ -487,17 +501,17 @@ def run_backtest(CURRENT_YEAR):
     #code_list = ['002652','002316','002377','600322','600854']
     #code_list = ['002316']
     code_list = load_stock_list(CURRENT_YEAR)
-    #code_list = code_list[0:25]
+    #code_list = code_list[0:20]
     for code in code_list:
         # 创建示例数据（这里使用虚拟数据，实际使用时替换为真实数据
         data_name = load_hfq_data(code)
-        from_date = datetime(CURRENT_YEAR - 1, 12, 10)
+        from_date = datetime(CURRENT_YEAR - 1, 6, 10)
         to_date = datetime(CURRENT_YEAR, 12 , 31)
 
         first_date = data_name.index[0]
         last_date = data_name.index[-1]
         if first_date > from_date or last_date < to_date:
-            print(f"{code} 在指定日期内没有股价")
+            #print(f"{code} 在指定日期内没有股价")
             continue
 
         data = bt.feeds.PandasData(
@@ -507,6 +521,7 @@ def run_backtest(CURRENT_YEAR):
             fromdate=from_date,
             todate=to_date
         )
+        #print(f"feed {code}")
         # 添加数据
         cerebro.adddata(data, name=code)
 
@@ -553,5 +568,5 @@ def run_backtest(CURRENT_YEAR):
 
 # 运行回测
 if __name__ == '__main__':
-    for CURRENT_YEAR in range(2024,2014,-1):
+    for CURRENT_YEAR in range(2023,2024):
         run_backtest(CURRENT_YEAR)
