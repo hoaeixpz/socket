@@ -185,7 +185,7 @@ class StockAnalyzer:
             
             if self.find_good_stocks(year, stock_code):
                 #print(f"---------分析股票: {stock_code} {stock_name}")
-                date = str(year) + "-01-31"
+                date = str(year) + "-01-30"
                 market_value = stock_data[stock_code].get('market_value')
                 mv = market_value.get(date)
 

@@ -38,6 +38,15 @@ def load_stock_data(file_path='../../stock_info.json'):
             print(f"加载数据失败: {e}")
             return {}
 
+def save_results(stock_data, file_path='../../stock_info.json'):
+    """保存分析结果"""
+    try:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(stock_data, f, ensure_ascii=False, indent=2, cls=CustomJSONEncoder)
+        print(f"分析结果已保存到: {file_path}")
+    except Exception as e:
+        print(f"保存结果失败: {e}")
+
 stock_data = load_stock_data()
 
 def find_good_stocks(CURRENT_YEAR:int, stock_code):
@@ -275,13 +284,15 @@ class MonthlyDCAStrategy(bt.Strategy):
             self.last_month = current_month
 
     def rebalance(self):
-        if len(self.last_selected_codes) > 0:
-            return
+        #if len(self.last_selected_codes) > 0:
+        #    return
 
         current_date = self.data.datetime.date(0)
         print("rebalance ", current_date)
         year = current_date.year
         month = current_date.month
+        if month > 2:
+            return
         if month < 10:
             month = "0"+ str(month)
         else:
@@ -290,7 +301,10 @@ class MonthlyDCAStrategy(bt.Strategy):
         for data in self.datas:
             stock_code = data._name
             market_value = stock_data[stock_code].get('market_value')
-            date = str(year) + "-" + month + "-31"
+            date = str(year) + "-" + month + "-30"
+            if month == "02":
+                date = str(year) + "-02-28"
+
             mv = market_value.get(date)
             if mv is None:
                 df = ak.stock_zh_valuation_baidu(symbol=stock_code, indicator="总市值", period="全部")
@@ -299,7 +313,9 @@ class MonthlyDCAStrategy(bt.Strategy):
                     continue
 
             market_dict[data] = mv
+            market_value[date] = mv
 
+        save_results(stock_data)
         market_dict = list(sorted(market_dict.items(), key=lambda x:float(x[1])))
 
         for data, mv in market_dict[0:5]:
