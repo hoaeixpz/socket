@@ -18,7 +18,7 @@ def add_stock_prefix(stock_code):
         return code_str
 
 
-def load_existing_stocks(file = 'stock_info.json'):
+def load_existing_stocks(file = '../stock_info.json'):
     """加载现有的stock_info.json文件，返回所有股票代码列表"""
     try:
         with open(file, 'r', encoding='utf-8') as f:
@@ -39,8 +39,6 @@ def save_daily_prices():
     start_date = "20100101"
     end_date = "20161231"
     
-    
-    result_dict = {}
     all_stocks = load_existing_stocks()
     stock_codes = list(all_stocks.keys())
     
@@ -60,7 +58,7 @@ def save_daily_prices():
             stock_df = stock_df.sort_values('date')
             stock_df = stock_df[['date', 'close']]
 
-            filename = f"stock_price/{stock_code}_daily_hfq.parquet"
+            filename = f"{stock_code}_daily_hfq.parquet"
             file_size = os.path.getsize(filename) / (1024 )
             print(f" {filename}, 原先大小: {file_size:.2f} KB {datetime.now()}")
             

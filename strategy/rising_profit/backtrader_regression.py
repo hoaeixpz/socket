@@ -67,8 +67,6 @@ def save_results(stock_data, file_path='../../stock_info.json'):
 
 stock_data = load_stock_data()
 
-CY = 0
-
 def find_good_stocks(CURRENT_YEAR:int, stock_code):
     '''
     条件：净利润增长率连续3年大于20%
@@ -161,7 +159,7 @@ class MyStrategy(bt.Strategy):
         else:
             self.buy_price = None
             self.buy_comm = None
-
+'''
 class SimpleBuyAndHoldStrategy(bt.Strategy):
     """
     简单的买入持有策略 - 使用索引判断
@@ -257,6 +255,7 @@ class SimpleBuyAndHoldStrategy(bt.Strategy):
             print(f"初始资金: {initial_cash:.2f}")
             print(f"最终价值: {final_value:.2f}")
             print(f"总收益率: {total_return:.2f}%")
+'''
 
 class MonthlyDCAStrategy(bt.Strategy):
     """
@@ -283,9 +282,6 @@ class MonthlyDCAStrategy(bt.Strategy):
         # 获取当前交易日
         current_date = self.data.datetime.date(0)
         current_month = current_date.month
-        start_date = datetime(CY - 1, 12, 15).date()
-        if current_date < start_date:
-            return
         
         # 初始化last_month（只在第一个交易日）
         if self.last_month is None:
@@ -376,7 +372,7 @@ class MonthlyDCAStrategy(bt.Strategy):
             market_dict[data] = mv
             market_value[date] = mv
 
-        #save_results(stock_data)
+        save_results(stock_data)
         market_dict = list(sorted(market_dict.items(), key=lambda x:float(x[1])))
 
         if len(self.selected_codes) == 0:
@@ -390,11 +386,11 @@ class MonthlyDCAStrategy(bt.Strategy):
         for data in self.selected_codes:
             if data not in self.last_selected_codes:
                 rebalanced = True
-        '''
+        
         if rebalanced:
             for data, mv in market_dict[0:8]:
                 print(data._name, " ", mv)
-        '''
+        
         if rebalanced:
             self.state = "PREPARED"
         else:
@@ -524,34 +520,41 @@ def run_backtest(CURRENT_YEAR):
     )
     
     # 添加策略
-    global CY
-    CY = CURRENT_YEAR
     cerebro.addstrategy(MonthlyDCAStrategy)
 
     #code_list = ['600099','002112','002576','600234','002676']
     #code_list = ['603088','600202','002278','603988','600731']
     #code_list = ['002243','002295','002006','603326','000859']
     #code_list = ['002652','002316','002377','600322','600854']
-    #code_list = ['002316']
+    #code_list = ['002925']
     start_time = time.time()
     code_list = load_stock_list(CURRENT_YEAR)
     end_time = time.time()
     print(f"load_stock_list {end_time - start_time}s")
 
     start_time = end_time
-    #code_list = code_list[0:20]
+    #code_list = code_list[0:1]
     for code in code_list:
         # 创建示例数据（这里使用虚拟数据，实际使用时替换为真实数据
         data_name = load_hfq_data(code)
-        from_date = datetime(CURRENT_YEAR - 1, 6, 10)
+        from_date = datetime(CURRENT_YEAR - 1, 12, 25)
         to_date = datetime(CURRENT_YEAR, 12 , 31)
+        
+        flag1 = False
+        flag2 = False
+        for date in data_name.index:
+            if date < from_date or date > to_date:
+                continue
 
-        first_date = data_name.index[0]
-        last_date = data_name.index[-1]
-        if first_date > from_date or last_date < to_date:
-            #print(f"{code} 在指定日期内没有股价")
+            if date.year == from_date.year and date.month == from_date.month:
+                flag1 = True
+            if date.year == to_date.year and date.month == to_date.month:
+                flag2 = True
+
+        if not flag1 or not flag2:
+            print(f"{code} 在指定日期内没有股价")
             continue
-
+        
         data = bt.feeds.PandasData(
             dataname=data_name,  # 创建示例数据
             #fromdate=datetime(2019, 12, 31),
@@ -615,6 +618,6 @@ def run_backtest(CURRENT_YEAR):
 
 # 运行回测
 if __name__ == '__main__':
-    run_backtest(2023)
+    run_backtest(2010)
     #for CURRENT_YEAR in range(2023,2024):
     #run_backtest(CURRENT_YEAR)
