@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt  # 由于 Backtrader 的问题，此处要求 pi
 import akshare as ak  # 升级到最新版
 import pandas as pd
 import json
+import math
 #import quantstats as qs
 #import pyfolio as pf
 
@@ -58,12 +59,19 @@ class CustomJSONEncoder(json.JSONEncoder):
         
 def save_results(stock_data, file_path='../../stock_info.json'):
     """保存分析结果"""
+    stock_code = stock_data.get('stock_code')
     try:
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(stock_data, f, ensure_ascii=False, indent=2, cls=CustomJSONEncoder)
-        print(f"分析结果已保存到: {file_path}")
+        if stock_code is None:
+            print(f"分析结果已保存到: {file_path}")
+        else:
+            print(f"{stock_code}分析结果已保存到: {file_path}")
     except Exception as e:
-        print(f"保存结果失败: {e}")
+        if stock_code is None:
+            print(f"保存结果失败: {e}")
+        else:
+            print(f"{stock_code}保存结果失败: {e}")
 
 stock_data = load_stock_data()
 
@@ -82,17 +90,21 @@ def find_good_stocks(CURRENT_YEAR:int, stock_code):
             continue
         #print("year pct ", year, " ", pct)
         if date[4:6] == '12':
+            if math.isnan(pct):
+                continue
+
             if pct < 20:
                 return False
             count += 1
 
-    if count != 3:
+    if count < 3:
         return False
-    '''
+    
+    print(stock_code)
     for year, pct in zzl:
         if year[4:6] == '12':
             print(year, " ", float(pct))
-    '''
+    
 
     return True
 
@@ -321,8 +333,8 @@ class MonthlyDCAStrategy(bt.Strategy):
         print("pre_rebalance ", current_date)
         year = current_date.year
         month = current_date.month
-        #if month > 1:
-        #    return
+        if month > 1:
+            return
 
         month = month - 1
         date = ''
@@ -337,7 +349,7 @@ class MonthlyDCAStrategy(bt.Strategy):
         
         if month == "02":
             date = str(year) + "-02-28"
-        #print(date)
+        print(date)
 
         market_dict = {}
         for data in self.datas:
@@ -346,6 +358,7 @@ class MonthlyDCAStrategy(bt.Strategy):
 
             mv = market_value.get(date)
             if mv is None:
+                print("baidu ", stock_code)
                 df = ak.stock_zh_valuation_baidu(symbol=stock_code, indicator="总市值", period="全部")
                 mv = stock_price.get_specify_date_price(df, date, head = 'value')
                 if mv is None:
@@ -371,8 +384,10 @@ class MonthlyDCAStrategy(bt.Strategy):
 
             market_dict[data] = mv
             market_value[date] = mv
+            save_results(stock_data)
+            time.sleep(0.2)
 
-        save_results(stock_data)
+        #save_results(stock_data)
         market_dict = list(sorted(market_dict.items(), key=lambda x:float(x[1])))
 
         if len(self.selected_codes) == 0:
@@ -390,6 +405,13 @@ class MonthlyDCAStrategy(bt.Strategy):
         if rebalanced:
             for data, mv in market_dict[0:8]:
                 print(data._name, " ", mv)
+
+            print("last codes")
+            for data in self.last_selected_codes:
+                print(data._name)
+            print("now codes")
+            for data in self.selected_codes:
+                print(data._name)
         
         if rebalanced:
             self.state = "PREPARED"
@@ -400,7 +422,7 @@ class MonthlyDCAStrategy(bt.Strategy):
 
     def execute_rebalance(self):
         current_date = self.data.datetime.date(0)
-        #print("exe rebalance ", current_date, " ", self.state)
+        print("exe rebalance ", current_date, " ", self.state)
 
         if self.state == "PREPARED":
             if len(self.last_selected_codes) > 0:
@@ -529,6 +551,7 @@ def run_backtest(CURRENT_YEAR):
     #code_list = ['002925']
     start_time = time.time()
     code_list = load_stock_list(CURRENT_YEAR)
+    print(f"符合增长率 > 20% 的共有{len(code_list)}只")
     end_time = time.time()
     print(f"load_stock_list {end_time - start_time}s")
 
@@ -618,6 +641,6 @@ def run_backtest(CURRENT_YEAR):
 
 # 运行回测
 if __name__ == '__main__':
-    run_backtest(2018)
+    run_backtest(2011)
     #for CURRENT_YEAR in range(2023,2024):
     #run_backtest(CURRENT_YEAR)
