@@ -618,6 +618,6 @@ def run_backtest(CURRENT_YEAR):
 
 # 运行回测
 if __name__ == '__main__':
-    run_backtest(2010)
+    run_backtest(2018)
     #for CURRENT_YEAR in range(2023,2024):
     #run_backtest(CURRENT_YEAR)
