@@ -270,6 +270,7 @@ class MonthlyDCAStrategy(bt.Strategy):
         self.record = {}
         self.selected_codes = []
         self.last_selected_codes = []
+        self.state = "PREPARED" ##{PREPARED, SELLED, BUYED}
         for data in self.datas:
             self.record[data] = {
                 'name': data._name,
@@ -285,25 +286,43 @@ class MonthlyDCAStrategy(bt.Strategy):
         start_date = datetime(CY - 1, 12, 15).date()
         if current_date < start_date:
             return
-        #print(current_date)
         
         # 初始化last_month（只在第一个交易日）
         if self.last_month is None:
             self.last_month = current_month
             return
+
+        #print(current_date)
         
         # ========== 检测月份是否变更 ==========
         month_changed = (current_month != self.last_month)
         if month_changed:
-            self.rebalance()
-            self.last_month = current_month
+            if self.state == "BUYED":
+                self.state = None
+                cash = self.broker.getcash()
+                each_cash = self.each_cash + cash / 5
+                self.each_cash = min(each_cash, self.broker.getvalue() / 5)
+                #print(self.each_cash)
 
-    def rebalance(self):
+            self.pre_rebalance()
+            self.last_month = current_month        
+
+        if self.state == "PREPARED":
+            self.execute_rebalance()
+            if self.state == "BUYED":
+                self.last_selected_codes = self.selected_codes
+                self.selected_codes = []
+        elif self.state == "SELLED":
+            self.execute_rebalance()
+            self.last_selected_codes = self.selected_codes
+            self.selected_codes = []
+
+    def pre_rebalance(self):
         #if len(self.last_selected_codes) > 0:
         #    return
 
         current_date = self.data.datetime.date(0)
-        print("rebalance ", current_date)
+        print("pre_rebalance ", current_date)
         year = current_date.year
         month = current_date.month
         #if month > 1:
@@ -322,7 +341,7 @@ class MonthlyDCAStrategy(bt.Strategy):
         
         if month == "02":
             date = str(year) + "-02-28"
-        print(date)
+        #print(date)
 
         market_dict = {}
         for data in self.datas:
@@ -360,56 +379,70 @@ class MonthlyDCAStrategy(bt.Strategy):
         #save_results(stock_data)
         market_dict = list(sorted(market_dict.items(), key=lambda x:float(x[1])))
 
-        for data, mv in market_dict[0:5]:
-            self.selected_codes.append(data)
+        if len(self.selected_codes) == 0:
+            for data, mv in market_dict[0:5]:
+                self.selected_codes.append(data)
 
         rebalanced = False
+        for data in self.last_selected_codes:
+            if data not in self.selected_codes:
+                rebalanced = True
+        for data in self.selected_codes:
+            if data not in self.last_selected_codes:
+                rebalanced = True
+        '''
+        if rebalanced:
+            for data, mv in market_dict[0:8]:
+                print(data._name, " ", mv)
+        '''
+        if rebalanced:
+            self.state = "PREPARED"
+        else:
+            self.state = None
+            self.selected_codes = []
+            
 
-        cash = self.broker.getcash()
-        print(cash)
-        sell_num = 0
+    def execute_rebalance(self):
+        current_date = self.data.datetime.date(0)
+        #print("exe rebalance ", current_date, " ", self.state)
+
+        if self.state == "PREPARED":
+            if len(self.last_selected_codes) > 0:
+                self.execute_sell()
+                print("execute_sell ", current_date)
+            elif len(self.selected_codes) > 0:
+                self.execute_buy()
+                print("execute_buy ", current_date)
+
+        elif self.state == "SELLED":
+            self.execute_buy()
+            print("execute_buy ", current_date)
+
+    def execute_buy(self):
+        """执行买入操作"""
+        for data in self.selected_codes:
+            if data not in self.last_selected_codes:
+
+                # 计算可买数量（向下取整）
+                price = data.close[0]
+                size = int(self.each_cash / price / 105) * 100
+                if size > 0:
+                    self.buy(data=data, size=size)
+                    self.record[data]['buy_size'] = size
+            
+                    #print(f'  买入价格: {price:.2f}, 买入数量: {size}')
+                else:
+                    name = data._name
+                    print(f'  ⛔警告：{name}至少需要 {price * 100} 现金不足，无法买入')
+                self.state = "BUYED"
+
+    def execute_sell(self):
+        """执行卖出操作"""
+
         for data in self.last_selected_codes:
             if data not in self.selected_codes:
                 self.close(data=data)
-                price = data.close[1]
-                size = self.record[data]['buy_size']
-                cash += price * size
-                #print(f"{price} * {size} {price * size}")
-                sell_num += 1
-                rebalanced = True
-
-        for data in self.selected_codes:
-            if data not in self.last_selected_codes:
-                self.execute_buy(data, current_date)
-                rebalanced = True
-
-        if rebalanced:
-            #if sell_num > 0:
-                #print(self.each_cash)
-                #self.each_cash = (cash / sell_num)
-                #print(self.each_cash)
-            for data, mv in market_dict[0:8]:
-                print(data._name, " ", mv)
-        
-        self.last_selected_codes = self.selected_codes
-        self.selected_codes = []
-
-    def execute_buy(self, data, current_date):
-        """执行买入操作"""
-        #print(f'\n[{current_date}] 执行月度买入')
-        
-        # 用固定金额买入（更符合传统定投）
-        # 计算可买数量（向下取整）
-        price = data.close[0]
-        size = int(self.each_cash / price / 105) * 100
-        if size > 0:
-            self.buy(data=data, size=size)
-            self.record[data]['buy_size'] = size
-            
-            #print(f'  买入价格: {price:.2f}, 买入数量: {size}')
-        else:
-            name = data._name
-            print(f'  ⛔警告：{name}至少需要 {price * 100} 现金不足，无法买入')
+                self.state = "SELLED"
 
     def notify_order(self, order):
         """基本的订单状态处理"""
@@ -500,7 +533,12 @@ def run_backtest(CURRENT_YEAR):
     #code_list = ['002243','002295','002006','603326','000859']
     #code_list = ['002652','002316','002377','600322','600854']
     #code_list = ['002316']
+    start_time = time.time()
     code_list = load_stock_list(CURRENT_YEAR)
+    end_time = time.time()
+    print(f"load_stock_list {end_time - start_time}s")
+
+    start_time = end_time
     #code_list = code_list[0:20]
     for code in code_list:
         # 创建示例数据（这里使用虚拟数据，实际使用时替换为真实数据
@@ -525,6 +563,10 @@ def run_backtest(CURRENT_YEAR):
         # 添加数据
         cerebro.adddata(data, name=code)
 
+    end_time = time.time()
+    print(f"cerebro adddata {end_time - start_time}s")
+
+    start_time = end_time
     # 设置初始资金
     start_cash = 60000
     cerebro.broker.setcash(start_cash * 5)
@@ -541,6 +583,11 @@ def run_backtest(CURRENT_YEAR):
     
     # 运行回测
     results = cerebro.run()
+
+    end_time = time.time()
+    print(f"cerebro run {end_time - start_time}s")
+
+    start_time = end_time
     
     # 打印最终资金
     print(f'最终投资组合价值: {cerebro.broker.getvalue():.2f}')
@@ -568,5 +615,6 @@ def run_backtest(CURRENT_YEAR):
 
 # 运行回测
 if __name__ == '__main__':
-    for CURRENT_YEAR in range(2023,2024):
-        run_backtest(CURRENT_YEAR)
+    run_backtest(2023)
+    #for CURRENT_YEAR in range(2023,2024):
+    #run_backtest(CURRENT_YEAR)
