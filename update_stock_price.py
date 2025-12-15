@@ -4,6 +4,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import json
 import os
+from datetime import datetime, timedelta
 
 def add_stock_prefix(stock_code):
     """为股票代码添加市场前缀"""
@@ -50,39 +51,28 @@ def save_daily_prices():
             
             # 获取日线数据
             stock_df = ak.stock_zh_a_daily(symbol=stock_code, start_date=start_date, end_date=end_date, adjust="hfq")
-
+            if stock_df.empty:
+                print(stock_df)
+                continue
+            
             # 确保数据按日期排序
             stock_df['date'] = pd.to_datetime(stock_df['date'])
             stock_df = stock_df.sort_values('date')
-
             stock_df = stock_df[['date', 'close']]
 
             filename = f"stock_price/{stock_code}_daily_hfq.parquet"
-            file_size = os.path.getsize(filename) / (1024 * 1024)
-            print(f" {filename}, 原先大小: {file_size:.2f} MB {datetime.now()}")
+            file_size = os.path.getsize(filename) / (1024 )
+            print(f" {filename}, 原先大小: {file_size:.2f} KB {datetime.now()}")
             
             old_df = pd.read_parquet(filename)
             combined_df = pd.concat([stock_df, old_df], ignore_index=True)
-
-            if i < 10:
-            	print(old_df)
-            	print(stock_df)
-            	print(combined_df)
-
-            if stock_df.empty:
-            	print(stock_code)
-            	print(old_df)
-            	print(stock_df)
-            	print(combined_df)
-
             combined_df.to_parquet(filename, index=False, compression='snappy')
     
-            file_size = os.path.getsize(filename) / (1024 * 1024)
-            print(f"Parquet数据已保存到 {filename}, 大小: {file_size:.2f} MB {datetime.now()}")
+            file_size = os.path.getsize(filename) / (1024)
+            print(f"Parquet数据已保存到 {filename}, 大小: {file_size:.2f} KB {datetime.now()}")
         except Exception as e:
             print(f"获取股票 {stock_code} 数据时出错: {e}")
             continue
 
-        break
 
 save_daily_prices()
