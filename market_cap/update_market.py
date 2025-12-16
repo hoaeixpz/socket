@@ -41,7 +41,8 @@ def save_markets():
     stock_codes = list(all_stocks.keys())
     
     for i, stock_code in enumerate(stock_codes, 1):
-        if i <= 50:
+        filename = f"{stock_code}_market_cap.parquet"
+        if os.path.exists(filename):
             continue
         try:
             print(f"正在获取股票 {stock_code} 的数据...")
@@ -67,7 +68,8 @@ class StockMarketCache:
         self.cache_dir = current_dir
 
     def load_market_df(self, stock_code):
-        filename = f"{self.cache_dir}/{stock_code}_market_cap.parquet"
+        clean_code = stock_code.replace('sz', '').replace('sh', '')
+        filename = f"{self.cache_dir}/{clean_code}_market_cap.parquet"
         df = pd.read_parquet(filename)
         return df
 
@@ -95,26 +97,31 @@ class StockMarketCache:
                 price_series = df.loc[[target_date], [head]]
                 return price_series.iloc[0][head]
             except KeyError:
-                print(f"未找到目标日 {target_date.date()} 的数据，尝试查前几日数据。")
-
-            first_day_of_month = target_date.replace(day=1)
-            all_days_in_month = pd.date_range(start=first_day_of_month, end=target_date, freq='D')
-            for current_date in reversed(all_days_in_month):
-                try:
-                    return df.at[current_date, head]
-                except KeyError:
-                    continue
+                #print(f"未找到目标日 {target_date.date()} 的数据，尝试查前几日数据。")
+                first_day_of_month = target_date.replace(day=1)
+                all_days_in_month = pd.date_range(start=first_day_of_month, end=target_date, freq='D')
+                for current_date in reversed(all_days_in_month):
+                    try:
+                        return df.at[current_date, head]
+                    except KeyError:
+                        continue
             
-            print(f"警告：目标日期所在月份 {first_day_of_month.date()} 没有任何数据。")
-            return None
+                print(f"警告：目标日期所在月份 {first_day_of_month.date()} 没有任何数据。")
+                return None
         else:
             print("df not has cloumn date")
             return None
 
 
 if __name__ == "__main__":
-    #save_markets()
+    save_markets()
+    exit()
+
     mc = StockMarketCache()
-    df = mc.load_market_df('603155')
-    print(mc.get_specify_date_market(df, "2023-01-06"))
+    df = mc.load_market_df('002006')
+    print(df[500:550])
+    exit()
+    for day in range(20,31):
+        date = "2018-01-" + str(day)
+        print(date, mc.get_specify_date_market(df, date))
     #print(df[100: 150])

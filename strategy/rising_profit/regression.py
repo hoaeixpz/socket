@@ -16,9 +16,12 @@ import akshare as ak
 sys.path.append("../..")
 from financial_data import FinancialData
 from stock_price_cache import StockPriceCache
+sys.path.append("../../market_cap")
+from update_market import StockMarketCache
 
 finan_data = FinancialData()
 stock_price = StockPriceCache()
+market_data = StockMarketCache()
 
 class CustomJSONEncoder(json.JSONEncoder):
     """自定义JSON编码器，处理pandas和numpy数据类型"""
@@ -186,6 +189,7 @@ class StockAnalyzer:
             if self.find_good_stocks(year, stock_code):
                 #print(f"---------分析股票: {stock_code} {stock_name}")
                 date = str(year) + "-01-30"
+                '''
                 market_value = stock_data[stock_code].get('market_value')
                 mv = market_value.get(date)
 
@@ -205,11 +209,14 @@ class StockAnalyzer:
                             print("next_mv ", next_mv)
                             if next_mv is not None:
                                 market_value[next_date] = next_mv
-
-                market_value[date] = mv
+                '''
+                #market_value[date] = mv
                 #print(f"{date} 市值 {mv}")
                 #print(stock_data[stock_code].get('market_value'))
-                
+                market_df = market_data.load_market_df(stock_code)
+                mv = market_data.get_specify_date_market(market_df, date)
+                if mv is None:
+                    continue
                 
                 p, p2 = self.cal_profit(year-1, stock_info)
                 count = count + 1
@@ -282,7 +289,7 @@ class StockAnalyzer:
 
 
             sorted_result = list(sorted(analysis_results.items(), key=lambda x: x[1]['market_value']))
-            #print(sorted_kfroe)
+            print(sorted_result[0:12])
             psum = 0
             for result in sorted_result[:5]:
                 print(result)

@@ -168,13 +168,14 @@ def main():
     cache = StockPriceCache()
     
     # 步骤1: 获取过滤后的股票列表
-    print("步骤1: 获取股票...")
-    df = cache.get_index_price("sz000001")
-    price = cache.get_specify_date_price(df, "19000201")
-    print(price)
-    df = cache.get_stock_hfq_price("600362")
-    price = cache.get_specify_date_price(df, "2016-12-10")
-    print(price)
+    #print("步骤1: 获取股票...")
+    #df = cache.get_index_price("sz000001")
+    #price = cache.get_specify_date_price(df, "19000201")
+    #print(price)
+    df = cache.get_stock_hfq_price("002331")
+    print(df[480:520])
+    #price = cache.get_specify_date_price(df, "2012-05-04")
+    #print(price)
 
 
     
