@@ -12,10 +12,13 @@ from datetime import datetime
 import inspect
 
 from financial_data import FinancialData
+import sys
+sys.path.append("market_cap")
+from update_market import StockMarketCache
 #import efinance as ef
 
 #from test_proxy import HybridProxyCrawler
-
+market_data = StockMarketCache()
 stock_data = FinancialData()
 
 ts.set_token('7bc87dd76b1cdfed7157ff2ef0d96f2918fbd3728292507939d9cc84')
@@ -159,9 +162,25 @@ def test_get_price():
   #df = ak.stock_zh_index_daily("sh160416​")
   #print(df)
 
+def cal_PB(symbol):
+  #df = stock_data.get_indicator_data(symbol, "股东权益合计(净资产)")
+  
+  date = "2020-12-30"
+  jzc = stock_data.get_indicator_value(symbol, "股东权益合计(净资产)", date)
+  market_df = market_data.load_market_df(symbol)
+
+  date = "2021-01-05"
+  mv = market_data.get_specify_date_market(market_df, date)
+  print("净资产 ",jzc)
+  print("市值 ", mv)
+  One = 100000000
+  PB = mv * One / jzc
+  print("PB ", PB)
 
 # 使用示例
-symbol = "600180"  # 平安银行
+symbol = "000333"  # 美的
+cal_PB(symbol)
+exit()
 #test_sz_index()
 #test_get_price()
 #stock_info = ak.stock_individual_info_em(symbol="000001")

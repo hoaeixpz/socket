@@ -34,6 +34,9 @@ finan_data = FinancialData()
 stock_price = StockPriceCache()
 market_data = StockMarketCache()
 
+# 筛选净利润增长率 > 20%
+Profit_Grown_Ratio_Threshold = 30 
+
 def load_stock_data(file_path='../../stock_info.json'):
     """加载股票数据"""
     try:
@@ -96,7 +99,7 @@ def find_good_stocks(CURRENT_YEAR:int, stock_code):
             if math.isnan(pct):
                 continue
 
-            if pct < 20:
+            if pct < Profit_Grown_Ratio_Threshold:
                 return False
             count += 1
 
@@ -127,156 +130,7 @@ def load_stock_list(CURRENT_YEAR):
     #print(code_list)
     return code_list
 
-class MyStrategy(bt.Strategy):
-    """
-    主策略程序
-    """
-    params = (
-        ("MA20", 20),
-        ("MA05", 5))  # 全局设定交易策略的参数
-
-    def __init__(self):
-        """
-        初始化函数
-        """
-        self.data_close = self.datas[0].close  # 指定价格序列
-        # 初始化交易指令、买卖价格和手续费
-        self.order = None
-        self.buy_price = None
-        self.buy_comm = None
-        # 添加移动均线指标
-        self.sma_20 = bt.indicators.SimpleMovingAverage(
-            self.datas[0], period=self.params.MA20
-        )
-        self.sma = bt.indicators.SimpleMovingAverage(
-            self.datas[0], period=self.params.MA05
-        )
-
-    def next(self):
-        """
-        执行逻辑
-        """
-        if self.order:  # 检查是否有指令等待执行,
-            return
-        #print(self.position)
-        # 检查是否持仓
-        if not self.position:  # 没有持仓
-            if self.sma[0] > self.sma_20[0]:  # 执行买入条件判断：收盘价格上涨突破20日均线
-                self.order = self.buy(size=100)  # 执行买入
-        else:
-            if self.sma[0] < self.sma_20[0]:  # 执行卖出条件判断：收盘价格跌破20日均线
-                self.order = self.sell(size=100)  # 执行卖出
-        # 更新指令状态
-        if self.order:
-            self.buy_price = self.data_close[0]
-            self.buy_comm = self.broker.getcommissioninfo(self.data).getcommission(self.buy_price, 100)
-            self.order = None  # 在这里将订单设置为None，表示没有正在执行的订单
-        else:
-            self.buy_price = None
-            self.buy_comm = None
-'''
-class SimpleBuyAndHoldStrategy(bt.Strategy):
-    """
-    简单的买入持有策略 - 使用索引判断
-    第一天买入，最后一天卖出
-    """
-    
-    def __init__(self):
-        self.record = {}
-        for data in self.datas:
-            self.record[data] = {
-                'name': data._name,
-                'has_bought': False,
-                'buy_price': 0
-            }
-
-    def next(self):
-        cash = self.broker.getcash()
-        cash = cash / len(self.datas)
-
-        for data in self.datas:
-            name = data._name
-            record = self.record[data]
-            current_bar = len(data)  # 当前bar的索引
-        
-            # 第一天买入（索引为0）
-            if not record['has_bought'] and current_bar == 1:            
-                price = data.close[0]
-                size = int(cash / price / 101) * 100
-                if size > 0:
-                    self.buy(data=data, size=size)
-                    record['has_bought'] = True
-                    #print(f'  买入价格: {price:.2f}, 买入数量: {size} 总价 {price * size}')
-                else:
-                    print(f'  警告：{name}至少需要 {price * 100} 现金不足，无法买入')
-            # 最后一天卖出（索引为总长度-1）
-            elif (record['has_bought'] and 
-                self.getposition(data) and 
-                current_bar == data.buflen()-1):
-            
-                self.close(data=data)
-
-
-
-    def notify_order(self, order):
-        """基本的订单状态处理"""
-        data = order.data
-        name = data._name
-        trade_date = data.datetime.date(0)  # 获取当前Bar的日期（date对象
-        trade_date_str = data.datetime.date(0).strftime('%Y-%m-%d')
-    
-        # 1. 订单已提交/接受 - 无需特殊处理
-        if order.status in [order.Submitted, order.Accepted]:
-            # 订单正在处理中，等待后续状态
-            print(f"{name} 订单{order.getstatusname()} - 等待执行")
-            return
-    
-        # 2. 订单完成成交
-        if order.status == order.Completed:
-            if order.isbuy():
-                print(f"✅ {name} {trade_date_str} 买入成交: {order.executed.size}股 @ {order.executed.price:.2f}")
-                print(f"   成本: {order.executed.value:.2f}, 佣金: {order.executed.comm:.2f}")
-            else:  # 卖出订单
-                print(f"⭕ {name} {trade_date_str} 卖出成交: {order.executed.size}股 @ {order.executed.price:.2f}")
-                print(f"   收入: {order.executed.value:.2f}, 佣金: {order.executed.comm:.2f}")
-            print("")
-    
-        # 3. 订单失败情况
-        elif order.status in [order.Canceled, order.Margin, order.Rejected]:
-            print(f"❌ {name} 订单失败: {order.getstatusname()}")
-        
-            # 根据不同失败原因处理
-            if order.status == order.Canceled:
-                print("   订单已被取消")
-            elif order.status == order.Margin:
-                print("   保证金不足")
-            elif order.status == order.Rejected:
-                print("   订单被拒绝")
-            print("")
-    
-        # 4. 重置订单变量（重要！）
-        self.order = None  # 允许提交新订单
-    
-    def stop(self):
-        """策略结束时的总结"""
-        if True:
-            final_value = self.broker.getvalue()
-            initial_cash = self.broker.startingcash
-            total_return = (final_value / initial_cash - 1) * 100
-            
-            print("\n" + "="*50)
-            print("策略执行总结:")
-            print("="*50)
-            print(f"初始资金: {initial_cash:.2f}")
-            print(f"最终价值: {final_value:.2f}")
-            print(f"总收益率: {total_return:.2f}%")
-'''
-
-class MonthlyDCAStrategy(bt.Strategy):
-    """
-    月度定投策略 (Dollar-Cost Averaging)
-    规则：每月第一个交易日买入，最后一个交易日清仓。
-    """
+class MonthlyStrategy(bt.Strategy):
 
     def __init__(self):
         # 记录上一个交易日的月份，用于检测月份变化
@@ -521,6 +375,8 @@ def load_hfq_data(symbol="600519"):
 
 # 主函数
 def run_backtest(CURRENT_YEAR):
+    print("\n")
+    print(f"{CURRENT_YEAR} 年")
     # 创建Cerebro引擎
     cerebro = bt.Cerebro()
     
@@ -533,7 +389,7 @@ def run_backtest(CURRENT_YEAR):
     )
     
     # 添加策略
-    cerebro.addstrategy(MonthlyDCAStrategy)
+    cerebro.addstrategy(MonthlyStrategy)
 
     #code_list = ['600099','002112','002576','600234','002676']
     #code_list = ['603088','600202','002278','603988','600731']
@@ -542,8 +398,6 @@ def run_backtest(CURRENT_YEAR):
     #code_list = ['002925']
     start_time = time.time()
     code_list = load_stock_list(CURRENT_YEAR)
-    print("\n")
-    print(f"{CURRENT_YEAR} 年")
     print(f"符合增长率 > 20% 的共有{len(code_list)}只")
     end_time = time.time()
     print(f"load_stock_list {end_time - start_time:.2f}s")
@@ -661,6 +515,6 @@ if __name__ == '__main__':
         years += 1
 
     annualized_return = math.pow(total_r, 1/years) - 1
-    print(f"总收益率 {(total_r - 1) * 100:.2f} %")
+    print(f"\n总收益率 {(total_r - 1) * 100:.2f} %")
     print(f"年化收益率 {annualized_return * 100:.2f} %")
     print(f"\n耗时 {time.time() - START_TIME:.2f}s")
