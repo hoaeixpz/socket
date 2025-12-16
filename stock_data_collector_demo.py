@@ -365,11 +365,12 @@ class StockDataCollector:
         if result is None:
             return
 
-        df = ak.stock_zh_valuation_baidu(stock_code, indicator="总市值", period="近一年")
-        date = df.iloc[-1]['date']
-        market = df.iloc[-1]['value']
-        result['market_value'] = {}
-        result['market_value'][str(date)] = market
+        result.pop('market_value', None)
+        #df = ak.stock_zh_valuation_baidu(stock_code, indicator="总市值", period="近一年")
+        #date = df.iloc[-1]['date']
+        #market = df.iloc[-1]['value']
+        #result['market_value'] = {}
+        #result['market_value'][str(date)] = market
 
         #self._save_results()
 
@@ -628,8 +629,8 @@ def demo_test():
         stock_name = value.get('stock_name')
     #for stock_code, stock_name in test_stocks:
     #    print(f"\n分析 {stock_code} {stock_name}:")
-        #analyzer.update_market_value(stock_code)
-
+        analyzer.update_market_value(stock_code)
+        continue
         #analyzer.clear_invalid_data(stock_code)
         
         result = analyzer.analyze_stock(stock_code, stock_name, 15)

@@ -122,7 +122,7 @@ class StockPriceCache:
                 return pd.read_parquet(cache_file)
             return None
 
-    def get_specify_date_price(self, df, target_date_str:str, head = 'close', force_update=False):
+    def get_specify_date_price(self, df, target_date_str:str, head = 'close'):
         if df is None or df.empty:
             print("input df is None")
             return None
@@ -135,7 +135,7 @@ class StockPriceCache:
             first_date = pd.to_datetime(df['date'].iloc[0])
             last_date = pd.to_datetime(df['date'].iloc[-1])
             if target_date < first_date or target_date > last_date:
-                #print(f"请求日期 {target_date}  缓存只包含从 {first_date} 到 {last_date} 期间股价，请执行stock_zh_a_daily获取股价")
+                print(f"请求日期 {target_date}  缓存只包含从 {first_date} 到 {last_date} 期间股价，请执行stock_zh_a_daily获取股价")
                 return None
 
             df = df.copy()
