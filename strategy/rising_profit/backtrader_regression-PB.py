@@ -145,9 +145,13 @@ def calc_PB(stock_code, date):
     df = finan_data.get_indicator_data(stock_code, "股东权益合计(净资产)")
     jzc = finan_data.get_indicator_value(stock_code, "股东权益合计(净资产)", date)
     good_will = finan_data.get_indicator_value(stock_code, "商誉", date)
+    #print("净资产： ", jzc)
+    #print("商誉： ", good_will)
+    #print("市值： ", mv)
 
     One = 100000000
-    PB = mv * One / jzc - (good_will)
+    PB = mv * One / (jzc - good_will)
+    #print(PB)
     return PB
 
 def load_stock_list(CURRENT_YEAR):
@@ -544,6 +548,8 @@ def test():
 
 # 运行回测
 if __name__ == '__main__':
+    #test()
+    #exit()
     START_TIME = time.time()
 
     if False:
