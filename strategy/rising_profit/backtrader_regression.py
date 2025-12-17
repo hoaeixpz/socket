@@ -36,7 +36,7 @@ market_data = StockMarketCache()
 
 # 筛选净利润增长率 > 20%
 # 扣非ROE > 15
-Profit_Grown_Ratio_Threshold = 20
+Profit_Grown_Ratio_Threshold = 30
 KF_ROE_Threshold = 15
 
 
@@ -144,7 +144,7 @@ def load_stock_list(CURRENT_YEAR):
         print("没有找到股票数据")
         return {}
     else:
-        print("筛选净利润增长率连续3年 > 20%")
+        print(f"筛选净利润增长率连续3年 > {Profit_Grown_Ratio_Threshold}%")
         for stock_code, stock_info in stock_data.items():
             stock_name = stock_info.get('stock_name', '')
 
@@ -158,16 +158,24 @@ def load_stock_list(CURRENT_YEAR):
 def filter_date_code_list(codes_list, CURRENT_YEAR):
     result_codes = []
     for code in codes_list:
-        # 创建示例数据（这里使用虚拟数据，实际使用时替换为真实数据
         data_name = load_hfq_data(code)
-        from_date = datetime(CURRENT_YEAR - 1, 12, 25)
+        from_date = datetime(CURRENT_YEAR - 1, 12, 20)
         to_date = datetime(CURRENT_YEAR, 12 , 31)
         
         flag1 = False
         flag2 = False
+        last_month = None
         for date in data_name.index:
             if date < from_date or date > to_date:
                 continue
+
+            if last_month is None:
+                last_month = date.month
+            elif date.month != last_month:
+                if date.month - last_month > 2:
+                    break
+                # 停牌超过2个月的过滤掉
+                last_month = date.month            
 
             if date.year == from_date.year and date.month == from_date.month:
                 flag1 = True
@@ -201,6 +209,22 @@ def choose_low_market_codes(codes_list, date):
     print(f"筛选市值最小的 {NUM} 只股票")
     return result_list
 
+def get_indicator(stock_code, current_year, indicator="权益乘数"):
+    df = finan_data.get_indicator_data(stock_code, indicator)
+    Y = 3
+    ind_list = finan_data.get_indicator_recent_year(df, Y, current_year)
+    if indicator == "净资产收益率_平均_扣除非经常损益":
+        indicator = "KF_ROE"
+    for date, ind in ind_list:
+        year = int(date[0:4])
+        if current_year - year > Y:
+            continue
+        if date[4:6] == '12':
+            if math.isnan(ind):
+                continue
+
+            print("year ", year, " ", indicator, " ", ind)
+
 class MonthlyStrategy(bt.Strategy):
 
     def __init__(self):
@@ -217,7 +241,11 @@ class MonthlyStrategy(bt.Strategy):
                 'name': data._name,
                 'buy_executed_this_month': False,
                 'buy_size': 0,
-                'buy_price': 0
+                'buy_price': 0,
+                'sell_price': 0,
+                'is_buyed': False,
+                'is_selled': False,
+                'return_rate': None
             }
         self.each_cash = self.broker.getcash() / 5
 
@@ -225,6 +253,7 @@ class MonthlyStrategy(bt.Strategy):
         # 获取当前交易日
         current_date = self.data.datetime.date(0)
         current_month = current_date.month
+        #print(current_date)
         
         # 初始化last_month（只在第一个交易日）
         if self.last_month is None:
@@ -299,7 +328,7 @@ class MonthlyStrategy(bt.Strategy):
         if len(self.selected_codes) == 0:
             for data, mv in market_dict[0:5]:
                 self.selected_codes.append(data)
-                self.traded_codes.add(data._name)
+                self.traded_codes.add(data)
 
         rebalanced = False
         for data in self.last_selected_codes:
@@ -375,8 +404,17 @@ class MonthlyStrategy(bt.Strategy):
 
         for data in self.last_selected_codes:
             if data not in self.selected_codes:
+                print(f"sell {data._name}")
                 self.close(data=data)
                 self.state = "SELLED"
+
+        for data in self.last_selected_codes:
+            for selected in self.selected_codes:
+                if data == selected:
+                    if data._name != selected._name:
+                        print("#"*50)
+                        print(f"{data._name} = {selected._name}")
+                        print(f"{data} = {selected}")
 
     def notify_order(self, order):
         """基本的订单状态处理"""
@@ -395,11 +433,25 @@ class MonthlyStrategy(bt.Strategy):
         if order.status == order.Completed:
             if order.isbuy():
                 self.record[data]['buy_price'] = order.executed.price
+                self.record[data]['is_buyed'] = True
+                self.record[data]['is_selled'] = False
+
                 print(f"✅ {name} {trade_date_str} 买入成交: {order.executed.size}股 @ {order.executed.price:.2f}")
                 print(f"   成本: {order.executed.value:.2f}, 佣金: {order.executed.comm:.2f}")
             else:  # 卖出订单
                 buy_price = self.record[data]['buy_price']
                 value = (order.executed.price - buy_price) * abs(order.executed.size)
+                self.record[data]['sell_price'] = order.executed.price
+                self.record[data]['is_buyed'] = False
+                self.record[data]['is_selled'] = True
+                curr_return_rate = self.record[data]['sell_price'] / buy_price - 1
+                return_rate = self.record[data]['return_rate']
+                if return_rate is None:
+                    return_rate = curr_return_rate
+                else:
+                    return_rate = (1 + return_rate) * (1 + curr_return_rate) - 1
+                self.record[data]['return_rate'] = return_rate
+
                 print(f"⭕ {name} {trade_date_str} 卖出成交: {order.executed.size}股 @ {order.executed.price:.2f}")
                 print(f"   买入价格 {buy_price} 收益: {value:.2f}, 佣金: {order.executed.comm:.2f}")
             print(f"现有现金 {self.broker.getcash():.2f}")
@@ -428,14 +480,41 @@ class MonthlyStrategy(bt.Strategy):
         """策略结束时的总结"""
         final_value = self.broker.getvalue()
         initial_cash = self.broker.startingcash
-        total_return = (final_value / initial_cash - 1) * 100
+        profit = final_value - initial_cash
+        total_return = (profit / initial_cash) * 100
+        if len(self.datas) < 5:
+            initial_cash = initial_cash / 5 * len(self.datas)
+            final_value = initial_cash + profit
+            total_return = (profit / initial_cash) * 100
             
         print("\n" + "="*50)
         print("策略执行总结:")
         print("="*50)
         print("交易过股票：")
-        for code in self.traded_codes:
-            print(f"{code}")
+        current_date = self.data.datetime.date(0)
+        current_year = current_date.year
+        for data in self.traded_codes:
+            code = data._name
+            stock_info = stock_data[code]
+            stock_name = stock_info.get('stock_name')
+            industry = stock_info.get('industry')
+            return_rate = self.record[data]['return_rate']
+            if self.record[data]['is_buyed'] and not self.record[data]['is_selled']:
+                buy_price = self.record[data]['buy_price']
+                price = data.close[0]
+                curr_return_rate = price / buy_price - 1
+                if return_rate is None:
+                    return_rate = curr_return_rate
+                else:
+                    return_rate = (1 + return_rate) * (1 + curr_return_rate) - 1
+            elif return_rate is None:
+                return_rate = 0
+
+            print(f"{code} {stock_name} {industry} 收益率 {return_rate * 100:.2f}%")
+            #get_indicator(code, current_year - 1)
+            #get_indicator(code, current_year - 1, "净资产收益率_平均_扣除非经常损益")
+            #get_indicator(code, current_year - 1, "净利润")
+            #et_indicator(code, current_year - 1, "扣非净利润")
             #print(f"{code} rank {self.rank_dict[code]}")
         print("")
         print(f"初始资金: {initial_cash:.2f}")
@@ -538,6 +617,8 @@ def run_backtest(CURRENT_YEAR):
     final_value = cerebro.broker.getvalue()
     initial_cash = cerebro.broker.startingcash
     total_return = (final_value / initial_cash - 1) * 100
+    if len(cerebro.datas) < 5:
+        total_return = total_return / len(cerebro.datas) * 5
 
     end_time = time.time()
     print(f"cerebro run {end_time - start_time:.2f}s")
@@ -575,11 +656,11 @@ def run_backtest(CURRENT_YEAR):
 if __name__ == '__main__':
     START_TIME = time.time()
 
-    #Test_single_year = True
+    Test_single_year = True
     Test_single_year = False
 
     if Test_single_year:
-        run_backtest(2020)
+        run_backtest(2011)
     else:
         return_dict = {}
         for CURRENT_YEAR in range(2010,2026):

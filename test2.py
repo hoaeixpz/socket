@@ -142,7 +142,9 @@ def test_sz_index(symbol):
   '''
 
 def test_get_price():
-  #df = ak.stock_zh_a_daily("sh510300", start_date="20201201", end_date="20210406", adjust = 'hfq')
+  df = ak.stock_zh_a_daily("sz002012", start_date="20110725", end_date="20110830", adjust = 'hfq')
+  print(df)
+  exit()
   #df = ak.stock_zh_index_daily("sh510300")
   #df = ak.stock_zh_index_daily("sh511260")
   #df = ak.stock_zh_index_daily("sh511010")
@@ -189,11 +191,10 @@ def get_profit_grown_rate(symbol):
     print("year pct ", date, " ", pct)
 # 使用示例
 symbol = "002607"  # 美的
-get_profit_grown_rate(symbol)
+#get_profit_grown_rate(symbol)
 #cal_PB(symbol)
-exit()
 #test_sz_index()
-#test_get_price()
+test_get_price()
 #stock_info = ak.stock_individual_info_em(symbol="000001")
 #print(stock_info)
 #test_stock_individual_basic_info_xq(symbol)
