@@ -108,13 +108,13 @@ def find_good_stocks(CURRENT_YEAR:int, stock_code):
 
     if count < 3:
         return False
-    
+    '''
     print(stock_code)
     for year, pct in zzl:
         if year[4:6] == '12':
             print("year ", year, " ", float(pct))
-    
-    #return True
+    '''
+    return True
 
 
 
@@ -152,8 +152,54 @@ def load_stock_list(CURRENT_YEAR):
                 code_list.append(stock_code)
 
     #print(code_list)
-    exit()
+    #exit()
     return code_list
+
+def filter_date_code_list(codes_list, CURRENT_YEAR):
+    result_codes = []
+    for code in codes_list:
+        # 创建示例数据（这里使用虚拟数据，实际使用时替换为真实数据
+        data_name = load_hfq_data(code)
+        from_date = datetime(CURRENT_YEAR - 1, 12, 25)
+        to_date = datetime(CURRENT_YEAR, 12 , 31)
+        
+        flag1 = False
+        flag2 = False
+        for date in data_name.index:
+            if date < from_date or date > to_date:
+                continue
+
+            if date.year == from_date.year and date.month == from_date.month:
+                flag1 = True
+            if date.year == to_date.year and date.month == to_date.month:
+                flag2 = True
+
+        if not flag1 or not flag2:
+            #print(f"{code} 在指定日期内没有股价")
+            continue
+
+        result_codes.append(code)
+
+    return result_codes
+
+def choose_low_market_codes(codes_list, date):
+    NUM = 20
+    market_dict = {}
+    result_list = []
+    for stock_code in codes_list:
+        market_df = market_data.load_market_df(stock_code)
+        mv = market_data.get_specify_date_market(market_df, date)
+        if mv is None:
+            continue
+        market_dict[stock_code] = mv
+
+    market_dict = sorted(market_dict.items(), key=lambda x:float(x[1]))
+    for code, mv in market_dict[0:NUM]:
+        result_list.append(code)
+
+
+    print(f"筛选市值最小的 {NUM} 只股票")
+    return result_list
 
 class MonthlyStrategy(bt.Strategy):
 
@@ -416,11 +462,6 @@ def run_backtest(CURRENT_YEAR):
     # 添加策略
     cerebro.addstrategy(MonthlyStrategy)
 
-    #code_list = ['600099','002112','002576','600234','002676']
-    #code_list = ['603088','600202','002278','603988','600731']
-    #code_list = ['002243','002295','002006','603326','000859']
-    #code_list = ['002652','002316','002377','600322','600854']
-    #code_list = ['002925']
     start_time = time.time()
     code_list = load_stock_list(CURRENT_YEAR)
     print(f"符合增长率 > 20% 的共有{len(code_list)}只")
@@ -428,29 +469,27 @@ def run_backtest(CURRENT_YEAR):
     print(f"load_stock_list {end_time - start_time:.2f}s")
 
     start_time = end_time
-    #code_list = code_list[0:1]
-    code_number = 0
+    code_list = filter_date_code_list(code_list, CURRENT_YEAR)
+    code_number = len(code_list)
+    print(f"符合条件股票 {code_number} 个")
+    if code_number == 0:
+        return 0
+
+    #code_list = ['600099','002112','002576','600234','002676']
+    #code_list = ['603088','600202','002278','603988','600731']
+    #code_list = ['002243','002295','002006','603326','000859']
+    #code_list = ['002652','002316','002377','600322','600854']
+    #code_list = ['002925']
+
+    #date = datetime(CURRENT_YEAR - 1, 12, 31)
+    #code_list = choose_low_market_codes(code_list, date)
+    end_time = time.time()
+    print(f"filter codes {end_time - start_time:.2f}s")
+
     for code in code_list:
-        # 创建示例数据（这里使用虚拟数据，实际使用时替换为真实数据
         data_name = load_hfq_data(code)
         from_date = datetime(CURRENT_YEAR - 1, 12, 25)
-        to_date = datetime(CURRENT_YEAR, 12 , 31)
-        
-        flag1 = False
-        flag2 = False
-        for date in data_name.index:
-            if date < from_date or date > to_date:
-                continue
-
-            if date.year == from_date.year and date.month == from_date.month:
-                flag1 = True
-            if date.year == to_date.year and date.month == to_date.month:
-                flag2 = True
-
-        if not flag1 or not flag2:
-            #print(f"{code} 在指定日期内没有股价")
-            continue
-        
+        to_date = datetime(CURRENT_YEAR, 12, 31)
         data = bt.feeds.PandasData(
             dataname=data_name,  # 创建示例数据
             #fromdate=datetime(2019, 12, 31),
@@ -458,14 +497,10 @@ def run_backtest(CURRENT_YEAR):
             fromdate=from_date,
             todate=to_date
         )
-        #print(f"feed {code}")
+
         # 添加数据
         cerebro.adddata(data, name=code)
-        code_number += 1
 
-    print(f"符合条件股票 {code_number} 个")
-    if code_number == 0:
-        return 0
 
     end_time = time.time()
     print(f"cerebro adddata {end_time - start_time:.2f}s")
@@ -528,24 +563,27 @@ def run_backtest(CURRENT_YEAR):
 if __name__ == '__main__':
     START_TIME = time.time()
 
+    Test_single_year = True
+    #Test_single_year = False
 
+    if Test_single_year:
+        run_backtest(2020)
+    else:
+        return_dict = {}
+        for CURRENT_YEAR in range(2010,2026):
+            r = run_backtest(CURRENT_YEAR)
+            return_dict[CURRENT_YEAR] = r
 
-    return_dict = {}
-    #run_backtest(2012)
-    for CURRENT_YEAR in range(2023,2026):
-        r = run_backtest(CURRENT_YEAR)
-        return_dict[CURRENT_YEAR] = r
+        total_r = 1
+        years = 0
+        for y,r in return_dict.items():
+            print(f"{y} 收益率 {r:.2f}%")
+            total_r *= (1 + r / 100.0)
+            years += 1
 
+        annualized_return = math.pow(total_r, 1/years) - 1
+        print(f"\n总收益率 {(total_r - 1) * 100:.2f} %")
+        print(f"年化收益率 {annualized_return * 100:.2f} %")
+    
 
-
-    total_r = 1
-    years = 0
-    for y,r in return_dict.items():
-        print(f"{y} 收益率 {r:.2f}%")
-        total_r *= (1 + r / 100.0)
-        years += 1
-
-    annualized_return = math.pow(total_r, 1/years) - 1
-    print(f"\n总收益率 {(total_r - 1) * 100:.2f} %")
-    print(f"年化收益率 {annualized_return * 100:.2f} %")
     print(f"\n耗时 {time.time() - START_TIME:.2f}s")

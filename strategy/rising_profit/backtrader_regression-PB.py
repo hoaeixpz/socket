@@ -450,6 +450,7 @@ def run_backtest(CURRENT_YEAR):
 
     start_time = end_time
     #code_list = code_list[0:1]
+    code_number = 0
     for code in code_list:
         # 创建示例数据（这里使用虚拟数据，实际使用时替换为真实数据
         data_name = load_hfq_data(code)
@@ -481,6 +482,11 @@ def run_backtest(CURRENT_YEAR):
         #print(f"feed {code}")
         # 添加数据
         cerebro.adddata(data, name=code)
+        code_number += 1
+
+    print(f"符合条件股票 {code_number} 个")
+    if code_number == 0:
+        return 0
 
     end_time = time.time()
     print(f"cerebro adddata {end_time - start_time:.2f}s")
