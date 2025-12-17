@@ -177,9 +177,20 @@ def cal_PB(symbol):
   PB = mv * One / jzc
   print("PB ", PB)
 
+def get_profit_grown_rate(symbol):
+  df = stock_data.get_indicator_data(symbol, "归属母公司净利润增长率")
+  Y = 10
+  zzl = stock_data.get_indicator_recent_year(df, Y, 2020)
+
+  for date, pct in zzl:
+    year = int(date[0:4])
+    if 2011 - year > Y:
+      continue
+    print("year pct ", date, " ", pct)
 # 使用示例
-symbol = "000333"  # 美的
-cal_PB(symbol)
+symbol = "002607"  # 美的
+get_profit_grown_rate(symbol)
+#cal_PB(symbol)
 exit()
 #test_sz_index()
 #test_get_price()

@@ -183,7 +183,7 @@ def filter_date_code_list(codes_list, CURRENT_YEAR):
     return result_codes
 
 def choose_low_market_codes(codes_list, date):
-    NUM = 20
+    NUM = 30
     market_dict = {}
     result_list = []
     for stock_code in codes_list:
@@ -207,6 +207,7 @@ class MonthlyStrategy(bt.Strategy):
         # 记录上一个交易日的月份，用于检测月份变化
         self.last_month = None
         self.record = {}
+        self.rank_dict = {}
         self.traded_codes = set()
         self.selected_codes = []
         self.last_selected_codes = []
@@ -265,7 +266,7 @@ class MonthlyStrategy(bt.Strategy):
         print("pre_rebalance ", current_date)
         year = current_date.year
         month = current_date.month
-        #if month > 1:
+        #if month > 4:
         #    return
 
         month = month - 1
@@ -292,6 +293,8 @@ class MonthlyStrategy(bt.Strategy):
             market_dict[data] = mv
 
         market_dict = list(sorted(market_dict.items(), key=lambda x:float(x[1])))
+        #if current_date.month == 1:
+        #    self.record_sort_rank(market_dict)
 
         if len(self.selected_codes) == 0:
             for data, mv in market_dict[0:5]:
@@ -324,7 +327,14 @@ class MonthlyStrategy(bt.Strategy):
         else:
             self.state = None
             self.selected_codes = []
-            
+          
+    def record_sort_rank(self, market_dict):
+        rank = 1
+        for data, mv in market_dict:
+            code = data._name
+            self.rank_dict[code] = rank
+            rank += 1
+
     def execute_rebalance(self):
         current_date = self.data.datetime.date(0)
         #print("exe rebalance ", current_date, " ", self.state)
@@ -424,7 +434,9 @@ class MonthlyStrategy(bt.Strategy):
         print("策略执行总结:")
         print("="*50)
         print("交易过股票：")
-        print(self.traded_codes)
+        for code in self.traded_codes:
+            print(f"{code}")
+            #print(f"{code} rank {self.rank_dict[code]}")
         print("")
         print(f"初始资金: {initial_cash:.2f}")
         print(f"最终价值: {final_value:.2f}")
@@ -481,8 +493,8 @@ def run_backtest(CURRENT_YEAR):
     #code_list = ['002652','002316','002377','600322','600854']
     #code_list = ['002925']
 
-    #date = datetime(CURRENT_YEAR - 1, 12, 31)
-    #code_list = choose_low_market_codes(code_list, date)
+    date = datetime(CURRENT_YEAR - 1, 12, 31)
+    code_list = choose_low_market_codes(code_list, date)
     end_time = time.time()
     print(f"filter codes {end_time - start_time:.2f}s")
 
@@ -563,8 +575,8 @@ def run_backtest(CURRENT_YEAR):
 if __name__ == '__main__':
     START_TIME = time.time()
 
-    Test_single_year = True
-    #Test_single_year = False
+    #Test_single_year = True
+    Test_single_year = False
 
     if Test_single_year:
         run_backtest(2020)
