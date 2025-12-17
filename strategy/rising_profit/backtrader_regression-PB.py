@@ -145,13 +145,20 @@ def calc_PB(stock_code, date):
     df = finan_data.get_indicator_data(stock_code, "股东权益合计(净资产)")
     jzc = finan_data.get_indicator_value(stock_code, "股东权益合计(净资产)", date)
     good_will = finan_data.get_indicator_value(stock_code, "商誉", date)
-    #print("净资产： ", jzc)
-    #print("商誉： ", good_will)
-    #print("市值： ", mv)
 
+    print("净资产： ", jzc)
+    print("商誉： ", good_will)
+    print("市值： ", mv)
+
+    if math.isnan(good_will):
+        return None
+
+    if good_will > jzc:
+        return None
+        
     One = 100000000
     PB = mv * One / (jzc - good_will)
-    #print(PB)
+    print(PB)
     return PB
 
 def load_stock_list(CURRENT_YEAR):
@@ -533,7 +540,9 @@ def run_backtest(CURRENT_YEAR):
     return total_return
 
 def test():
-    for month in range(1,13):
+    calc_PB("002437", "2015-12-30")
+    exit(0)
+    for month in range(1,2):
         month = str(month)
         if int(month) < 10:
             month = str(0) + month
@@ -542,14 +551,14 @@ def test():
             if int(day) < 10:
                 day = str(0) + day
             
-            date = "2023-" + month + "-" + day
+            date = "2009-" + month + "-" + day
             print(date)
-            calc_PB("000333", date)
+            calc_PB("300014", date)
 
 # 运行回测
 if __name__ == '__main__':
-    #test()
-    #exit()
+    test()
+    exit()
     START_TIME = time.time()
 
     if False:

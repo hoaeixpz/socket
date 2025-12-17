@@ -35,7 +35,10 @@ stock_price = StockPriceCache()
 market_data = StockMarketCache()
 
 # 筛选净利润增长率 > 20%
-Profit_Grown_Ratio_Threshold = 30 
+# 扣非ROE > 15
+Profit_Grown_Ratio_Threshold = 20
+KF_ROE_Threshold = 15
+
 
 def load_stock_data(file_path='../../stock_info.json'):
     """加载股票数据"""
@@ -105,12 +108,33 @@ def find_good_stocks(CURRENT_YEAR:int, stock_code):
 
     if count < 3:
         return False
-    '''
+    
     print(stock_code)
     for year, pct in zzl:
         if year[4:6] == '12':
-            print(year, " ", float(pct))
-    '''
+            print("year ", year, " ", float(pct))
+    
+    #return True
+
+
+
+    count = 0
+    df = finan_data.get_indicator_data(stock_code, "权益乘数")
+    ROE = finan_data.get_indicator_recent_year(df, Y, CURRENT_YEAR-1)
+    for date, roe in ROE:
+        year = int(date[0:4])
+        if CURRENT_YEAR - year > Y:
+            continue
+        if date[4:6] == '12':
+            if math.isnan(roe):
+                continue
+
+
+            count += 1
+            print("year ", year, " roe ", roe)
+
+    if count < 3:
+        return False
 
     return True
 
@@ -128,6 +152,7 @@ def load_stock_list(CURRENT_YEAR):
                 code_list.append(stock_code)
 
     #print(code_list)
+    exit()
     return code_list
 
 class MonthlyStrategy(bt.Strategy):
@@ -404,6 +429,7 @@ def run_backtest(CURRENT_YEAR):
 
     start_time = end_time
     #code_list = code_list[0:1]
+    code_number = 0
     for code in code_list:
         # 创建示例数据（这里使用虚拟数据，实际使用时替换为真实数据
         data_name = load_hfq_data(code)
@@ -435,6 +461,11 @@ def run_backtest(CURRENT_YEAR):
         #print(f"feed {code}")
         # 添加数据
         cerebro.adddata(data, name=code)
+        code_number += 1
+
+    print(f"符合条件股票 {code_number} 个")
+    if code_number == 0:
+        return 0
 
     end_time = time.time()
     print(f"cerebro adddata {end_time - start_time:.2f}s")
@@ -501,7 +532,7 @@ if __name__ == '__main__':
 
     return_dict = {}
     #run_backtest(2012)
-    for CURRENT_YEAR in range(2010,2026):
+    for CURRENT_YEAR in range(2023,2026):
         r = run_backtest(CURRENT_YEAR)
         return_dict[CURRENT_YEAR] = r
 
