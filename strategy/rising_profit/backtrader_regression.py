@@ -36,7 +36,7 @@ market_data = StockMarketCache()
 
 # 筛选净利润增长率 > 20%
 # 扣非ROE > 15
-Profit_Grown_Ratio_Threshold = 30
+Profit_Grown_Ratio_Threshold = 20
 KF_ROE_Threshold = 15
 
 
@@ -403,18 +403,14 @@ class MonthlyStrategy(bt.Strategy):
         """执行卖出操作"""
 
         for data in self.last_selected_codes:
-            if data not in self.selected_codes:
-                print(f"sell {data._name}")
+            data_in_delected = False
+            for selected in self.selected_codes:
+                if data == selected and data._name == selected._name:
+                    data_in_delected = True
+                    break
+            if not data_in_delected:
                 self.close(data=data)
                 self.state = "SELLED"
-
-        for data in self.last_selected_codes:
-            for selected in self.selected_codes:
-                if data == selected:
-                    if data._name != selected._name:
-                        print("#"*50)
-                        print(f"{data._name} = {selected._name}")
-                        print(f"{data} = {selected}")
 
     def notify_order(self, order):
         """基本的订单状态处理"""
@@ -579,7 +575,7 @@ def run_backtest(CURRENT_YEAR):
 
     for code in code_list:
         data_name = load_hfq_data(code)
-        from_date = datetime(CURRENT_YEAR - 1, 12, 25)
+        from_date = datetime(CURRENT_YEAR - 1, 12, 15)
         to_date = datetime(CURRENT_YEAR, 12, 31)
         data = bt.feeds.PandasData(
             dataname=data_name,  # 创建示例数据
@@ -660,7 +656,7 @@ if __name__ == '__main__':
     Test_single_year = False
 
     if Test_single_year:
-        run_backtest(2011)
+        run_backtest(2013)
     else:
         return_dict = {}
         for CURRENT_YEAR in range(2010,2026):
