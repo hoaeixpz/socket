@@ -17,6 +17,7 @@ import akshare as ak  # 升级到最新版
 import pandas as pd
 import json
 import math
+import numpy as np
 #import quantstats as qs
 #import pyfolio as pf
 
@@ -39,6 +40,8 @@ market_data = StockMarketCache()
 Profit_Grown_Ratio_Threshold = 20
 KF_ROE_Threshold = 15
 
+indicator_list = []
+return_list = []
 
 def load_stock_data(file_path='../../stock_info.json'):
     """加载股票数据"""
@@ -173,6 +176,7 @@ def filter_date_code_list(codes_list, CURRENT_YEAR):
                 last_month = date.month
             elif date.month != last_month:
                 if date.month - last_month > 2:
+                    #print(f"{code} 停牌超过2个月")
                     break
                 # 停牌超过2个月的过滤掉
                 last_month = date.month            
@@ -191,7 +195,7 @@ def filter_date_code_list(codes_list, CURRENT_YEAR):
     return result_codes
 
 def choose_low_market_codes(codes_list, date):
-    NUM = 30
+    NUM = 100
     market_dict = {}
     result_list = []
     for stock_code in codes_list:
@@ -215,6 +219,8 @@ def get_indicator(stock_code, current_year, indicator="权益乘数"):
     ind_list = finan_data.get_indicator_recent_year(df, Y, current_year)
     if indicator == "净资产收益率_平均_扣除非经常损益":
         indicator = "KF_ROE"
+
+    result_list = []
     for date, ind in ind_list:
         year = int(date[0:4])
         if current_year - year > Y:
@@ -224,6 +230,11 @@ def get_indicator(stock_code, current_year, indicator="权益乘数"):
                 continue
 
             print("year ", year, " ", indicator, " ", ind)
+            result_list.append(ind)
+
+    if len(result_list) == 0:
+        return None
+    return sum(result_list) / len(result_list)
 
 class MonthlyStrategy(bt.Strategy):
 
@@ -508,15 +519,18 @@ class MonthlyStrategy(bt.Strategy):
 
             print(f"{code} {stock_name} {industry} 收益率 {return_rate * 100:.2f}%")
             #get_indicator(code, current_year - 1)
+            ind_mean = get_indicator(code, current_year - 1)
+            if ind_mean is not None:
+                return_list.append(return_rate)
+                indicator_list.append(ind_mean)
             #get_indicator(code, current_year - 1, "净资产收益率_平均_扣除非经常损益")
             #get_indicator(code, current_year - 1, "净利润")
-            #et_indicator(code, current_year - 1, "扣非净利润")
+            #get_indicator(code, current_year - 1, "扣非净利润")
             #print(f"{code} rank {self.rank_dict[code]}")
         print("")
         print(f"初始资金: {initial_cash:.2f}")
         print(f"最终价值: {final_value:.2f}")
         print(f"总收益率: {total_return:.2f}%")
-
 
 def load_hfq_data(symbol="600519"):
     #print(symbol)
@@ -529,7 +543,6 @@ def load_hfq_data(symbol="600519"):
     df['volume'] = 100000              # 固定成交量
     #print(df)
     return df
-
 
 # 主函数
 def run_backtest(CURRENT_YEAR):
@@ -648,8 +661,81 @@ def run_backtest(CURRENT_YEAR):
 
     return total_return
 
+
+import least_squares_mothod as lsq
+def verify_volatility_correlation():
+    #分析上一年股价的波动率与下一年的波动率是否具有相关性
+    #统计一年的涨跌幅，用涨跌幅的标准差最为波动率指标，标准差越小，说明涨跌幅度越小，反之亦然
+    #对上一年的标准差，与今年的标准差做回归分析
+    
+    for CURRENT_YEAR in range(2011,2025):
+        
+        print(CURRENT_YEAR)
+        code_list = load_stock_list(CURRENT_YEAR)
+        code_list = filter_date_code_list(code_list, CURRENT_YEAR)
+        date = datetime(CURRENT_YEAR - 1, 12, 31)
+        code_list = choose_low_market_codes(code_list, date)
+        from_date = datetime(CURRENT_YEAR, 1, 1)
+        to_date = datetime(CURRENT_YEAR, 12, 31)
+        next_date = datetime(CURRENT_YEAR + 1, 12, 31)
+
+        last_year_bo = []
+        next_year_bo = []
+        for stock_code in code_list:
+            df = stock_price.get_stock_hfq_price(stock_code)
+            #print(df[2350:2410])
+            price_list = []
+            next_year = []
+            for index, row in df.iterrows():
+                date = pd.to_datetime(row['date'])
+                if date < from_date:
+                    continue
+                if date <= to_date:
+                    price_list.append(row['close'])
+                elif date <= next_date:
+                    next_year.append(row['close'])
+                if date > next_date:
+                    break
+            #print(len(price_list), " ", len(next_year))
+            if len(price_list) > 150 and len(next_year) > 150:
+                return_ratio = np.diff(price_list) / price_list[:-1] * 100
+                k1,b1,x = lsq.simple_linear_regression(return_ratio)
+                next_return_ratio = np.diff(next_year) / next_year[:-1] * 100
+                k2,b2,y = lsq.simple_linear_regression(next_return_ratio)
+                '''
+                if True:
+                    print(stock_code)
+                    print(f"y = {k1} x + {b1} + {x}")
+                    X = list(range(1, len(price_list)))
+                    x_min, x_max = min(X), max(X)
+                    x_line = np.linspace(x_min, x_max, 100)
+                    y_line = b2 + k2 * x_line
+
+                    plt.plot(x_line, y_line, 'r-', linewidth=2, label=f'y = {b1:.2f} + {k1:.2f}x')
+                    plt.scatter(X, next_return_ratio, alpha=0.6, s=50, c='blue', edgecolors='black', linewidth=0.5)
+                    plt.show()
+                    exit()
+                '''
+                
+                last_year_bo.append(x)
+                next_year_bo.append(y)
+
+        print(len(last_year_bo))
+        k,b,se = lsq.linear_regression_least_squares(next_year_bo, last_year_bo)
+        print(f"y = {k} x + {b} + E({se})")
+        x_min, x_max = min(last_year_bo), max(last_year_bo)
+        x_line = np.linspace(x_min, x_max, 100)
+        y_line = b + k * x_line
+        plt.plot(x_line, y_line, 'r-', linewidth=2, label=f'y = {k:.2f}x + {b:.2f} + E({se:.2f})')
+        plt.legend()
+        plt.scatter(last_year_bo, next_year_bo, alpha=0.6, s=50, c='blue', edgecolors='black', linewidth=0.5)
+        plt.show()
+
+
 # 运行回测
 if __name__ == '__main__':
+    verify_volatility_correlation()
+    exit()
     START_TIME = time.time()
 
     Test_single_year = True
@@ -659,7 +745,7 @@ if __name__ == '__main__':
         run_backtest(2013)
     else:
         return_dict = {}
-        for CURRENT_YEAR in range(2010,2026):
+        for CURRENT_YEAR in range(2011,2025):
             r = run_backtest(CURRENT_YEAR)
             return_dict[CURRENT_YEAR] = r
 
@@ -674,5 +760,5 @@ if __name__ == '__main__':
         print(f"\n总收益率 {(total_r - 1) * 100:.2f} %")
         print(f"年化收益率 {annualized_return * 100:.2f} %")
     
-
+    plot_scatter(indicator_list, return_list)
     print(f"\n耗时 {time.time() - START_TIME:.2f}s")

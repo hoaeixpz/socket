@@ -35,7 +35,7 @@ def linear_regression_least_squares(y: list[float], x: list[float] = None) -> Tu
     
     # 防止除零错误
     if abs(denominator) < 1e-10:
-        return 0.0, float(y_mean)
+        return 0.0, float(y_mean), None
     
     # 计算斜率和截距
     slope = numerator / denominator
@@ -86,8 +86,19 @@ def simple_linear_regression(y: list[float]) -> Tuple[float, float, float]:
     sorted_res = np.sort(residuals)
     residuals = sorted_res[1:-1]
     se = np.std(residuals, ddof=2)
+    '''
+    X = list(range(0, n))
+    x_min, x_max = min(X), max(X)
+    x_line = np.linspace(x_min, x_max, 100)
+    y_line = intercept + slope * x_line
 
+    plt.plot(x_line, y_line, 'r-', linewidth=2)
+    plt.scatter(X, y_arr, alpha=0.6, s=50, c='blue', edgecolors='black', linewidth=0.5)
+    plt.show()
+    '''
     
+
+    #斜率 截距 波动标准差
     return float(slope), float(intercept), float(se)
 
 def test_fun():
@@ -107,10 +118,10 @@ def test_fun():
     plt.show()
 
 def test_fun2():
-    K = 50
+    K = 2
     B = 100
     X = list(range(1, 50))
-    Y = list(x * K + B + random.uniform(-4, 4) for x in X)
+    Y = list(x * K + B + random.uniform(-40, 40) for x in X)
 
     k, b, se= simple_linear_regression(Y)
     print(f"y = {k} x + {b} + {se}")
