@@ -152,7 +152,7 @@ def load_stock_list(CURRENT_YEAR):
         print(f"筛选净利润增长率连续3年 > {Profit_Grown_Ratio_Threshold}%")
         for stock_code, stock_info in stock_data.items():
             #if not stock_code.startswith('0'):
-             #   continue
+            #    continue
 
             if find_good_stocks(CURRENT_YEAR, stock_code):
                 code_list.append(stock_code)
@@ -372,7 +372,6 @@ class MonthlyStrategy(bt.Strategy):
             market_df = market_data.load_market_df(stock_code)
             mv = market_data.get_specify_date_market(market_df, date_str)
             if mv is None:
-                print(f"{stock_code} mv None")
                 continue
             market_dict[data] = mv
 
@@ -600,7 +599,7 @@ class MonthlyStrategy(bt.Strategy):
             #get_indicator(code, current_year - 1, "净资产收益率_平均_扣除非经常损益")
             #get_indicator(code, current_year - 1, "净利润")
             #get_indicator(code, current_year - 1, "扣非净利润")
-            #print(f"{code} rank {self.rank_dict[code]}")
+            print(f"{code} rank {self.rank_dict[code]}")
         print("")
         print(f"初始资金: {initial_cash:.2f}")
         print(f"最终价值: {final_value:.2f}")
@@ -671,7 +670,7 @@ def run_backtest(CURRENT_YEAR):
 
         #code_list = choose_high_volatility_codes(code_list, CURRENT_YEAR)
         date = datetime(CURRENT_YEAR - 1, 12, 31)
-        code_list = choose_low_market_codes(code_list, date)
+        #code_list = choose_low_market_codes(code_list, date)
         end_time = time.time()
         print(f"filter codes {end_time - start_time:.2f}s")
 
@@ -743,7 +742,7 @@ def run_backtest(CURRENT_YEAR):
    
     qs.reports.html(
         returns,
-        output=f'{CURRENT_YEAR}_rising_profit_golden.html',
+        output=f'{CURRENT_YEAR}_rising_profit_sz.html',
         title='策略分析',
         rf=0.02
     )
