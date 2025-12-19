@@ -151,7 +151,8 @@ def load_stock_list(CURRENT_YEAR):
     else:
         print(f"筛选净利润增长率连续3年 > {Profit_Grown_Ratio_Threshold}%")
         for stock_code, stock_info in stock_data.items():
-            stock_name = stock_info.get('stock_name', '')
+            #if not stock_code.startswith('0'):
+             #   continue
 
             if find_good_stocks(CURRENT_YEAR, stock_code):
                 code_list.append(stock_code)
@@ -371,12 +372,13 @@ class MonthlyStrategy(bt.Strategy):
             market_df = market_data.load_market_df(stock_code)
             mv = market_data.get_specify_date_market(market_df, date_str)
             if mv is None:
+                print(f"{stock_code} mv None")
                 continue
             market_dict[data] = mv
 
         market_dict = list(sorted(market_dict.items(), key=lambda x:float(x[1])))
-        #if current_date.month == 1:
-        #    self.record_sort_rank(market_dict)
+        if current_date.month == 1:
+            self.record_sort_rank(market_dict)
 
         if len(self.selected_codes) == 0:
             for data, mv in market_dict[0:5]:
@@ -676,7 +678,7 @@ def run_backtest(CURRENT_YEAR):
 
     for code in code_list:
         data_name = load_hfq_data(code)
-        from_date = datetime(CURRENT_YEAR - 1, 12, 25)
+        from_date = datetime(CURRENT_YEAR - 1, 12, 15)
         to_date = datetime(CURRENT_YEAR, 12, 31)
         data = bt.feeds.PandasData(
             dataname=data_name,  # 创建示例数据
@@ -842,7 +844,7 @@ if __name__ == '__main__':
     Test_single_year = False
 
     if Test_single_year:
-        run_backtest(2024)
+        run_backtest(2013)
     else:
         return_dict = {}
         for CURRENT_YEAR in range(2011,2026):
