@@ -98,11 +98,11 @@ class StockMarketCache:
                 return price_series.iloc[0][head]
             except KeyError:
                 #print(f"未找到目标日 {target_date.date()} 的数据，尝试查前几日数据。")
-                first_day_of_month = target_date.replace(day=1)
-                all_days_in_month = pd.date_range(start=first_day_of_month, end=target_date, freq='D')
-                for current_date in reversed(all_days_in_month):
+                date_sequence  = pd.date_range(end=target_date, periods=30, freq='D')
+                for current_date in reversed(date_sequence):
                     try:
-                        return df.at[current_date, head]
+                        result = df.at[current_date, head]
+                        return result
                     except KeyError:
                         continue
             

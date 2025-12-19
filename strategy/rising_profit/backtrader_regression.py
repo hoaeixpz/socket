@@ -280,6 +280,7 @@ class MonthlyStrategy(bt.Strategy):
     def __init__(self):
         # 记录上一个交易日的月份，用于检测月份变化
         self.last_month = None
+        self.last_week = None
         self.record = {}
         self.rank_dict = {}
         self.traded_codes = set()
@@ -304,12 +305,16 @@ class MonthlyStrategy(bt.Strategy):
         # 获取当前交易日
         current_date = self.data.datetime.date(0)
         current_month = current_date.month
-        #print(current_date)
+        year, current_week, _ = current_date.isocalendar()
+        #print(current_date, " ", current_week)
         
         # 初始化last_month（只在第一个交易日）
         if self.last_month is None:
             self.last_month = current_month
             return
+
+        if self.last_week is None:
+            self.last_week = current_week
 
         #print(current_date)
         #for data in self.last_selected_codes:
@@ -317,6 +322,7 @@ class MonthlyStrategy(bt.Strategy):
         
         # ========== 检测月份是否变更 ==========
         month_changed = (current_month != self.last_month)
+        week_changed = (current_week != self.last_week)
         if month_changed:
             if self.state == "BUYED":
                 self.state = None
@@ -328,6 +334,7 @@ class MonthlyStrategy(bt.Strategy):
                 print(f"调整各股现金额度 {self.each_cash:.2f}")
 
             self.pre_rebalance()
+            self.last_week = current_week
             self.last_month = current_month        
 
         if self.state == "PREPARED":
@@ -351,21 +358,9 @@ class MonthlyStrategy(bt.Strategy):
         month = current_date.month
         #if month > 4:
         #    return
-
-        month = month - 1
-        date = ''
-        if month == 0:
-            date = str(year-1) + "-12-30"
-        elif month < 10:
-            month = "0"+ str(month)
-            date = str(year) + "-" + month + "-30"
-        else:
-            month = str(month)
-            date = str(year) + "-" + month + "-30"
-        
-        if month == "02":
-            date = str(year) + "-02-28"
-
+        date = str(current_date)
+        yesterday = pd.to_datetime(date) - pd.Timedelta(days=1)
+        date_str = yesterday.strftime('%Y-%m-%d')
         market_dict = {}
         for data in self.datas:
             frozen_month = self.record[data]['frozen_month']
@@ -374,7 +369,7 @@ class MonthlyStrategy(bt.Strategy):
                 continue
             stock_code = data._name
             market_df = market_data.load_market_df(stock_code)
-            mv = market_data.get_specify_date_market(market_df, date)
+            mv = market_data.get_specify_date_market(market_df, date_str)
             if mv is None:
                 continue
             market_dict[data] = mv
@@ -622,7 +617,7 @@ def load_hfq_data(symbol="600519"):
     return df
 
 # 主函数
-USE_CODE_TABLE = True
+USE_CODE_TABLE = False
 code_table = {  2025: ['002731', '002775', '002370', '002899', '002209', '002377', '600573', '002796', '002316'],
                 2024: ['002652', '002316', '002377', '002337', '600322', '000014', '600854'],
                 2023: ['000571', '002835', '002696', '600241', '002652', '600854', '600539', '600883'],
@@ -681,7 +676,7 @@ def run_backtest(CURRENT_YEAR):
 
     for code in code_list:
         data_name = load_hfq_data(code)
-        from_date = datetime(CURRENT_YEAR - 1, 12, 15)
+        from_date = datetime(CURRENT_YEAR - 1, 12, 25)
         to_date = datetime(CURRENT_YEAR, 12, 31)
         data = bt.feeds.PandasData(
             dataname=data_name,  # 创建示例数据
