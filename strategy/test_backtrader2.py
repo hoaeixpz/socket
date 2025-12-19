@@ -348,6 +348,6 @@ returns, positions, transactions, gross_lev = pyfoliozer.get_pf_items()
 cerebro.plot()
 
 # Use quantstats to output backtrader backtest results
-#qs.reports.html(returns, output='temp.html')
+qs.reports.html(returns, output='temp.html')
 
-#stock = qs.utils.download_returns(returns)
+stock = qs.utils.download_returns(returns)

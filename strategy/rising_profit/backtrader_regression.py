@@ -18,7 +18,7 @@ import pandas as pd
 import json
 import math
 import numpy as np
-#import quantstats as qs
+import quantstats as qs
 #import pyfolio as pf
 
 plt.rcParams["font.sans-serif"] = ["SimHei"]
@@ -28,6 +28,8 @@ import sys
 sys.path.append("../..")
 from financial_data import FinancialData
 from stock_price_cache import StockPriceCache
+import least_squares_mothod as lsq
+
 sys.path.append("../../market_cap")
 from update_market import StockMarketCache
 
@@ -158,9 +160,9 @@ def load_stock_list(CURRENT_YEAR):
     #exit()
     return code_list
 
-def filter_date_code_list(codes_list, CURRENT_YEAR):
+def filter_date_code_list(code_list, CURRENT_YEAR):
     result_codes = []
-    for code in codes_list:
+    for code in code_list:
         data_name = load_hfq_data(code)
         from_date = datetime(CURRENT_YEAR - 1, 12, 20)
         to_date = datetime(CURRENT_YEAR, 12 , 31)
@@ -194,11 +196,11 @@ def filter_date_code_list(codes_list, CURRENT_YEAR):
 
     return result_codes
 
-def choose_low_market_codes(codes_list, date):
-    NUM = 100
+def choose_low_market_codes(code_list, date):
+    NUM = 30
     market_dict = {}
     result_list = []
-    for stock_code in codes_list:
+    for stock_code in code_list:
         market_df = market_data.load_market_df(stock_code)
         mv = market_data.get_specify_date_market(market_df, date)
         if mv is None:
@@ -212,6 +214,43 @@ def choose_low_market_codes(codes_list, date):
 
     print(f"筛选市值最小的 {NUM} 只股票")
     return result_list
+
+def cal_volatility(stock_code, last_year):
+    from_date = datetime(last_year, 1, 1)
+    to_date = datetime(last_year, 12, 31)
+    df = stock_price.get_stock_hfq_price(stock_code)
+    price_list = []
+    for index, row in df.iterrows():
+        date = pd.to_datetime(row['date'])
+        if date < from_date:
+            continue
+        if date <= to_date:
+            price_list.append(row['close'])
+        else:
+            break
+
+    return_ratio = np.diff(price_list) / price_list[:-1] * 100
+    k,b,volatility = lsq.simple_linear_regression(return_ratio)
+
+    return volatility
+
+def choose_high_volatility_codes(code_list, current_year):
+    NUM = 100
+    volatility_dict = {}
+    for stock_code in code_list:
+        volatility = cal_volatility(stock_code, current_year - 1)
+        volatility_dict[stock_code] = volatility
+
+    volatility_dict = sorted(volatility_dict.items(), key=lambda x:float(x[1]))
+    volatility_dict = list(reversed(volatility_dict))
+    result_list = []
+    for code, v in volatility_dict[0:NUM]:
+        result_list.append(code)
+        #print(f"{code} rank {rank_dict[code]}")
+
+    print(f"筛选波动率最小的 {NUM} 只股票")
+    return result_list
+
 
 def get_indicator(stock_code, current_year, indicator="权益乘数"):
     df = finan_data.get_indicator_data(stock_code, indicator)
@@ -256,7 +295,8 @@ class MonthlyStrategy(bt.Strategy):
                 'sell_price': 0,
                 'is_buyed': False,
                 'is_selled': False,
-                'return_rate': None
+                'return_rate': None,
+                'frozen_month': 0 #如果一个股票被强制平仓，则将frozen_month设为3，表示3个月内不能再交易
             }
         self.each_cash = self.broker.getcash() / 5
 
@@ -272,6 +312,8 @@ class MonthlyStrategy(bt.Strategy):
             return
 
         #print(current_date)
+        #for data in self.last_selected_codes:
+        #    self.forced_liquidation(data)
         
         # ========== 检测月份是否变更 ==========
         month_changed = (current_month != self.last_month)
@@ -289,8 +331,9 @@ class MonthlyStrategy(bt.Strategy):
             self.last_month = current_month        
 
         if self.state == "PREPARED":
-            self.execute_rebalance()
+            self.execute_rebalance()  #头一个月交易，execute会执行买入，后面几个月都执行卖出
             if self.state == "BUYED":
+                #若是执行买入，更新交易过的code列表
                 self.last_selected_codes = self.selected_codes
                 self.selected_codes = []
         elif self.state == "SELLED":
@@ -325,6 +368,10 @@ class MonthlyStrategy(bt.Strategy):
 
         market_dict = {}
         for data in self.datas:
+            frozen_month = self.record[data]['frozen_month']
+            if frozen_month > 0:
+                self.record[data]['frozen_month'] = frozen_month - 1
+                continue
             stock_code = data._name
             market_df = market_data.load_market_df(stock_code)
             mv = market_data.get_specify_date_market(market_df, date)
@@ -423,6 +470,34 @@ class MonthlyStrategy(bt.Strategy):
                 self.close(data=data)
                 self.state = "SELLED"
 
+    def calc_return(self, data):
+        if self.record[data]['is_buyed'] and not self.record[data]['is_selled']:
+            buy_price = self.record[data]['buy_price']
+            price = data.close[0]
+            return_rate = (price / buy_price - 1) * 100
+            return return_rate
+        else:
+            return None
+
+    #一旦某只股票收益率低于 15%,强制平仓
+    def forced_liquidation(self, data):
+        return_rate = self.calc_return(data)
+        
+        if return_rate is None:
+            return
+
+        date = data.datetime.date(0)
+        if return_rate < -15 and return_rate > -20:
+            #print(f"⚔ {data._name} {date} 收益率为 {return_rate}% ,是否平仓")
+            return
+
+        if return_rate < -20:
+            self.close(data=data)
+            print(f"⚔ {data._name} {date} 收益率为 {return_rate}% ,强制平仓")
+            self.last_selected_codes.remove(data)
+            self.record[data]['frozen_month'] = 22
+
+
     def notify_order(self, order):
         """基本的订单状态处理"""
         data = order.data
@@ -519,10 +594,12 @@ class MonthlyStrategy(bt.Strategy):
 
             print(f"{code} {stock_name} {industry} 收益率 {return_rate * 100:.2f}%")
             #get_indicator(code, current_year - 1)
+            '''
             ind_mean = get_indicator(code, current_year - 1)
             if ind_mean is not None:
                 return_list.append(return_rate)
                 indicator_list.append(ind_mean)
+            '''
             #get_indicator(code, current_year - 1, "净资产收益率_平均_扣除非经常损益")
             #get_indicator(code, current_year - 1, "净利润")
             #get_indicator(code, current_year - 1, "扣非净利润")
@@ -545,6 +622,24 @@ def load_hfq_data(symbol="600519"):
     return df
 
 # 主函数
+USE_CODE_TABLE = True
+code_table = {  2025: ['002731', '002775', '002370', '002899', '002209', '002377', '600573', '002796', '002316'],
+                2024: ['002652', '002316', '002377', '002337', '600322', '000014', '600854'],
+                2023: ['000571', '002835', '002696', '600241', '002652', '600854', '600539', '600883'],
+                2022: ['600235', '600560', '000571', '600455', '600099', '605180', '002800'],
+                2021: ['002296', '600234', '002676', '000880', '000020', '603506', '002576', '603918', '002112', '600099'], 
+                2020: ['600287', '600202', '603988', '603800', '603088', '002278', '000632', '600731'],
+                2019: ['600148', '603136', '600137', '002896', '000632', '600250', '600257', '000757', '603326'],
+                2018: ['002295', '603685', '600419', '603757', '000859', '002006', '002243', '603496', '603326'],
+                2017: ['000868', '002403', '000859', '002793', '002548', '002536', '600163', '600371', '000590'],
+                2016: ['000637', '002579', '002403', '000949', '000567', '002139', '000756', '000948', '002669', '600452', '002166', '000716'],
+                2015: ['600692', '600405', '000637', '000838', '002700', '002469', '600730', '600116', '000790', '600452', '600697', '600313', '000716'],
+                2014: ['600697', '000639', '000056', '600452', '600167', '600738', '000705', '600692', '600621', '000065'],
+                2013: ['002696', '000802', '600167', '002331', '000892', '600738', '000524', '000019', '000700', '002159'],
+                2012: ['002044', '600113', '002645', '600483', '600241', '000753', '600571', '600155', '002640', '002077', '002098', '000785', '002331', '002159', '000782'],
+                2011: ['600967', '002126', '002331', '600113', '002012', '000153', '000753', '002494', '002139', '600405', '600336', '600483', '000411']
+}
+
 def run_backtest(CURRENT_YEAR):
     print("\n")
     print(f"{CURRENT_YEAR} 年")
@@ -563,28 +658,26 @@ def run_backtest(CURRENT_YEAR):
     cerebro.addstrategy(MonthlyStrategy)
 
     start_time = time.time()
-    code_list = load_stock_list(CURRENT_YEAR)
-    print(f"符合增长率 > 20% 的共有{len(code_list)}只")
-    end_time = time.time()
-    print(f"load_stock_list {end_time - start_time:.2f}s")
+    code_list = code_table.get(CURRENT_YEAR)
+    if not USE_CODE_TABLE or code_list is None:
+        code_list = load_stock_list(CURRENT_YEAR)
+        print(f"符合增长率 > 20% 的共有{len(code_list)}只")
+        end_time = time.time()
+        print(f"load_stock_list {end_time - start_time:.2f}s")
 
-    start_time = end_time
-    code_list = filter_date_code_list(code_list, CURRENT_YEAR)
-    code_number = len(code_list)
-    print(f"符合条件股票 {code_number} 个")
-    if code_number == 0:
-        return 0
+        start_time = end_time
+        code_list = filter_date_code_list(code_list, CURRENT_YEAR)
+        code_number = len(code_list)
+        print(f"符合条件股票 {code_number} 个")
+        if code_number == 0:
+            return 0
 
-    #code_list = ['600099','002112','002576','600234','002676']
-    #code_list = ['603088','600202','002278','603988','600731']
-    #code_list = ['002243','002295','002006','603326','000859']
-    #code_list = ['002652','002316','002377','600322','600854']
-    #code_list = ['002925']
+        #code_list = choose_high_volatility_codes(code_list, CURRENT_YEAR)
+        date = datetime(CURRENT_YEAR - 1, 12, 31)
+        code_list = choose_low_market_codes(code_list, date)
+        end_time = time.time()
+        print(f"filter codes {end_time - start_time:.2f}s")
 
-    date = datetime(CURRENT_YEAR - 1, 12, 31)
-    code_list = choose_low_market_codes(code_list, date)
-    end_time = time.time()
-    print(f"filter codes {end_time - start_time:.2f}s")
 
     for code in code_list:
         data_name = load_hfq_data(code)
@@ -610,7 +703,7 @@ def run_backtest(CURRENT_YEAR):
     start_cash = 60000
     cerebro.broker.setcash(start_cash * 5)
     
-    
+    cerebro.addanalyzer(bt.analyzers.TimeReturn, _name='timereturn')
     # 添加分析器
     cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe')
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
@@ -639,15 +732,24 @@ def run_backtest(CURRENT_YEAR):
     
     # 打印分析结果
     strat = results[0]
-    if hasattr(strat, 'analyzers'):
-        if hasattr(strat.analyzers.returns.get_analysis(), 'rnorm100'):
-            print(f'年化收益率: {strat.analyzers.returns.get_analysis()["rnorm100"]:.2f}%')
-        
-        if hasattr(strat.analyzers.sharpe.get_analysis(), 'sharperatio'):
-            print(f'夏普比率: {strat.analyzers.sharpe.get_analysis()["sharperatio"]:.3f}')
-        
-        #if hasattr(strat.analyzers.drawdown.get_analysis(), 'max'):
-        #    print(f'最大回撤: {strat.analyzers.drawdown.get_analysis()["max"]:.2f}%')
+    timereturn = strat.analyzers.timereturn.get_analysis()
+    returns = pd.Series(timereturn)
+    returns.index = pd.to_datetime(returns.index)
+
+    print("\n🔍 策略表现:")
+    print(f"累计收益: {qs.stats.comp(returns):.2%}")
+    print(f"年化收益: {qs.stats.cagr(returns):.2%}")
+    print(f"夏普比率: {qs.stats.sharpe(returns):.3f}")
+    print(f"最大回撤: {qs.stats.max_drawdown(returns):.2%}")
+
+    # 生成完整报告
+   
+    qs.reports.html(
+        returns,
+        output=f'{CURRENT_YEAR}_rising_profit_golden.html',
+        title='策略分析',
+        rf=0.02
+    )
     
     # 绘图
     #cerebro.plot()
@@ -662,7 +764,6 @@ def run_backtest(CURRENT_YEAR):
     return total_return
 
 
-import least_squares_mothod as lsq
 def verify_volatility_correlation():
     #分析上一年股价的波动率与下一年的波动率是否具有相关性
     #统计一年的涨跌幅，用涨跌幅的标准差最为波动率指标，标准差越小，说明涨跌幅度越小，反之亦然
@@ -675,6 +776,8 @@ def verify_volatility_correlation():
         code_list = filter_date_code_list(code_list, CURRENT_YEAR)
         date = datetime(CURRENT_YEAR - 1, 12, 31)
         code_list = choose_low_market_codes(code_list, date)
+        choose_high_volatility_codes(code_list, CURRENT_YEAR)
+        exit()
         from_date = datetime(CURRENT_YEAR, 1, 1)
         to_date = datetime(CURRENT_YEAR, 12, 31)
         next_date = datetime(CURRENT_YEAR + 1, 12, 31)
@@ -699,9 +802,11 @@ def verify_volatility_correlation():
             #print(len(price_list), " ", len(next_year))
             if len(price_list) > 150 and len(next_year) > 150:
                 return_ratio = np.diff(price_list) / price_list[:-1] * 100
-                k1,b1,x = lsq.simple_linear_regression(return_ratio)
+                #k1,b1,x = lsq.simple_linear_regression(return_ratio)
+                b1 = np.mean(return_ratio)
                 next_return_ratio = np.diff(next_year) / next_year[:-1] * 100
-                k2,b2,y = lsq.simple_linear_regression(next_return_ratio)
+                #k2,b2,y = lsq.simple_linear_regression(next_return_ratio)
+                b2 = np.mean(next_return_ratio)
                 '''
                 if True:
                     print(stock_code)
@@ -717,8 +822,8 @@ def verify_volatility_correlation():
                     exit()
                 '''
                 
-                last_year_bo.append(x)
-                next_year_bo.append(y)
+                last_year_bo.append(b1)
+                next_year_bo.append(b2)
 
         print(len(last_year_bo))
         k,b,se = lsq.linear_regression_least_squares(next_year_bo, last_year_bo)
@@ -734,18 +839,18 @@ def verify_volatility_correlation():
 
 # 运行回测
 if __name__ == '__main__':
-    verify_volatility_correlation()
-    exit()
+    #verify_volatility_correlation()
+    #exit()
     START_TIME = time.time()
 
     Test_single_year = True
     Test_single_year = False
 
     if Test_single_year:
-        run_backtest(2013)
+        run_backtest(2024)
     else:
         return_dict = {}
-        for CURRENT_YEAR in range(2011,2025):
+        for CURRENT_YEAR in range(2011,2026):
             r = run_backtest(CURRENT_YEAR)
             return_dict[CURRENT_YEAR] = r
 
@@ -760,5 +865,5 @@ if __name__ == '__main__':
         print(f"\n总收益率 {(total_r - 1) * 100:.2f} %")
         print(f"年化收益率 {annualized_return * 100:.2f} %")
     
-    plot_scatter(indicator_list, return_list)
+    #plot_scatter(indicator_list, return_list)
     print(f"\n耗时 {time.time() - START_TIME:.2f}s")
