@@ -113,13 +113,16 @@ class StableTrendStrategy(bt.Strategy):
         if len(data_list) == 0:
             return
 
-
+        print("before standard R2")
+        print(R2_list)
         R2_list = self.calc_standard_score(R2_list)
+        print("after standard R2")
+        print(R2_list)
         FZ_list = self.calc_standard_score(FZ_list)
         VR_list = self.calc_standard_score(VR_list)
         indicator_dict = {}
         for i in range(0, len(data_list)):
-            indicator_dict[data_list[i]] = R2_list[i] * 10.4 + FZ_list[i] * 0.2 +  VR_list[i] * 0.2
+            indicator_dict[data_list[i]] = R2_list[i] * 1 + FZ_list[i] * 0 +  VR_list[i] * 0
 
 
         indicator_dict = list(sorted(indicator_dict.items(), key=lambda x:float(x[1]), reverse=True))
@@ -151,18 +154,19 @@ class StableTrendStrategy(bt.Strategy):
         if len(data) < period + 1:
             return None
 
-        print("============calc_volumn_rate ", data._name)
+        #print("============calc_volumn_rate ", data._name)
         volume = [data.volume[-i] for i in range(period, 0, -1)]
         mv = np.mean(volume)
         current_v = volume[-1]
         vr = current_v / mv
         if data.close[-1] < data.close[-2]:
             vr = -vr
-
+        '''
         print(volume)
         print(mv)
         print(current_v)
         print("vr ", vr)
+        '''
 
         return vr
 
@@ -178,18 +182,19 @@ class StableTrendStrategy(bt.Strategy):
         if len(data) < period + 1:
             return None
 
-        print("============calc_fanzhuan ", data._name)
+        #print("============calc_fanzhuan ", data._name)
         price = [data.close[-i] for i in range(period, 0, -1)]
         R_short = (price[-1] - price[0]) / price[0]
         return_ratio = np.diff(price) / price[:-1]
         se = np.std(return_ratio, ddof=1)
         Z_score = R_short / se
-
+        '''
         print(price)
         print(R_short)
         print(return_ratio)
         print("SE ", se)
         print("Z ", Z_score)
+        '''
 
         return -Z_score
 
@@ -455,7 +460,7 @@ if __name__ == '__main__':
     #Test_single_year = False
 
     if Test_single_year:
-        run_backtest(2016)
+        run_backtest(2017)
     else:
         return_dict = {}
         for CURRENT_YEAR in range(2014,2026):
