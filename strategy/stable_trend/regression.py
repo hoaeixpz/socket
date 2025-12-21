@@ -211,9 +211,9 @@ class StableTrendStrategy(bt.Strategy):
         print(price)
         print(annualized_return)
         print(R2)
-        print(R2 * R2 * annualized_return)
+        print(R2 * annualized_return)
         
-        return R2 * R2 * annualized_return
+        return R2 * annualized_return
 
     def calc_standard_score(self, score_list):
         num = len(score_list)
