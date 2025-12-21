@@ -95,21 +95,38 @@ class StableTrendStrategy(bt.Strategy):
         current_date = self.data.datetime.date(0)
         print("pre_rebalance ", current_date)
 
-        R2_dict = {}
+        R2_list = []
+        FZ_list = []
+        VR_list = []
+        data_list = []
         for data in self.datas:
             R2 = self.calc_annualized_return_R2(data)
-            if R2 is None:
+            FZ = self.calc_fanzhuan(data)
+            VR = self.calc_volumn_rate(data)
+            if R2 is None or FZ is None or VR is None:
                 continue
-            R2_dict[data] = R2
+            R2_list.append(R2)
+            FZ_list.append(FZ)
+            VR_list.append(VR)
+            data_list.append(data)
 
-        if len(R2_dict) == 0:
+        if len(data_list) == 0:
             return
 
-        R2_dict = list(sorted(R2_dict.items(), key=lambda x:float(x[1]), reverse=True))
 
-        #print(R2_dict)
+        R2_list = self.calc_standard_score(R2_list)
+        FZ_list = self.calc_standard_score(FZ_list)
+        VR_list = self.calc_standard_score(VR_list)
+        indicator_dict = {}
+        for i in range(0, len(data_list)):
+            indicator_dict[data_list[i]] = R2_list[i] * 10.4 + FZ_list[i] * 0.2 +  VR_list[i] * 0.2
 
-        data = R2_dict[0][0]
+
+        indicator_dict = list(sorted(indicator_dict.items(), key=lambda x:float(x[1]), reverse=True))
+
+        print(indicator_dict)
+
+        data = indicator_dict[0][0]
         if data != self.buyed_code:
             if self.buyed_code is not None:
                 self.close(data=self.buyed_code)
@@ -130,23 +147,82 @@ class StableTrendStrategy(bt.Strategy):
                 print(f'  ⛔警告：{name}至少需要 {price * 100:.2f} 现金不足，无法买入')
             self.state = "BUYED"
 
+    def calc_volumn_rate(self, data, period = 25):
+        if len(data) < period + 1:
+            return None
+
+        print("============calc_volumn_rate ", data._name)
+        volume = [data.volume[-i] for i in range(period, 0, -1)]
+        mv = np.mean(volume)
+        current_v = volume[-1]
+        vr = current_v / mv
+        if data.close[-1] < data.close[-2]:
+            vr = -vr
+
+        print(volume)
+        print(mv)
+        print(current_v)
+        print("vr ", vr)
+
+        return vr
+
+    def calc_fanzhuan(self, data, period = 10):
+        # 计算一个周期内的涨跌幅
+        # 再统计这个周期内每天的涨跌幅，计算这些涨跌幅的标准差
+        # 用周期总的涨跌幅 / 标准差，得到Z_score
+        # Z_score 代表着总体涨跌幅与平均涨跌幅的比值
+        # Z_score 绝对值越大，说明这个周期内的涨跌幅度远超平日的涨跌幅
+        # Z_score 如果大于0且值很大，那说明涨幅远超平时，很可能涨过头了，预计会跌
+        # 所以返回的因子要对Z_score取负方向
+
+        if len(data) < period + 1:
+            return None
+
+        print("============calc_fanzhuan ", data._name)
+        price = [data.close[-i] for i in range(period, 0, -1)]
+        R_short = (price[-1] - price[0]) / price[0]
+        return_ratio = np.diff(price) / price[:-1]
+        se = np.std(return_ratio, ddof=1)
+        Z_score = R_short / se
+
+        print(price)
+        print(R_short)
+        print(return_ratio)
+        print("SE ", se)
+        print("Z ", Z_score)
+
+        return -Z_score
 
     def calc_annualized_return_R2(self, data, period = 25):
         if len(data) < period + 1:  # 需要26天数据
             return None
-        #print("calc_annualized_return_R2 ", data._name)
+        print("==========calc_annualized_return_R2 ", data._name)
         price = [data.close[-i] for i in range(period, 0, -1)]
         log_price = list(math.log(p) for p in price)
         k, b, se = lsq.simple_linear_regression(log_price)
-        annualized_return = math.exp(k * 252) - 1
+        annualized_return = k * 252
         R2 = lsq.calc_R_squared(log_price)
-        '''
+        
         print(price)
         print(annualized_return)
         print(R2)
-        print(R2 / annualized_return)
-        '''
-        return R2 *annualized_return
+        print(R2 * R2 * annualized_return)
+        
+        return R2 * R2 * annualized_return
+
+    def calc_standard_score(self, score_list):
+        num = len(score_list)
+        M = np.mean(score_list)
+        Sum = 0
+        for score in score_list:
+            Sum += (score - M) * (score - M)
+        se = math.sqrt(Sum / num)
+
+        result = []
+        for score in score_list:
+            result.append((score - M) / se)
+
+        return result
 
     def calc_return(self, data):
         if self.record[data]['is_buyed'] and not self.record[data]['is_selled']:
@@ -276,8 +352,8 @@ def run_backtest(CURRENT_YEAR = None):
     cerebro.addstrategy(StableTrendStrategy)
 
     start_time = time.time()
-    code_list = ['510300', '513500', '518880', '159915']
-    #code_list = ['159915']
+    code_list = ['510300', '513500', '518880', '159920']
+    #code_list = ['159920']
     for code in code_list:
         data_name = stock_price.get_index_price(code)
         data_name.index = pd.to_datetime(data_name['date'])
@@ -371,8 +447,8 @@ def run_backtest(CURRENT_YEAR = None):
 
 # 运行回测
 if __name__ == '__main__':
-    run_backtest()
-    exit()
+    #run_backtest()
+    #exit()
     START_TIME = time.time()
 
     Test_single_year = True
