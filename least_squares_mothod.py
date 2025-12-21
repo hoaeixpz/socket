@@ -145,6 +145,9 @@ def calc_R_squared(y: list[float]):
 
     SSE = np.sum(residuals ** 2)
     SST = np.sum((y_arr - sum_y / n) ** 2)
+    #print("SSE ", SSE)
+    #print("SST ", SST)
+    #print("SSE / SST ", SSE/SST)
     if SST == 0:
         return 1
     R2 = 1 - SSE / SST
@@ -216,14 +219,17 @@ def test_fun3():
 def test_fun4():
     Y0 = 100
     r = 1.05
-    X = list(range(1, 10))
+    #X = list(range(1, 10))
     #Y = list(math.log(Y0 * (r ** x)) for x in X)
     #print(Y)
 
     K = 0.9
     B = 10
-    origin_Y = list(x * K + B for x in X)
+    #origin_Y = list(x * K + B for x in X)
+    origin_Y = [0.624, 0.627, 0.628, 0.64, 0.641, 0.64, 0.639, 0.637, 0.633, 0.635, 0.637, 0.629, 0.63, 0.633, 0.631, 0.633, 0.638, 0.638, 0.635, 0.636, 0.63, 0.63, 0.628, 0.632, 0.643]
+    #origin_Y = [2.581, 2.591, 2.58, 2.554, 2.576, 2.579, 2.581, 2.574, 2.621, 2.625, 2.646, 2.724, 2.717, 2.73, 2.777, 2.715, 2.717, 2.712, 2.675, 2.681, 2.805, 2.828, 2.817, 2.83, 2.818]
     Y  =  list(math.log(y) for y in origin_Y)
+    X = list(range(1, len(Y) + 1))
 
     k, b, se = simple_linear_regression(Y)
     R2   = calc_R_squared(Y)
@@ -241,4 +247,4 @@ def test_fun4():
     plt.legend()
     plt.show()
 
-test_fun4()
+#test_fun4()

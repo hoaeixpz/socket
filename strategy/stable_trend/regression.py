@@ -47,9 +47,10 @@ class StableTrendStrategy(bt.Strategy):
         self.last_month = None
         self.last_week = None
         self.record = {}
+        self.traded_codes = set()
         self.state = "PREPARED" ##{PREPARED, SELLED, BUYED}
         self.buyed_code = None
-        self.each_cash = self.broker.getcash() / 5
+        self.each_cash = self.broker.getcash()
         for data in self.datas:
             self.record[data] = {
                 'name': data._name,
@@ -59,7 +60,8 @@ class StableTrendStrategy(bt.Strategy):
                 'sell_price': 0,
                 'is_buyed': False,
                 'is_selled': False,
-                'return_rate': None
+                'return_rate': None,
+
             }
 
     def next(self):
@@ -68,6 +70,7 @@ class StableTrendStrategy(bt.Strategy):
         current_month = current_date.month
         year, current_week, _ = current_date.isocalendar()
         #print(current_date, " ", current_week)
+
         
         # 初始化last_month（只在第一个交易日）
         if self.last_month is None:
@@ -77,37 +80,13 @@ class StableTrendStrategy(bt.Strategy):
         if self.last_week is None:
             self.last_week = current_week
 
-        #print(current_date)
-        #for data in self.last_selected_codes:
-        #    self.forced_liquidation(data)
-        
+        #print(current_date)        
         # ========== 检测月份是否变更 ==========
         month_changed = (current_month != self.last_month)
-        week_changed = (current_week != self.last_week)
+        #week_changed = (current_week != self.last_week)
         if month_changed:
-            if self.state == "BUYED":
-                self.state = None
-                cash = self.broker.getcash()
-                each_cash = self.each_cash + cash / 5
-                self.each_cash = min(each_cash, self.broker.getvalue() / 5)
-                print("")
-                print("- "*25)
-                print(f"调整各股现金额度 {self.each_cash:.2f}")
-
             self.pre_rebalance()
-            self.last_week = current_week
-            self.last_month = current_month        
-
-        if self.state == "PREPARED":
-            self.execute_rebalance()  #头一个月交易，execute会执行买入，后面几个月都执行卖出
-            if self.state == "BUYED":
-                #若是执行买入，更新交易过的code列表
-                self.last_selected_codes = self.selected_codes
-                self.selected_codes = []
-        elif self.state == "SELLED":
-            self.execute_rebalance()
-            self.last_selected_codes = self.selected_codes
-            self.selected_codes = []
+            self.last_month = current_month
 
     def pre_rebalance(self):
         #if len(self.last_selected_codes) > 0:
@@ -118,83 +97,56 @@ class StableTrendStrategy(bt.Strategy):
 
         R2_dict = {}
         for data in self.datas:
-        	R2_dict[data] = self.calc_annualized_return_R2(data)
+            R2 = self.calc_annualized_return_R2(data)
+            if R2 is None:
+                continue
+            R2_dict[data] = R2
 
-        R2_dict = list(sorted(R2_dict.items(), key=lambda x:float(x[1])))
+        if len(R2_dict) == 0:
+            return
 
-        data = R2_dict[0][1]
+        R2_dict = list(sorted(R2_dict.items(), key=lambda x:float(x[1]), reverse=True))
+
+        #print(R2_dict)
+
+        data = R2_dict[0][0]
         if data != self.buyed_code:
-        	if buyed_code is None:
-        		price = data.close[0] * 1.05
-        		size = int(self.each_cash / price / 100) * 100
-        		if size > 0:
-                    self.buy(data=data, size=size)
-                    self.record[data]['buy_size'] = size
-                    self.record[data]['buy_price'] = price
+            if self.buyed_code is not None:
+                self.close(data=self.buyed_code)
+                self.state = "SELLED"
+
+            price = data.close[0] * 1.05
+            size = int(self.broker.getvalue() / price / 100) * 100
+            if size > 0:
+                self.buy(data=data, size=size)
+                self.record[data]['buy_size'] = size
+                self.record[data]['buy_price'] = price
             
-                    print(f' {data._name} 申请价格: {price:.2f}, 买入数量: {size}')
-                else:
-                    name = data._name
-                    print(f'  ⛔警告：{name}至少需要 {price * 100:.2f} 现金不足，无法买入')
-                self.state = "BUYED"
+                print(f' {data._name} 申请价格: {price:.2f}, 买入数量: {size}')
+                self.buyed_code = data
+                self.traded_codes.add(data)
             else:
-            	self.close(data=data)
-                self.state = "SELLED"
-    '''     
-    def execute_rebalance(self):
-        current_date = self.data.datetime.date(0)
-        #print("exe rebalance ", current_date, " ", self.state)
+                name = data._name
+                print(f'  ⛔警告：{name}至少需要 {price * 100:.2f} 现金不足，无法买入')
+            self.state = "BUYED"
 
-        if self.state == "PREPARED":
-            if len(self.last_selected_codes) > 0:
-                self.execute_sell()
-                #print("execute_sell ", current_date)
-            elif len(self.selected_codes) > 0:
-                self.execute_buy()
-                #print("execute_buy ", current_date)
 
-        elif self.state == "SELLED":
-            self.execute_buy()
-            #print("execute_buy ", current_date)
-
-    def execute_buy(self):
-        """执行买入操作"""
-        for data in self.selected_codes:
-            if data not in self.last_selected_codes:
-
-                # 计算可买数量（向下取整）
-                price = data.close[0] * 1.05     #假设下一个交易日会涨
-                size = int(self.each_cash / price / 100) * 100
-                if size > 0:
-                    self.buy(data=data, size=size)
-                    self.record[data]['buy_size'] = size
-                    self.record[data]['buy_price'] = price
-            
-                    print(f' {data._name} 申请价格: {price:.2f}, 买入数量: {size}')
-                else:
-                    name = data._name
-                    print(f'  ⛔警告：{name}至少需要 {price * 100:.2f} 现金不足，无法买入')
-                self.state = "BUYED"
-
-    def execute_sell(self):
-        """执行卖出操作"""
-
-        for data in self.last_selected_codes:
-            data_in_delected = False
-            for selected in self.selected_codes:
-                if data == selected and data._name == selected._name:
-                    data_in_delected = True
-                    break
-            if not data_in_delected:
-                self.close(data=data)
-                self.state = "SELLED"
-	'''
     def calc_annualized_return_R2(self, data, period = 25):
-    	price = data.close[-period:0]
-    	log_price = list(math.log(p) for p in price)
-    	annualized_return = lsq.simple_linear_regression(log_price)
-    	R2 = calc_R_squared(log_price)
-    	return R2 * annualized_return
+        if len(data) < period + 1:  # 需要26天数据
+            return None
+        #print("calc_annualized_return_R2 ", data._name)
+        price = [data.close[-i] for i in range(period, 0, -1)]
+        log_price = list(math.log(p) for p in price)
+        k, b, se = lsq.simple_linear_regression(log_price)
+        annualized_return = math.exp(k * 252) - 1
+        R2 = lsq.calc_R_squared(log_price)
+        '''
+        print(price)
+        print(annualized_return)
+        print(R2)
+        print(R2 / annualized_return)
+        '''
+        return R2 *annualized_return
 
     def calc_return(self, data):
         if self.record[data]['is_buyed'] and not self.record[data]['is_selled']:
@@ -266,7 +218,12 @@ class StableTrendStrategy(bt.Strategy):
         self.order = None  # 允许提交新订单
 
     def stop(self):
-        """策略结束时的总结"""            
+        """策略结束时的总结"""
+        final_value = self.broker.getvalue()
+        initial_cash = self.broker.startingcash
+        profit = final_value - initial_cash
+        total_return = (profit / initial_cash) * 100
+
         print("\n" + "="*50)
         print("策略执行总结:")
         print("="*50)
@@ -275,9 +232,6 @@ class StableTrendStrategy(bt.Strategy):
         current_year = current_date.year
         for data in self.traded_codes:
             code = data._name
-            stock_info = stock_data[code]
-            stock_name = stock_info.get('stock_name')
-            industry = stock_info.get('industry')
             return_rate = self.record[data]['return_rate']
             if self.record[data]['is_buyed'] and not self.record[data]['is_selled']:
                 buy_price = self.record[data]['buy_price']
@@ -290,9 +244,158 @@ class StableTrendStrategy(bt.Strategy):
             elif return_rate is None:
                 return_rate = 0
 
-            print(f"{code} {stock_name} {industry} 收益率 {return_rate * 100:.2f}%")
+            print(f"{code}  收益率 {return_rate * 100:.2f}%")
 
         print("")
         print(f"初始资金: {initial_cash:.2f}")
         print(f"最终价值: {final_value:.2f}")
         print(f"总收益率: {total_return:.2f}%")
+
+def run_backtest(CURRENT_YEAR = None):
+    print("\n")
+    START_YEAR = None
+    END_YEAR = None
+    if CURRENT_YEAR is None:
+        START_YEAR = 2014
+        END_YEAR = 2025
+        print(f"{START_YEAR} -- {END_YEAR}")
+    else:
+        print(f"{CURRENT_YEAR} 年")
+    # 创建Cerebro引擎
+    cerebro = bt.Cerebro()
+    
+    # 设置佣金
+    cerebro.broker.setcommission(
+        commission=0.003,      # 佣金率
+        margin=None,           # 关键：设置为None禁用保证金
+        mult=1.0,
+        stocklike=True         # 股票模式
+    )
+    
+    # 添加策略
+    cerebro.addstrategy(StableTrendStrategy)
+
+    start_time = time.time()
+    code_list = ['510300', '513500', '518880', '159915']
+    #code_list = ['159915']
+    for code in code_list:
+        data_name = stock_price.get_index_price(code)
+        data_name.index = pd.to_datetime(data_name['date'])
+        #print(code)
+        #print(data_name)
+        from_date = None
+        to_date = None
+        if CURRENT_YEAR is None:
+            from_date = datetime(START_YEAR - 1, 11, 25)
+            to_date = datetime(END_YEAR, 12, 31)
+        else:
+            from_date = datetime(CURRENT_YEAR - 1, 11, 25)
+            to_date = datetime(CURRENT_YEAR, 12, 31)
+        data = bt.feeds.PandasData(
+            dataname=data_name,  # 创建示例数据
+            fromdate=from_date,
+            todate=to_date
+        )
+
+        # 添加数据
+        cerebro.adddata(data, name=code)
+
+
+    end_time = time.time()
+    print(f"cerebro adddata {end_time - start_time:.2f}s")
+
+    start_time = end_time
+    # 设置初始资金
+    start_cash = 10000
+    cerebro.broker.setcash(start_cash)
+    
+    cerebro.addanalyzer(bt.analyzers.TimeReturn, _name='timereturn')
+    # 添加分析器
+    cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe')
+    cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
+    cerebro.addanalyzer(bt.analyzers.Returns, _name='returns')
+
+    
+    # 打印初始资金
+    print(f'初始投资组合价值: {cerebro.broker.getvalue() / 10000.0:.2f} 万')
+    
+    # 运行回测
+    results = cerebro.run()
+
+    final_value = cerebro.broker.getvalue()
+    initial_cash = cerebro.broker.startingcash
+    total_return = (final_value / initial_cash - 1) * 100
+
+    end_time = time.time()
+    print(f"cerebro run {end_time - start_time:.2f}s")
+
+    start_time = end_time
+    
+    # 打印最终资金
+    print(f'最终投资组合价值: {cerebro.broker.getvalue():.2f}')
+    
+    # 打印分析结果
+    strat = results[0]
+    timereturn = strat.analyzers.timereturn.get_analysis()
+    returns = pd.Series(timereturn)
+    returns.index = pd.to_datetime(returns.index)
+
+    print("\n🔍 策略表现:")
+    print(f"累计收益: {qs.stats.comp(returns):.2%}")
+    print(f"年化收益: {qs.stats.cagr(returns):.2%}")
+    print(f"夏普比率: {qs.stats.sharpe(returns):.3f}")
+    print(f"最大回撤: {qs.stats.max_drawdown(returns):.2%}")
+
+    # 生成完整报告
+    '''
+    qs.reports.html(
+        returns,
+        output=f'{CURRENT_YEAR}_rising_profit_sz.html',
+        title='策略分析',
+        rf=0.02
+    )
+    '''
+    
+    # 绘图
+    cerebro.plot()
+    #cerebro.plot(style='candlestick')
+
+    # Use quantstats to output backtrader backtest results
+    #qs.reports.html(returns, output='temp.html')
+
+    #stock = qs.utils.download_returns(returns)
+    print("\n" + "="*50)
+
+    return total_return
+
+
+# 运行回测
+if __name__ == '__main__':
+    run_backtest()
+    exit()
+    START_TIME = time.time()
+
+    Test_single_year = True
+    #Test_single_year = False
+
+    if Test_single_year:
+        run_backtest(2016)
+    else:
+        return_dict = {}
+        for CURRENT_YEAR in range(2014,2026):
+            r = run_backtest(CURRENT_YEAR)
+            return_dict[CURRENT_YEAR] = r
+
+        total_r = 1
+        years = 0
+        for y,r in return_dict.items():
+            print(f"{y} 收益率 {r:.2f}%")
+            total_r *= (1 + r / 100.0)
+            years += 1
+
+        annualized_return = math.pow(total_r, 1/years) - 1
+        print(f"\n总收益率 {(total_r - 1) * 100:.2f} %")
+        print(f"年化收益率 {annualized_return * 100:.2f} %")
+    
+    #plot_scatter(indicator_list, return_list)
+    print(f"\n耗时 {time.time() - START_TIME:.2f}s")

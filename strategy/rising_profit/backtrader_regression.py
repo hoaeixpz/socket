@@ -670,7 +670,7 @@ def run_backtest(CURRENT_YEAR):
 
         #code_list = choose_high_volatility_codes(code_list, CURRENT_YEAR)
         date = datetime(CURRENT_YEAR - 1, 12, 31)
-        #code_list = choose_low_market_codes(code_list, date)
+        code_list = choose_low_market_codes(code_list, date)
         end_time = time.time()
         print(f"filter codes {end_time - start_time:.2f}s")
 
@@ -739,13 +739,14 @@ def run_backtest(CURRENT_YEAR):
     print(f"最大回撤: {qs.stats.max_drawdown(returns):.2%}")
 
     # 生成完整报告
-   
+    '''
     qs.reports.html(
         returns,
         output=f'{CURRENT_YEAR}_rising_profit_sz.html',
         title='策略分析',
         rf=0.02
     )
+    '''
     
     # 绘图
     #cerebro.plot()

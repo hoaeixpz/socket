@@ -39,7 +39,7 @@ market_data = StockMarketCache()
 
 # 筛选净利润增长率 > 20%
 # 扣非ROE > 15
-Profit_Grown_Ratio_Threshold = 20
+Profit_Grown_Ratio_Threshold = 0
 KF_ROE_Threshold = 15
 
 indicator_list = []
@@ -89,11 +89,68 @@ def save_results(stock_data, file_path='../../stock_info.json'):
 
 stock_data = load_stock_data()
 
+def find_ST_stock(CURRENT_YEAR:int, stock_code):
+    #if stock_code != "002602":
+    #    return
+    '''
+    条件： 净利润为负，且营收低于1亿
+        & 期末净资产为负
+    '''
+    df = finan_data.get_indicator_data(stock_code, "净利润")
+    profit = finan_data.get_indicator_recent_year(df, 0, CURRENT_YEAR-1)
+    
+    if len(profit) == 0:
+        return True
+
+    last_profit = None
+    for date, p in profit:
+        if date[4:6] == '12':
+            if math.isnan(p):
+                continue
+            last_profit = p
+            break
+
+    if last_profit is None:
+        return True
+
+    df = finan_data.get_indicator_data(stock_code, "营业总收入")
+    income = finan_data.get_indicator_recent_year(df, 0, CURRENT_YEAR-1)
+    if len(income) == 0:
+        return True
+
+    last_income = None
+    for date, ic in income:
+        if date[4:6] == '12':
+            if math.isnan(ic):
+                continue
+            last_income = ic
+            break
+
+    if last_income is None:
+        return True
+    
+
+    billion = 100000000
+    if last_profit < 0 and last_income < 10 * billion:
+        return True
+        print(stock_code)
+        print("profit")
+        print(profit)
+        print(last_profit)
+        print("income")
+        print(income)
+        print(last_income)
+
+    return False
+
+
+
 def find_good_stocks(CURRENT_YEAR:int, stock_code):
     '''
-    条件：净利润增长率连续3年大于20%
+    #条件：净利润增长率连续3年大于20%
     '''
-    df = finan_data.get_indicator_data(stock_code, "净资产收益率_平均_扣除非经常损益")
+    #df = finan_data.get_indicator_data(stock_code, "净资产收益率_平均_扣除非经常损益")
+    df = finan_data.get_indicator_data(stock_code, "归属母公司净利润增长率")
     Y = 3
     zzl = finan_data.get_indicator_recent_year(df, Y, CURRENT_YEAR-1)
 
@@ -107,7 +164,8 @@ def find_good_stocks(CURRENT_YEAR:int, stock_code):
             if math.isnan(pct):
                 continue
 
-            if pct < KF_ROE_Threshold:
+            #if pct < KF_ROE_Threshold:
+            if pct < Profit_Grown_Ratio_Threshold:
                 return False
             count += 1
 
@@ -149,9 +207,12 @@ def load_stock_list(CURRENT_YEAR):
         print("没有找到股票数据")
         return {}
     else:
-        #print(f"筛选净利润增长率连续3年 > {Profit_Grown_Ratio_Threshold}%")
+        print(f"筛选净利润增长率连续3年 > {Profit_Grown_Ratio_Threshold}%")
+        print(f"总共{len(stock_data.keys())}")
         for stock_code, stock_info in stock_data.items():
-            if True or find_good_stocks(CURRENT_YEAR, stock_code):
+            #if not find_ST_stock(CURRENT_YEAR, stock_code):
+            #    code_list.append(stock_code)
+            if find_good_stocks(CURRENT_YEAR, stock_code):
                 code_list.append(stock_code)
 
     #print(code_list)
@@ -195,7 +256,7 @@ def filter_date_code_list(code_list, CURRENT_YEAR):
     return result_codes
 
 def choose_low_market_codes(code_list, date):
-    NUM = 200
+    NUM = 100
     market_dict = {}
     result_list = []
     for stock_code in code_list:
@@ -206,11 +267,21 @@ def choose_low_market_codes(code_list, date):
         market_dict[stock_code] = mv
 
     market_dict = sorted(market_dict.items(), key=lambda x:float(x[1]))
+    rank = 1
     for code, mv in market_dict[0:NUM]:
+        stock_info = stock_data[code]
+        stock_name = stock_info.get('stock_name')
+        #print(code, " ", stock_name, " ", rank, " ", mv)
+        rank += 1
         result_list.append(code)
+        year = str(date)
+        year = year[0:4]
+        if find_ST_stock(int(year), code):
+            print(f"{code} ST")
 
 
     print(f"筛选市值最小的 {NUM} 只股票")
+    #exit()
     return result_list
 
 def cal_volatility(stock_code, last_year):
@@ -654,7 +725,7 @@ def run_backtest(CURRENT_YEAR):
     code_list = code_table.get(CURRENT_YEAR)
     if not USE_CODE_TABLE or code_list is None:
         code_list = load_stock_list(CURRENT_YEAR)
-        print(f"符合增长率 > 20% 的共有{len(code_list)}只")
+        print(f"符合增长率 > {Profit_Grown_Ratio_Threshold}% 的共有{len(code_list)}只")
         end_time = time.time()
         print(f"load_stock_list {end_time - start_time:.2f}s")
 
@@ -666,15 +737,14 @@ def run_backtest(CURRENT_YEAR):
             return 0
 
         #code_list = choose_high_volatility_codes(code_list, CURRENT_YEAR)
-        date = datetime(CURRENT_YEAR - 1, 12, 31)
+        date = datetime(CURRENT_YEAR, 5, 31)
         code_list = choose_low_market_codes(code_list, date)
         end_time = time.time()
         print(f"filter codes {end_time - start_time:.2f}s")
 
-
     for code in code_list:
         data_name = load_hfq_data(code)
-        from_date = datetime(CURRENT_YEAR - 1, 12, 15)
+        from_date = datetime(CURRENT_YEAR-1 , 12, 15)
         to_date = datetime(CURRENT_YEAR, 12, 31)
         data = bt.feeds.PandasData(
             dataname=data_name,  # 创建示例数据
@@ -684,7 +754,6 @@ def run_backtest(CURRENT_YEAR):
 
         # 添加数据
         cerebro.adddata(data, name=code)
-
 
     end_time = time.time()
     print(f"cerebro adddata {end_time - start_time:.2f}s")
@@ -721,6 +790,7 @@ def run_backtest(CURRENT_YEAR):
     # 打印最终资金
     print(f'最终投资组合价值: {cerebro.broker.getvalue():.2f}')
     
+    
     # 打印分析结果
     strat = results[0]
     timereturn = strat.analyzers.timereturn.get_analysis()
@@ -734,13 +804,14 @@ def run_backtest(CURRENT_YEAR):
     print(f"最大回撤: {qs.stats.max_drawdown(returns):.2%}")
 
     # 生成完整报告
-   
+    '''
     qs.reports.html(
         returns,
         output=f'{CURRENT_YEAR}_rising_profit_sz.html',
         title='策略分析',
         rf=0.02
     )
+    '''
     
     # 绘图
     #cerebro.plot()
@@ -755,79 +826,6 @@ def run_backtest(CURRENT_YEAR):
     return total_return
 
 
-def verify_volatility_correlation():
-    #分析上一年股价的波动率与下一年的波动率是否具有相关性
-    #统计一年的涨跌幅，用涨跌幅的标准差最为波动率指标，标准差越小，说明涨跌幅度越小，反之亦然
-    #对上一年的标准差，与今年的标准差做回归分析
-    
-    for CURRENT_YEAR in range(2011,2025):
-        
-        print(CURRENT_YEAR)
-        code_list = load_stock_list(CURRENT_YEAR)
-        code_list = filter_date_code_list(code_list, CURRENT_YEAR)
-        date = datetime(CURRENT_YEAR - 1, 12, 31)
-        code_list = choose_low_market_codes(code_list, date)
-        choose_high_volatility_codes(code_list, CURRENT_YEAR)
-        exit()
-        from_date = datetime(CURRENT_YEAR, 1, 1)
-        to_date = datetime(CURRENT_YEAR, 12, 31)
-        next_date = datetime(CURRENT_YEAR + 1, 12, 31)
-
-        last_year_bo = []
-        next_year_bo = []
-        for stock_code in code_list:
-            df = stock_price.get_stock_hfq_price(stock_code)
-            #print(df[2350:2410])
-            price_list = []
-            next_year = []
-            for index, row in df.iterrows():
-                date = pd.to_datetime(row['date'])
-                if date < from_date:
-                    continue
-                if date <= to_date:
-                    price_list.append(row['close'])
-                elif date <= next_date:
-                    next_year.append(row['close'])
-                if date > next_date:
-                    break
-            #print(len(price_list), " ", len(next_year))
-            if len(price_list) > 150 and len(next_year) > 150:
-                return_ratio = np.diff(price_list) / price_list[:-1] * 100
-                #k1,b1,x = lsq.simple_linear_regression(return_ratio)
-                b1 = np.mean(return_ratio)
-                next_return_ratio = np.diff(next_year) / next_year[:-1] * 100
-                #k2,b2,y = lsq.simple_linear_regression(next_return_ratio)
-                b2 = np.mean(next_return_ratio)
-                '''
-                if True:
-                    print(stock_code)
-                    print(f"y = {k1} x + {b1} + {x}")
-                    X = list(range(1, len(price_list)))
-                    x_min, x_max = min(X), max(X)
-                    x_line = np.linspace(x_min, x_max, 100)
-                    y_line = b2 + k2 * x_line
-
-                    plt.plot(x_line, y_line, 'r-', linewidth=2, label=f'y = {b1:.2f} + {k1:.2f}x')
-                    plt.scatter(X, next_return_ratio, alpha=0.6, s=50, c='blue', edgecolors='black', linewidth=0.5)
-                    plt.show()
-                    exit()
-                '''
-                
-                last_year_bo.append(b1)
-                next_year_bo.append(b2)
-
-        print(len(last_year_bo))
-        k,b,se = lsq.linear_regression_least_squares(next_year_bo, last_year_bo)
-        print(f"y = {k} x + {b} + E({se})")
-        x_min, x_max = min(last_year_bo), max(last_year_bo)
-        x_line = np.linspace(x_min, x_max, 100)
-        y_line = b + k * x_line
-        plt.plot(x_line, y_line, 'r-', linewidth=2, label=f'y = {k:.2f}x + {b:.2f} + E({se:.2f})')
-        plt.legend()
-        plt.scatter(last_year_bo, next_year_bo, alpha=0.6, s=50, c='blue', edgecolors='black', linewidth=0.5)
-        plt.show()
-
-
 # 运行回测
 if __name__ == '__main__':
     #verify_volatility_correlation()
@@ -838,7 +836,7 @@ if __name__ == '__main__':
     Test_single_year = False
 
     if Test_single_year:
-        run_backtest(2013)
+        run_backtest(2025)
     else:
         return_dict = {}
         for CURRENT_YEAR in range(2011,2026):

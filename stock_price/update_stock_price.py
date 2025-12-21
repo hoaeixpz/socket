@@ -73,13 +73,13 @@ def save_daily_prices():
             continue
 
 def save_index_prices():
-    index_list = ['510300', '513500', '518880', '159915']
+    index_list = ['510300', '513500', '518880']
     for symbol in index_list:
         try:
-            df = ak.stock_zh_index_daily(f"sh{symbol}")
-            #df = pd.read_parquet(filename)
-
             filename = f"sh{symbol}_index_daily.parquet"
+            df = ak.stock_zh_index_daily(f"sh{symbol}", adjust='qfq')
+
+            #df = pd.read_parquet(filename)
             df.to_parquet(filename, index=False, compression='snappy')
             print(symbol)
             print(df)
@@ -89,19 +89,42 @@ def save_index_prices():
             continue
 
 def save_fund_peices():
-    index_list = ['159915']
+    index_list = ['513500', '159915', '510300', '518880']
     for symbol in index_list:
         try:
-            df = ak.fund_etf_hist_em(symbol=symbol,period="daily")
-            filename = f"sh{symbol}_index_daily.parquet"
-            df.to_parquet(filename, index=False, compression='snappy')
+            df = ak.fund_etf_hist_em(symbol=symbol,period="daily",adjust='qfq')
+            filename = f"{symbol}_index_daily.parquet"
+            #df = pd.read_parquet(filename)
+            print(df)
+
+            new_df = df.rename(columns={
+                '日期': 'date',
+                '开盘': 'open',
+                '收盘': 'close',
+                '最高': 'high',
+                '最低': 'low',
+                '成交量': 'volume'
+            })
+            print(new_df)
+            new_df.to_parquet(filename, index=False, compression='snappy')
             file_size = os.path.getsize(filename) / 1024
             print(f"Parquet数据已保存到 {filename}, 大小: {file_size:.2f} KB {datetime.now()}")
-            print(df)
+            
         except Exception as e:
             print(f"{e}")
             continue
 
-save_daily_prices()
+#save_daily_prices()
 #save_index_prices()
 #save_fund_peices()
+filename = f"sh513500_index_daily.parquet"
+df = pd.read_parquet(filename)
+print(df[1980:2010])
+
+filename = f"513500_index_daily.parquet"
+df = pd.read_parquet(filename)
+print(df[1980:2010])
+
+#filename = f"sh513500_index_daily.parquet"
+#df = pd.read_parquet(filename)
+#print(df[1950:2010])
