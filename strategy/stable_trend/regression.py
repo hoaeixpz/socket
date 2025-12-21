@@ -113,21 +113,27 @@ class StableTrendStrategy(bt.Strategy):
         if len(data_list) == 0:
             return
 
-        print("before standard R2")
-        print(R2_list)
+        #print("before standard R2")
+        #print(R2_list)
         R2_list = self.calc_standard_score(R2_list)
-        print("after standard R2")
-        print(R2_list)
+        #print("after standard R2")
+        #print(R2_list)
         FZ_list = self.calc_standard_score(FZ_list)
         VR_list = self.calc_standard_score(VR_list)
         indicator_dict = {}
+        R2_w = 100.4
+        FZ_w = 0.2
+        VR_w = 0.4
         for i in range(0, len(data_list)):
-            indicator_dict[data_list[i]] = R2_list[i] * 1 + FZ_list[i] * 0 +  VR_list[i] * 0
+            print(data_list[i]._name)
+            print(f"{R2_list[i]}  {FZ_list[i]}  {VR_list[i]}")
+            print(f"{R2_list[i] * R2_w + FZ_list[i] * FZ_w +  VR_list[i] * VR_w}")
+            indicator_dict[data_list[i]] = R2_list[i] * R2_w + FZ_list[i] * FZ_w +  VR_list[i] * VR_w
 
 
         indicator_dict = list(sorted(indicator_dict.items(), key=lambda x:float(x[1]), reverse=True))
 
-        print(indicator_dict)
+        #print(indicator_dict)
 
         data = indicator_dict[0][0]
         if data != self.buyed_code:
@@ -170,7 +176,7 @@ class StableTrendStrategy(bt.Strategy):
 
         return vr
 
-    def calc_fanzhuan(self, data, period = 10):
+    def calc_fanzhuan(self, data, period = 25):
         # 计算一个周期内的涨跌幅
         # 再统计这个周期内每天的涨跌幅，计算这些涨跌幅的标准差
         # 用周期总的涨跌幅 / 标准差，得到Z_score
@@ -201,17 +207,18 @@ class StableTrendStrategy(bt.Strategy):
     def calc_annualized_return_R2(self, data, period = 25):
         if len(data) < period + 1:  # 需要26天数据
             return None
-        print("==========calc_annualized_return_R2 ", data._name)
+        #print("==========calc_annualized_return_R2 ", data._name)
         price = [data.close[-i] for i in range(period, 0, -1)]
         log_price = list(math.log(p) for p in price)
         k, b, se = lsq.simple_linear_regression(log_price)
         annualized_return = k * 252
         R2 = lsq.calc_R_squared(log_price)
-        
+        '''
         print(price)
         print(annualized_return)
         print(R2)
         print(R2 * annualized_return)
+        '''
         
         return R2 * annualized_return
 
@@ -452,8 +459,8 @@ def run_backtest(CURRENT_YEAR = None):
 
 # 运行回测
 if __name__ == '__main__':
-    #run_backtest()
-    #exit()
+    run_backtest()
+    exit()
     START_TIME = time.time()
 
     Test_single_year = True
