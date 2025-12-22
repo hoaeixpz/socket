@@ -144,7 +144,6 @@ def find_ST_stock(CURRENT_YEAR:int, stock_code):
     return False
 
 
-
 def find_good_stocks(CURRENT_YEAR:int, stock_code):
     '''
     #条件：净利润增长率连续3年大于20%

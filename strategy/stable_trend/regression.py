@@ -22,12 +22,8 @@ from financial_data import FinancialData
 from stock_price_cache import StockPriceCache
 import least_squares_mothod as lsq
 
-sys.path.append("../../market_cap")
-from update_market import StockMarketCache
-
 finan_data = FinancialData()
 stock_price = StockPriceCache()
-market_data = StockMarketCache()
 
 def load_stock_data(file_path='../../stock_info.json'):
     """加载股票数据"""

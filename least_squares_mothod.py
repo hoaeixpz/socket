@@ -49,7 +49,7 @@ def linear_regression_least_squares(y: list[float], x: list[float] = None) -> Tu
     return float(slope), intercept, se
 
 
-def simple_linear_regression(y: list[float]) -> Tuple[float, float, float]:
+def simple_linear_regression(y: list[float], ddof = 2) -> Tuple[float, float, float]:
     """
     简化的最小二乘法（适用于等间距x，输入为list）
     
@@ -193,18 +193,19 @@ def test_fun3():
     #Y = [6,7,8,9,10]
     #Y = [1,3,1,3,0]
 
-    K = 0.2
+    K = 0.6
     B = 10
     X = list(range(1, 50))
-    #Y = list(math.log(x * K + B + random.uniform(-4, 4)) for x in X)
-    Y = list(x * K + B + random.uniform(-4, 4) for x in X)
+    Y = list(math.log(x * K + B + random.uniform(-1, 1)) for x in X)
+    #Y = list(x * K + B + random.uniform(-4, 4) for x in X)
     #Y = list(100 / (x + 10) + random.uniform(-1, 1) for x in X)
 
 
     #k,b = linear_regression_least_squares(y, x)
     k, b, se = simple_linear_regression(Y)
     R2   = calc_R_squared(Y)
-    pct = Y[-1] / Y[0] - 1
+    #pct = Y[-1] / Y[0] - 1
+    pct = k * 252
     print(f"y = {k:.2f} x + {b:.2f} + E({se:.2f})  R2 = {R2:.3f}, pct = {pct:.3f}, {R2 * pct:.3f}")
 
     plt.scatter(X, Y, alpha=0.6, s=50, c='blue', edgecolors='black', linewidth=0.5)
@@ -247,4 +248,59 @@ def test_fun4():
     plt.legend()
     plt.show()
 
-#test_fun4()
+def test_fun5():
+    K = 0.6
+    B = 100
+    X = list(range(1, 200))
+
+    R2_list = []
+    pct_list = []
+    noise_list = []
+    for noise in range(1,200):
+        n = noise / 10
+        Y = list(math.log(x * K + B + random.uniform(-n, n)) for x in X)
+        k, b, se = simple_linear_regression(Y)
+        R2   = calc_R_squared(Y)
+        pct = k * 252
+
+        R2_list.append(R2)
+        pct_list.append(pct * R2)
+        noise_list.append(n)
+        if False and (n > 9.8 or n < 0.2):
+            print(f"y = {k} * x + {b:.2f} + E({se:.2f})  R2 = {R2:.3f}, pct = {pct:.3f}, {R2 * pct:.3f}")
+            plt.scatter(X, Y, alpha=0.6, s=50, c='blue', edgecolors='black', linewidth=0.5)
+            plt.show()
+
+
+    plt.scatter(noise_list, pct_list, alpha=0.6, s=50, c='blue', edgecolors='black', linewidth=0.5)
+    plt.show()
+
+def test_fun6():
+    n = 3
+    B = 100
+    X = list(range(1, 200))
+
+    R2_list = []
+    pct_list = []
+    k_list = []
+    for slope in range(1,100):
+        K = slope / 100
+        Y = list(math.log(x * K + B + random.uniform(-n, n)) for x in X)
+        k, b, se = simple_linear_regression(Y)
+        R2   = calc_R_squared(Y)
+        pct = k * 252
+
+        R2_list.append(R2)
+        pct_list.append(pct * R2)
+        k_list.append(K)
+        if K > 0.98 or K < 0.02:
+            print(f"y = {k} * x + {b:.2f} + E({se:.2f})  R2 = {R2:.3f}, pct = {pct:.3f}, {R2 * pct:.3f}")
+            plt.scatter(X, Y, alpha=0.6, s=50, c='blue', edgecolors='black', linewidth=0.5)
+            plt.show()
+
+
+    plt.scatter(k_list, R2_list, alpha=0.6, s=50, c='blue', edgecolors='black', linewidth=0.5)
+    plt.show()
+
+#test_fun3()
+#test_fun6()
