@@ -179,8 +179,8 @@ def cal_assessment(stock_code, last_year):
 def calc_industry_indicator(current_year):
 	for industry, industry_info in industry_data.items():
 		print(industry)
-		if industry != "游戏":
-			continue
+		#if industry == "文化传媒":
+		#	continue
 		industry_code_list = industry_info.get("code")
 		code_list = []
 		for stock_code in industry_code_list:
@@ -188,8 +188,8 @@ def calc_industry_indicator(current_year):
 				code_list.append(stock_code)
 		number = len(code_list)
 		print(number)
-		#if number < 40:
-		#	continue
+		if number < 40:
+			continue
 		
 		vol_dict = {}
 		ass_dict = {}
@@ -219,7 +219,6 @@ def calc_industry_indicator(current_year):
 			'''
 		#print(stock_data)
 		save_results(stock_data)
-		break
 
 		'''
 		sorted_vol = sorted(vol_dict.items(), key=lambda x:float(x[1]))
