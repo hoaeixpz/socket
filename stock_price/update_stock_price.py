@@ -73,24 +73,27 @@ def save_daily_prices():
             continue
 
 def save_index_prices():
-    index_list = ['510300', '513500', '518880']
+    #index_list = ['510300', '513500', '518880']
+    index_list = ['000300', '000852']
     for symbol in index_list:
         try:
             filename = f"sh{symbol}_index_daily.parquet"
-            df = ak.stock_zh_index_daily(f"sh{symbol}", adjust='qfq')
+            df = ak.stock_zh_index_daily(f"sh{symbol}")
 
             #df = pd.read_parquet(filename)
-            df.to_parquet(filename, index=False, compression='snappy')
-            print(symbol)
+            #df.to_parquet(filename, index=False, compression='snappy')
             print(df)
             file_size = os.path.getsize(filename) / 1024
             print(f"Parquet数据已保存到 {filename}, 大小: {file_size:.2f} KB {datetime.now()}")
-        except:
+        except Exception as e:
+            print(f"获取指数 {symbol} 数据时出错: {e}")
             continue
 
 def save_fund_peices():
-    index_list = ['513500', '159915', '510300', '518880']
+    index_list = ['513500', '159915', '510300', '518880', '513100']
     for symbol in index_list:
+        if symbol != '513100':
+            continue
         try:
             df = ak.fund_etf_hist_em(symbol=symbol,period="daily",adjust='qfq')
             filename = f"{symbol}_index_daily.parquet"
@@ -115,8 +118,10 @@ def save_fund_peices():
             continue
 
 #save_daily_prices()
-#save_index_prices()
+save_index_prices()
 #save_fund_peices()
+exit()
+
 filename = f"sh513500_index_daily.parquet"
 df = pd.read_parquet(filename)
 print(df[1980:2010])
