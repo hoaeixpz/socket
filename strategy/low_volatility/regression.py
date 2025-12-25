@@ -187,9 +187,9 @@ def calc_industry_indicator(current_year):
 			if stock_code in stock_data:
 				code_list.append(stock_code)
 		number = len(code_list)
-		print(number)
 		if number < 40:
 			continue
+		print(number)
 		
 		vol_dict = {}
 		ass_dict = {}
