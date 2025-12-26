@@ -90,9 +90,17 @@ def save_index_prices():
             continue
 
 def save_fund_peices():
-    index_list = ['513500', '159915', '510300', '518880', '513100', '000852', '000300', '399300']
+    index_list = ['513100', '513500', '159915', '510300', '512100', '518880', '000852', '399300']
+    #513100  纳指ETF
+    #513500  标普500ETF
+    #159915  创业板ETF
+    #510300  沪深300ETF
+    #512100  中证1000ETF
+    #518800  黄金ETF
+    #000852  中证1000指数
+    #399300  沪深300指数
     for symbol in index_list:
-        if not symbol == '399300':
+        if not symbol == '512100':
             continue
         try:
             df = ak.fund_etf_hist_em(symbol=symbol,period="daily",adjust='qfq')
