@@ -90,9 +90,9 @@ def save_index_prices():
             continue
 
 def save_fund_peices():
-    index_list = ['513500', '159915', '510300', '518880', '513100']
+    index_list = ['513500', '159915', '510300', '518880', '513100', '000852', '000300', '399300']
     for symbol in index_list:
-        if symbol != '513100':
+        if not symbol == '399300':
             continue
         try:
             df = ak.fund_etf_hist_em(symbol=symbol,period="daily",adjust='qfq')
@@ -118,8 +118,8 @@ def save_fund_peices():
             continue
 
 #save_daily_prices()
-save_index_prices()
-#save_fund_peices()
+#save_index_prices()
+save_fund_peices()
 exit()
 
 filename = f"sh513500_index_daily.parquet"

@@ -363,7 +363,9 @@ def run_backtest(CURRENT_YEAR = None):
     code_list = ['510300', '513500', '518880', '513100']
     #code_list = ['159920']
     code_list = ['513100']
-    code_list = ['513500']
+    code_list = ['399300']
+    #code_list = ['000852']
+
     for code in code_list:
         data_name = stock_price.get_index_price(code)
         data_name.index = pd.to_datetime(data_name['date'])
