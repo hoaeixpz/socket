@@ -46,7 +46,7 @@ def rebalance(context):
     # 获取当前日期是当月的第几个交易日
     
     current_date = context.current_dt.date()
-    if current_date.weekday() != 4:  # 周一
+    if current_date.weekday() != 0:  # 周一
         return
     current_month = current_date.month
     current_time = context.current_dt.time()
@@ -72,7 +72,10 @@ def rebalance(context):
         if len(current_holdings) == 0:
             g.stocks_to_buy = get_small_cap_stocks(g.stock_pool, prev_date, g.stock_num)
             buy_stocks(context)
-    
+            
+        #elif len(current_holdings) == g.stock_num:
+        #    balance_position(context)
+
     # 判断是否为每月第一个交易日（卖出日）
     if current_time == morning_sell_time:
         # 3. 获取市值数据（使用前一交易日数据，避免未来函数）
@@ -82,8 +85,6 @@ def rebalance(context):
         # 标记卖出已完成
         g.sell_done = True
 
-        
-        
     # 判断是否为下午交易时间（买入日）
     elif current_time == afternoon_buy_time and g.sell_done:
         # 执行买入逻辑
@@ -94,13 +95,38 @@ def rebalance(context):
         log.info(f"今日({current_date})非调仓日，不执行操作")
     
     #print(f"在 {current_date} 符合条件的股票数量: {len(filtered_stocks)}")
-
-    
     if len(g.selected_stocks) == 0:
         log.warn('未选到符合条件的股票，本日不调仓')
         return
     
     log_selection_details(g.selected_stocks, prev_date)
+
+def balance_position(context):
+    positions = context.portfolio.positions
+    max_stock = None
+    min_stock = None
+    max_ratio = None
+    min_ratio = None
+    for stock, pos in positions.items():
+        r = pos.value / context.portfolio.total_value * 100
+        if min_ratio is None or r < min_ratio:
+            min_stock = stock
+            min_ratio = r
+        if max_ratio is None or r > max_ratio:
+            max_stock = stock
+            max_ratio = r
+                    
+    if max_ratio - min_ratio > 14:
+        log.info(f'\n===================最大股票仓位比最小仓位高出 {max_ratio - min_ratio} 个点，调整仓位====================')
+        stock_name = get_security_info(min_stock).display_name
+        log.info('最小占比  持仓: %s(%s),  %.2f%%' % (stock_name, min_stock, min_ratio))
+        stock_name = get_security_info(max_stock).display_name
+        log.info('最大占比  持仓: %s(%s),  %.2f%%' % (stock_name, max_stock, max_ratio))
+        
+        balance_value = context.portfolio.total_value / 200 * (max_ratio - min_ratio)
+        log.info(f'卖出 {get_security_info(max_stock).display_name} {balance_value}，买入{get_security_info(min_stock).display_name} {balance_value}')
+        order_value(max_stock, -balance_value)
+        order_value(min_stock,  balance_value)
 
 def filter_stocks(stock_list, current_date):
     #过滤股票池：排除ST、停牌、上市不足60天的股票
@@ -262,17 +288,18 @@ def buy_stocks(context):
         log.info(get_security_info(stock).display_name)
     if len(g.stocks_to_buy) > 0:
         available_cash = context.portfolio.available_cash
-        g.each_cash = available_cash / len(g.stocks_to_buy)
         position_value = context.portfolio.positions_value
         total_cash = context.portfolio.cash
         total_value = context.portfolio.total_value
+        g.each_cash = available_cash / len(g.stocks_to_buy)
+        #g.each_cash = min(g.each_cash, total_value / g.stock_num)
         log.info("====调整每股额度====\n当前可用资金 ", available_cash, "\n持仓市值 ", position_value, "\n总资产: ", total_value, "\n每股额度 ", g.each_cash)
         # 计算每只股票的目标市值（等权重）
         # 获取当前总资产
         current_data = get_current_data()
         
         target_value_per_stock = g.each_cash
-        
+        #buy_num  = len(g.stocks_to_buy)
         for stock in g.stocks_to_buy:
             stock_data = current_data[stock]
             # 获取当前有效价格（优先使用现价）
@@ -327,17 +354,20 @@ def log_selection_details(selected_stocks, query_date):
     #print(f"Total {len(st_code_list)}")
 
 # 可选：每日盘后记录函数（非必需）
-def after_market_close(context):
+def after_trading_end(context):
+    current_date = context.current_dt.date()
+    if current_date.weekday() != 0:  # 周一
+        return
     #每日收盘后运行，记录当日持仓情况
     # 获取当前持仓
     positions = context.portfolio.positions
     
     if len(positions) > 0:
-        log.info('当日持仓市值: %.2f元' % context.portfolio.total_value)
+        log.info('\n*******************当日持仓市值: %.2f元*******************' % context.portfolio.total_value)
         for stock, pos in positions.items():
             stock_name = get_security_info(stock).display_name
-            log.info('  持仓: %s(%s), 数量: %d, 市值: %.2f元' % 
-                    (stock_name, stock, pos.total_amount, pos.value))
+            log.info('  持仓: %s(%s), 数量: %d, 市值: %.2f元 %.2f%%' % 
+                    (stock_name, stock, pos.total_amount, pos.value, pos.value / context.portfolio.total_value * 100))
 #"""
     
     
