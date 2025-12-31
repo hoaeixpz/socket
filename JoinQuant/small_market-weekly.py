@@ -60,6 +60,15 @@ def rebalance(context):
     log.info('========== 执行日度调仓，日期：%s ==========' % current_date)
     prev_date = current_date - datetime.timedelta(days=1)
     
+    if current_month == 1 or current_month == 4:
+        log.info('========== 一月和四月份清仓，日期：%s ==========' % current_date)
+        current_holdings = list(context.portfolio.positions.keys())
+        if len(current_holdings) > 0:
+            g.selected_stocks = []
+            sell_stocks(context)
+            
+        return
+    
     if current_month != g.last_month:
     #if (current_date.month == 1 or current_date.month == 4 or current_date.month == 7 or current_date.month == 11) and trade_day_index == 1:
         g.last_month = current_month
