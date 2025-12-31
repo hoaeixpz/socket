@@ -36,7 +36,9 @@ def save_markets():
     """
     获取A股股票市值历史数据
     """
-    
+    #with open('market_list.txt', 'r', encoding='utf-8') as f:
+    #    stock_codes = [line.strip() for line in f.readlines()]
+
     all_stocks = load_existing_stocks()
     stock_codes = list(all_stocks.keys())
     
@@ -68,10 +70,14 @@ class StockMarketCache:
         self.cache_dir = current_dir
 
     def load_market_df(self, stock_code):
-        clean_code = stock_code.replace('sz', '').replace('sh', '')
-        filename = f"{self.cache_dir}/{clean_code}_market_cap.parquet"
-        df = pd.read_parquet(filename)
-        return df
+        try:
+            clean_code = stock_code.replace('sz', '').replace('sh', '')
+            filename = f"{self.cache_dir}/{clean_code}_market_cap.parquet"
+            df = pd.read_parquet(filename)
+            return df
+        except Exception as e:
+            print(f'{stock_code} has not market data {e}')
+            return None
 
     def get_specify_date_market(self, df, target_date_str:str, head = 'value'):
         if df is None or df.empty:
@@ -86,7 +92,7 @@ class StockMarketCache:
             first_date = pd.to_datetime(df['date'].iloc[0])
             last_date = pd.to_datetime(df['date'].iloc[-1])
             if target_date < first_date or target_date > last_date:
-                print(f"请求日期: {target_date},  缓存只包含从 {first_date} 到 {last_date} 期间市值")
+                #print(f"请求日期: {target_date},  缓存只包含从 {first_date} 到 {last_date} 期间市值")
                 return None
 
             df = df.copy()
