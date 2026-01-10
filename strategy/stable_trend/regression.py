@@ -96,34 +96,36 @@ class StableTrendStrategy(bt.Strategy):
         VR_list = []
         data_list = []
         for data in self.datas:
-            R2 = self.calc_annualized_return_R2(data)
-            FZ = self.calc_fanzhuan(data)
-            VR = self.calc_volumn_rate(data)
-            if R2 is None or FZ is None or VR is None:
+            R2 = self.calc_annualized_return_R2(data,120)
+            #FZ = self.calc_fanzhuan(data)
+            #VR = self.calc_volumn_rate(data)
+            if R2 is None:# or FZ is None or VR is None:
                 continue
             R2_list.append(R2)
-            FZ_list.append(FZ)
-            VR_list.append(VR)
+            #FZ_list.append(FZ)
+            #VR_list.append(VR)
             data_list.append(data)
 
         if len(data_list) == 0:
             return
 
         #print("before standard R2")
-        #print(R2_list)
-        R2_list = self.calc_standard_score(R2_list)
+        print(R2_list)
+        #R2_list = self.calc_standard_score(R2_list)
         #print("after standard R2")
         #print(R2_list)
-        FZ_list = self.calc_standard_score(FZ_list)
-        VR_list = self.calc_standard_score(VR_list)
+        FZ_list = R2_list
+        VR_list = R2_list
+        #FZ_list = self.calc_standard_score(FZ_list)
+        #VR_list = self.calc_standard_score(VR_list)
         indicator_dict = {}
-        R2_w = 100.4
-        FZ_w = 0.2
-        VR_w = 0.4
+        R2_w = 1
+        FZ_w = 0
+        VR_w = 0
         for i in range(0, len(data_list)):
-            print(data_list[i]._name)
-            print(f"{R2_list[i]}  {FZ_list[i]}  {VR_list[i]}")
-            print(f"{R2_list[i] * R2_w + FZ_list[i] * FZ_w +  VR_list[i] * VR_w}")
+            #print(data_list[i]._name)
+            #print(f"{R2_list[i]}  {FZ_list[i]}  {VR_list[i]}")
+            #print(f"{R2_list[i] * R2_w + FZ_list[i] * FZ_w +  VR_list[i] * VR_w}")
             indicator_dict[data_list[i]] = R2_list[i] * R2_w + FZ_list[i] * FZ_w +  VR_list[i] * VR_w
 
 
@@ -340,8 +342,8 @@ def run_backtest(CURRENT_YEAR = None):
     START_YEAR = None
     END_YEAR = None
     if CURRENT_YEAR is None:
-        START_YEAR = 2014
-        END_YEAR = 2025
+        START_YEAR = 2011
+        END_YEAR = 2018
         print(f"{START_YEAR} -- {END_YEAR}")
     else:
         print(f"{CURRENT_YEAR} 年")
@@ -360,11 +362,21 @@ def run_backtest(CURRENT_YEAR = None):
     cerebro.addstrategy(StableTrendStrategy)
 
     start_time = time.time()
+
+    #513100  纳指ETF
+    #513500  标普500ETF
+    #159915  创业板ETF
+    #510300  沪深300ETF
+    #512100  中证1000ETF
+    #518880  黄金ETF
+    #000852  中证1000指数
+    #399300  沪深300指数
+
     code_list = ['510300', '513500', '518880', '513100']
     #code_list = ['159920']
-    code_list = ['513100']
-    code_list = ['399300']
-    #code_list = ['000852']
+    #code_list = ['513100']
+    #code_list = ['399300']
+    code_list = ['399300', '000852']
 
     for code in code_list:
         data_name = stock_price.get_index_price(code)
@@ -394,7 +406,7 @@ def run_backtest(CURRENT_YEAR = None):
 
     start_time = end_time
     # 设置初始资金
-    start_cash = 10000
+    start_cash = 1000000
     cerebro.broker.setcash(start_cash)
     
     cerebro.addanalyzer(bt.analyzers.TimeReturn, _name='timereturn')
@@ -464,7 +476,7 @@ if __name__ == '__main__':
     START_TIME = time.time()
 
     Test_single_year = True
-    #Test_single_year = False
+    Test_single_year = False
 
     if Test_single_year:
         run_backtest(2017)

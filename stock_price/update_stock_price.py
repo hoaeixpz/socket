@@ -96,7 +96,7 @@ def save_fund_peices():
     #159915  创业板ETF
     #510300  沪深300ETF
     #512100  中证1000ETF
-    #518800  黄金ETF
+    #518880  黄金ETF
     #000852  中证1000指数
     #399300  沪深300指数
     for symbol in index_list:
