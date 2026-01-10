@@ -303,9 +303,9 @@ def stop_loss(context):
                     g.reason_to_sell = 'stoploss'
 
         if g.stoploss_strategy == 2 or g.stoploss_strategy == 3:
-            stock_df = get_price(security=get_index_stocks('399101.XSHE'), end_date=context.current_dt, frequency='1m', fields=['close','high_limit'], skip_paused=False, fq='pre', count=1, panel=False, fill_paused=True)
-            pre_stock_df = get_price(security=get_index_stocks('399101.XSHE'), end_date=context.previous_date, frequency='daily', fields=['close'], count=1, panel=False)
-            down_ratio = abs((stock_df['close'] / (pre_stock_df['close']) - 1).mean())
+            stock_df = get_price(security='399101.XSHE', end_date=context.current_dt, frequency='1m', fields=['close'], skip_paused=False, fq='pre', count=1, panel=False, fill_paused=True)
+            pre_stock_df = get_price(security='399101.XSHE', end_date=context.previous_date, frequency='daily', fields=['close'], count=1, panel=False)
+            down_ratio = stock_df.close[0] / pre_stock_df.close[0] - 1
             # 市场大跌止损
             if down_ratio >= g.stoploss_market:
                 g.reason_to_sell = 'stoploss'
