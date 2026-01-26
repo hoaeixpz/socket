@@ -196,15 +196,12 @@ def print_order_info(obj):
 	print('股票:', obj.m_strInstrumentID, ' ', obj.m_strInstrumentName)
 	print('委托时间: ', obj.m_strInsertDate, ' ', obj.m_strInsertTime)
 	print('委托类型: ', ('买卖' if obj.m_eEntrustType == 48 else '未知'))
-	if obj.m_nDirection == 48:
+	if obj.m_nOffsetFlag == 48:
 		print('买入')
-	elif obj.m_nDirection == 49:
+	elif obj.m_nOffsetFlag == 49:
 		print('卖出')
-	else:
-		print('质押')
 	print('委托价: ', obj.m_dLimitPrice)
 	print('成交额: ', obj.m_dTradeAmount)
-	print('成交均价: ', obj.m_dTradedPrice)
 	print('成交量: ', obj.m_nVolumeTraded)
 	print('委托状态: ', get_entrust_status_str(obj.m_nOrderStatus))
 	print('委托剩余量: ', obj.m_nVolumeTotal)
@@ -214,6 +211,7 @@ def print_order_info(obj):
 	print('')
 
 def print_deal_info(obj):
+	print('委托号: ', obj.m_strOrderSysID)
 	print('股票:', obj.m_strInstrumentID, ' ', obj.m_strInstrumentName)
 	print('成交时间: ', obj.m_strTradeDate, ' ', obj.m_strTradeTime)
 	print('委托类型: ', ('买卖' if obj.m_eEntrustType == 48 else '未知'))
@@ -1035,9 +1033,10 @@ def sell_stocks(ContextInfo):
 	for stock in g.stocks_to_sell:
 		print('GGG>>>>>>>>>>>>')
 		print('GGG卖出: ',ContextInfo.get_stock_name(stock))
-		order_target_value(stock, 0, 'BUY1', ContextInfo, ContextInfo.account)
-		#if order_info != None and order_info.filled > 0:
-		#    print(f'卖出 {order_info.filled}股 * {order_info.price:.2f}元')
+		order_info = sell_target_value(ContextInfo, stock, 0)
+		#order_target_value(stock, 0, 'BUY1', ContextInfo, ContextInfo.account)
+		if order_info != None:
+		    print(f'卖出 {order_info.m_nVolume}股 * {order_info.m_dPrice:.2f}元')
 
 def buy_stocks(ContextInfo):
 	if len(g.stocks_to_buy) > 0:
@@ -1071,15 +1070,62 @@ def buy_stocks(ContextInfo):
 			else:
 				if g.excepted_position.get(stock) is not None:
 					target_value_per_stock = g.excepted_position[stock] * total_value
-				order_target_value(stock, target_value_per_stock, ContextInfo, ContextInfo.account)
+				#order_target_value(stock, target_value_per_stock, ContextInfo, ContextInfo.account)
+				order_info = buy_target_value(ContextInfo, stock, target_value_per_stock)
 				raw_amount = target_value_per_stock / current_price
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
 				print(f'委托买入: {ContextInfo.get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'
 					f'\n预计买入{amount}股，每股{current_price}元，合计:{amount * current_price:.2f}')
-				#if order_info != None and order_info.filled > 0:
-				#    print(f'实际买入{order_info.filled}股，每股{order_info.price}元，合计:{order_info.filled * order_info.price:.2f}')
-				#else:
-				#    print(f'股票 {stock} 买入失败，跳过')
+				if order_info != None:
+				    print(f'实际买入{order_info.m_nVolume}股，每股{order_info.m_dPrice}元，合计:{order_info.m_dTradeAmount:.2f}')
+				else:
+				    print(f'股票 {stock} 买入失败，跳过')
+
+def sell_target_value(ContextInfo, stock, target_value):
+	order_target_value(stock, target_value, 'BUY1', ContextInfo, ContextInfo.account)
+	orderid = None
+	objlist = get_trade_detail_data(ContextInfo.account,'STOCK','ORDER')
+	for order in objlist:
+		if order.m_strInstrumentID not in stock:
+			continue
+		if get_entrust_status_str(order.m_nOrderStatus) == '已成':
+			orderid = order.m_strOrderSysID
+			print_order_info(order)
+		else:
+			print(f'卖出{stock}异常 委托状态 ', get_entrust_status_str(order.m_nOrderStatus))
+
+
+	objlist = get_trade_detail_data(ContextInfo.account,'STOCK','DEAL')
+	print('deal')
+	for deal in objlist:
+		if deal.m_strOrderSysID == orderid:
+			print_deal_info(deal)
+			return deal
+
+	return None
+
+def buy_target_value(ContextInfo, stock, target_value):
+	order_target_value(stock, target_value, 'SALE1', ContextInfo, ContextInfo.account)
+	orderid = None
+	objlist = get_trade_detail_data(ContextInfo.account,'STOCK','ORDER')
+	for order in objlist:
+		if order.m_strInstrumentID not in stock:
+			continue
+		if get_entrust_status_str(order.m_nOrderStatus) == '已成':
+			orderid = order.m_strOrderSysID
+			print_order_info(order)
+		else:
+			print(f'买入{stock}异常 委托状态 ', get_entrust_status_str(order.m_nOrderStatus))
+
+
+	objlist = get_trade_detail_data(ContextInfo.account,'STOCK','DEAL')
+	print('deal')
+	for deal in objlist:
+		if deal.m_strOrderSysID == orderid:
+			print_deal_info(deal)
+			return deal
+
+	return None
 
 def order_callback(ContextInfo, orderInfo):
 	print_order_info(orderInfo)
