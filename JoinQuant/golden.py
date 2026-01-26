@@ -62,7 +62,7 @@ def initialize(context):
     run_daily(check_limit_up, time='10:30') #检查涨停股
     run_daily(check_limit_up, time='14:00') #检查涨停股
     run_daily(check_remain_amount, time='14:35')
-    run_daily(stop_loss, time='14:45') # 止损函数
+    #run_daily(stop_loss, time='14:45') # 止损函数
     #run_daily(create_signal_big_small_market, time='9:05')
     
     
@@ -281,6 +281,7 @@ def check_remain_amount(context):
         g.reason_to_sell = ''
         g.refresh_hold = True
 
+    
 #止盈止损
 def stop_loss(context):
     if g.run_stoploss:
@@ -303,9 +304,9 @@ def stop_loss(context):
                     g.reason_to_sell = 'stoploss'
 
         if g.stoploss_strategy == 2 or g.stoploss_strategy == 3:
-            stock_df = get_price(security='399101.XSHE', end_date=context.current_dt, frequency='1m', fields=['close'], skip_paused=False, fq='pre', count=1, panel=False, fill_paused=True)
-            pre_stock_df = get_price(security='399101.XSHE', end_date=context.previous_date, frequency='daily', fields=['close'], count=1, panel=False)
-            down_ratio = stock_df.close[0] / pre_stock_df.close[0] - 1
+            stock_df = get_price(security='399101.XSHE', end_date=context.previous_date, frequency='daily', fields=['close'], count=1, panel=False)
+            pre_stock_df = get_price(security='399101.XSHE', end_date=context.previous_date - datetime.timedelta(days=1), frequency='daily', fields=['close'], count=1, panel=False)
+            down_ratio = abs(stock_df.close[0] / pre_stock_df.close[0] - 1)
             # 市场大跌止损
             if down_ratio >= g.stoploss_market:
                 g.reason_to_sell = 'stoploss'
