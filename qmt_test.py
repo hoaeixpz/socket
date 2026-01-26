@@ -543,6 +543,8 @@ def calc_position(ContextInfo):
 	p = (1 - fail_pos) / (holding_num - len(g.stocks_fail_sell) - HL_count)
 	
 	#计算买入之后期望每只股票的持仓占比
+	print('selected_stocks')
+	print(g.selected_stocks)
 	for i in range(len(g.selected_stocks)):
 		stock = g.selected_stocks[i]
 		if stock in g.stocks_fail_sell or stock in g.yesterday_HL_list:
@@ -593,13 +595,11 @@ def calc_position(ContextInfo):
 					g.stocks_to_buy.append(stock)
 					cash -= diff_pos*total_value
 				else:
-					#order_info= 
-					order_target_value(stock, exce_pos*total_value, 'BUY1', ContextInfo, ContextInfo.account)
-					cash -= diff_pos*total_value#
-					#if order_info != None and order_info.filled != 0:
-					#	cash -= diff_pos*total_value
-					#	print(f'调整{stock_name}市值，卖出{order_info.filled}股 * {order_info.price}')
-					#	#update_stock_price(stock, order_info.price, -order_info.filled)
+					order_info= sell_target_value(ContextInfo, stock, exce_pos*total_value)
+					if order_info != None and order_info.m_dPrice != 0:
+						cash -= diff_pos*total_value
+						print(f'调整{stock_name}市值，卖出{order_info.m_nVolume}股 * {order_info.m_dPrice}')
+						#update_stock_price(stock, order_info.m_dPrice, -order_info.m_nVolume)
 						
 		
 		avai_cash += cash
@@ -649,7 +649,7 @@ def calc_position(ContextInfo):
 				print(f'期望持仓: {ContextInfo.get_stock_name(stock)}({stock})，占比{g.excepted_position[stock] * 100:.2f}%')
 			
 			
-	
+	position_dict = dict(sorted(position_dict.items(), key=lambda x: x[0]))
 	for stock, pos in position_dict.items():
 		stock_name = ContextInfo.get_stock_name(stock)
 		print(f' 预估持仓: {stock_name}({stock}), 占比 {pos[0] * 100:.2f}% 单价 {pos[1]}')
@@ -793,12 +793,11 @@ def stop_loss(ContextInfo):
 					print("⭕ 收益100%止盈,卖出{}".format(stock))
 				# 个股止损
 				elif price < avg_cost * (1 - g.stoploss_limit):
-					#order_info = 
-					order_target_value(stock, 0, 'BUY1', ContextInfo, ContextInfo.account)
+					order_info = sell_target_value(ContextInfo, stock, 0)
 					print(f"⭕ 收益止损,卖出{stock},跌幅 { (1 - price / avg_cost) * 100:.2f}%")
-					#if order_info != None and order_info.filled > 0:
-					#	print(f'卖出 {order_info.filled}股 * {order_info.price:.2f}元')
-					show_info = True#
+					if order_info != None:
+						print(f'卖出 {order_info.m_nVolume}股 * {order_info.m_dPrice:.2f}元')
+						show_info = True
 					
 					g.reason_to_sell = 'stoploss'
 					if stock in g.selected_stocks:
@@ -811,6 +810,7 @@ def stop_loss(ContextInfo):
 			dt_str = query_date.strftime('%Y%m%d%H%M%S')
 			#stocklist = ContextInfo.get_stock_list_in_sector('中小综指')
 			price_data = ContextInfo.get_market_data_ex(['open', 'close'], ['399101.SZ'], period='1d', start_time='', end_time=dt_str, count=1,dividend_type='none', fill_data=True,subscribe=False)
+			#print(price_data)
 			df = list(price_data.values())[0]
 			#stock_df = get_price(security=get_index_stocks('399101.XSHE'), end_date=context.previous_date, frequency='daily', fields=['close','open'], count=1, panel=False)
 			#print(stock_df)
@@ -831,11 +831,10 @@ def stop_loss(ContextInfo):
 						if stock == g.etf:
 							continue
 						print(f'⭕ 清仓{stock} {ContextInfo.get_stock_name(stock)}')
-						#order_info = 
-						order_target_value(stock, 0, 'BUY1', ContextInfo, ContextInfo.account)
-						#if order_info != None and order_info.filled > 0:
-						#	print(f'卖出 {order_info.filled}股 * {order_info.price:.2f}元')
-						show_info = True#
+						order_info = sell_target_value(ContextInfo, stock, 0)
+						if order_info != None:
+							print(f'卖出 {order_info.m_nVolume}股 * {order_info.m_dPrice:.2f}元')
+							show_info = True
 						if stock in g.selected_stocks:
 							g.selected_stocks.remove(stock)
 				else:
@@ -846,11 +845,10 @@ def stop_loss(ContextInfo):
 						if stock in g.yesterday_HL_list:
 							continue
 						print(f'⭕ 清仓{stock} {ContextInfo.get_stock_name(stock)}')
-						#order_info = 
-						order_target_value(stock, 0, 'BUY1', ContextInfo, ContextInfo.account)
-						#if order_info != None and order_info.filled > 0:
-						#	print(f'卖出 {order_info.filled}股 * {order_info.price:.2f}元')
-						show_info = True#
+						order_info = sell_target_value(ContextInfo, stock, 0)
+						if order_info != None:
+							print(f'卖出 {order_info.m_nVolume}股 * {order_info.m_dPrice:.2f}元')
+							show_info = True
 						if stock in g.selected_stocks:
 							g.selected_stocks.remove(stock)
 	
@@ -1036,7 +1034,7 @@ def sell_stocks(ContextInfo):
 		order_info = sell_target_value(ContextInfo, stock, 0)
 		#order_target_value(stock, 0, 'BUY1', ContextInfo, ContextInfo.account)
 		if order_info != None:
-		    print(f'卖出 {order_info.m_nVolume}股 * {order_info.m_dPrice:.2f}元')
+			print(f'卖出 {order_info.m_nVolume}股 * {order_info.m_dPrice:.2f}元')
 
 def buy_stocks(ContextInfo):
 	if len(g.stocks_to_buy) > 0:
@@ -1061,6 +1059,10 @@ def buy_stocks(ContextInfo):
 			current_price = get_current_price(ContextInfo, stock, dt)
 			if math.isnan(current_price):
 				continue
+
+			account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
+			print(f'===可用资金 {account_info[0].m_dAvailable}===')
+
 			if stock == g.etf:
 				raw_amount = target_value_per_stock / current_price
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
@@ -1070,16 +1072,20 @@ def buy_stocks(ContextInfo):
 			else:
 				if g.excepted_position.get(stock) is not None:
 					target_value_per_stock = g.excepted_position[stock] * total_value
-				#order_target_value(stock, target_value_per_stock, ContextInfo, ContextInfo.account)
-				order_info = buy_target_value(ContextInfo, stock, target_value_per_stock)
+				order_info = buy_target_value(ContextInfo, stock, target_value_per_stock, current_price)
 				raw_amount = target_value_per_stock / current_price
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
 				print(f'委托买入: {ContextInfo.get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'
 					f'\n预计买入{amount}股，每股{current_price}元，合计:{amount * current_price:.2f}')
 				if order_info != None:
-				    print(f'实际买入{order_info.m_nVolume}股，每股{order_info.m_dPrice}元，合计:{order_info.m_dTradeAmount:.2f}')
+					print(f'实际买入{order_info.m_nVolume}股，每股{order_info.m_dPrice}元，合计:{order_info.m_dTradeAmount:.2f}')
 				else:
-				    print(f'股票 {stock} 买入失败，跳过')
+					print(f'股票 {stock} 买入失败，跳过')
+
+			positions = get_positions(ContextInfo)
+			pos = positions.get(stock)
+			if pos is not None:
+				print(f"持仓 {pos['total_amount']}股, 市值:{pos['value']}")
 
 def sell_target_value(ContextInfo, stock, target_value):
 	order_target_value(stock, target_value, 'BUY1', ContextInfo, ContextInfo.account)
@@ -1104,8 +1110,8 @@ def sell_target_value(ContextInfo, stock, target_value):
 
 	return None
 
-def buy_target_value(ContextInfo, stock, target_value):
-	order_target_value(stock, target_value, 'SALE1', ContextInfo, ContextInfo.account)
+def buy_target_value(ContextInfo, stock, target_value, current_price):
+	order_target_value(stock, target_value + current_price * 10, 'SALE1', ContextInfo, ContextInfo.account)
 	orderid = None
 	objlist = get_trade_detail_data(ContextInfo.account,'STOCK','ORDER')
 	for order in objlist:
@@ -1159,15 +1165,15 @@ def info_position(ContextInfo):
 		total_value = info.m_dBalance
 		print(f'******************当日({current_date})持仓市值: {position_value:.2f}元*******************')
 
-		sorted_pos = dict(sorted(positions.items(), key=lambda x: x[0]))
-		for stock, pos in sorted_pos.items():
+		#sorted_pos = dict(sorted(positions.items(), key=lambda x: x[0]))
+		for stock, pos in positions.items():
 			stock_name = ContextInfo.get_stock_name(stock)
 			price = pos['value'] / pos['total_amount']
 			#ratio = (price / (g.stock_prices[stock][0]/g.stock_prices[stock][1]) - 1) * 100
 			#diff_price = price - g.stock_prices[stock][0]/g.stock_prices[stock][1]
 			ratio = 0
 			diff_price = 0
-			print(f"GGG持仓: {stock_name}({stock}), 占比 {pos['value'] / total_value * 100:.2f}%, 涨跌幅: {ratio:.2f}% ({diff_price * pos['total_amount']:.2f}), 数量: {pos['total_amount']}, 市值: {pos['value']:.2f}元")
+			print(f"GGG持仓: {stock_name}({stock}), 占比 {pos['value'] / total_value * 100:.1f}%, 涨跌幅: {ratio:.1f}% ({diff_price * pos['total_amount']:.1f}), 数量: {pos['total_amount']}, 市值: {pos['value']:.1f}元")
 		print(f'GGG*******************总资产 {total_value:.2f}  剩余可用金额 {available_cash:.2f}元*******************\n\n')
 
 # 可选：每日盘后记录函数（非必需）
@@ -1188,14 +1194,14 @@ def after_trading_end(ContextInfo):
 		total_value = info.m_dBalance
 
 		print(f'GGG*******************当日{current_date}(周{current_date.weekday()+1})持仓市值: {position_value:.2f}元*******************')
-		sorted_pos = dict(sorted(positions.items(), key=lambda x: x[0]))
-		for stock, pos in sorted_pos.items():
+		#sorted_pos = dict(sorted(positions.items(), key=lambda x: x[0]))
+		for stock, pos in positions.items():
 			stock_name = ContextInfo.get_stock_name(stock)
 			price = pos['value'] / pos['total_amount']
 			#ratio = (price / (g.stock_prices[stock][0]/g.stock_prices[stock][1]) - 1) * 100
 			#diff_price = price - g.stock_prices[stock][0]/g.stock_prices[stock][1]
 			ratio = 0
 			diff_price = 0
-			print(f"GGG持仓: {stock_name}({stock}), 占比 {pos['value'] / total_value * 100:.2f}%, 涨跌幅: {ratio:.2f}% ({diff_price * pos['total_amount']:.2f}), 数量: {pos['total_amount']}, 市值: {pos['value']:.2f}元")
+			print(f"GGG持仓: {stock_name}({stock}), 占比 {pos['value'] / total_value * 100:.1f}%, 涨跌幅: {ratio:.1f}% ({diff_price * pos['total_amount']:.1f}), 数量: {pos['total_amount']}, 市值: {pos['value']:.1f}元")
 			#g.stock_prices[stock] = [pos.value, pos.total_amount]
 		print(f'GGG*******************总资产 {total_value:.2f}  剩余可用金额 {available_cash:.2f}元*******************\n\n')
