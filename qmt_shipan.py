@@ -353,8 +353,8 @@ def is_weekday_job(ContextInfo):
 
 def handlebar(ContextInfo):
 	if not ContextInfo.is_last_bar():
-		#return
-		pass
+		return
+		#pass
 	# 获取当前K线的时间戳
 	# 将时间戳转换为可读的日期时间对象，这里需要根据QMT API具体函数来操作
 	# 假设有一个函数 timetag_to_datetime 用于转换
