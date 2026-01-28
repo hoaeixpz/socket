@@ -313,7 +313,7 @@ def init(ContextInfo):
 	g.refresh_hold = False
 	g.trade = True
 	g.stock_num = 9  # 每月持有的股票数量 5
-	g.weekday = 2  #每周二调仓
+	g.weekday = 4  #每周二调仓
 	g.trade_day = False
 	g.each_cash = ContextInfo.capital / g.stock_num
 	g.sell_done = False
@@ -365,17 +365,17 @@ def handlebar(ContextInfo):
 	dt = get_current_date(ContextInfo)
 	#print(dt)
 
-	if dt.hour == 9 and dt.minute == 35:
+	if dt.hour == 9 and dt.minute == 30:
+		judge_date(ContextInfo)
 		prepare_stock_list(ContextInfo)
 
-	if dt.hour == 14 and dt.minute == 3:
-		judge_date(ContextInfo)
+	if dt.hour == 9 and dt.minute == 35:
 		trade_etf(ContextInfo)
 
 	if dt.hour == 10 and dt.minute == 0 and is_weekday_job(ContextInfo):
 		rebalance_sell(ContextInfo)
 
-	if dt.hour == 10 and dt.minute == 5:
+	if dt.hour == 10 and dt.minute == 2:
 		stop_loss(ContextInfo)
 
 	if dt.hour == 10 and dt.minute == 10 and is_weekday_job(ContextInfo):
@@ -389,40 +389,24 @@ def handlebar(ContextInfo):
 
 	if dt.hour == 15 and dt.minute == 0:
 		after_trading_end(ContextInfo)
-		#stocklist = get_normal_stocks(ContextInfo, dt.strftime('%Y%m%d'))
-		#get_small_cap_stocks(ContextInfo, stocklist, dt, g.stock_num)
 
-	# 同样，判断是否为上午10点
-	if dt.hour == 19 and dt.minute == 0:
-		return
-		#这里是你的卖出逻辑
-		print(dt)
-		print("执行卖出511880")
-		
-
-		objlist = get_trade_detail_data(ContextInfo.account,'STOCK','TASK')
-		print('task')
-		for obj in objlist:
-			if get_task_status_str(obj.m_eStatus) == '完成':
-				continue
-			print_task_info(obj)
-		# passorder(...)
-		pass
 
 def judge_date(ContextInfo):
 	current_date = get_current_date(ContextInfo)
 	current_month = current_date.month
 	g.count += 1
-	if (current_month == 1 or current_month == 4):
+	#if (current_month == 1 or current_month == 4):
+	if current_month == 4:
 		if g.trade == True:
 			print('GGG========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
 	else:
 		g.trade = True
-	print('count ',g.count)
+	print('judge_date count ',g.count)
 
 def prepare_stock_list(ContextInfo):
 	#获取已持有列表
+	g.count += 1
 	g.hold_list= []
 	g.limitup_stocks = []
 	g.trade_day = False
@@ -447,6 +431,8 @@ def prepare_stock_list(ContextInfo):
 		print(f"************昨日({yesterday})涨停 **************")
 		print(g.yesterday_HL_list)
 		print("")
+
+	print('prepare_stock_list count ',g.count)
 
 def collect_sell_buy_stocks(ContextInfo):
 	g.stocks_to_sell = []
@@ -483,9 +469,10 @@ def rebalance_sell(ContextInfo):
 	if g.trade is False:
 		return
 	g.trade_day = True
+
+	g.count += 1
 	
 	current_date = get_current_date(ContextInfo)
-	
 	print(f'GGG========== 执行周度调仓，日期：{current_date} ==========')
 
 	info_position(ContextInfo)
@@ -523,6 +510,8 @@ def rebalance_sell(ContextInfo):
 
 	else:
 		print('未选到符合条件的股票，本日不调仓')
+
+	print('rebalance_sell count ',g.count)
 			
 
 def rebalance_buy(ContextInfo):
@@ -530,8 +519,9 @@ def rebalance_buy(ContextInfo):
 		return
 	g.trade_day = True
 
-	current_date = get_current_date(ContextInfo)
+	g.count += 1
 	
+	current_date = get_current_date(ContextInfo)
 	print(f'GGG========== 执行周度调仓，日期：{current_date} ==========')
 	# 执行买入逻辑
 	if len(g.stocks_to_buy):
@@ -547,6 +537,7 @@ def rebalance_buy(ContextInfo):
 	# 重置卖出标记
 	g.sell_done = False
 	info_position(ContextInfo)
+	print('rebalance_buy count ',g.count)
 
 def calc_position(ContextInfo):
 	account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
@@ -747,6 +738,7 @@ def trade_afternoon(ContextInfo):
 	check_remain_amount(ContextInfo)
 	
 def check_limit_up(ContextInfo):
+	g.count += 1
 	now_time = get_current_date(ContextInfo)
 	if g.yesterday_HL_list != []:
 		#对昨日涨停股票观察到尾盘如不涨停则提前卖出，如果涨停即使不在应买入列表仍暂时持有
@@ -768,8 +760,11 @@ def check_limit_up(ContextInfo):
 			else:
 				print(f"{stock} {ContextInfo.get_stock_name(stock)}涨停，继续持有")
 
+	print('check_limit_up count ',g.count)
+
 #如果昨天有股票卖出或者买入失败，剩余的金额今天买入
 def check_remain_amount(ContextInfo):
+	g.count += 1
 	account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
 	available_cash = account_info[0].m_dAvailable
 	if g.reason_to_sell is 'limitup': #判断提前售出原因，如果是涨停售出则次日再次交易，如果是止损售出则不交易
@@ -821,8 +816,11 @@ def check_remain_amount(ContextInfo):
 		g.reason_to_sell = ''
 		g.refresh_hold = True
 
+	print('check_remain_amount count ',g.count)
+
 #止盈止损
 def stop_loss(ContextInfo):
+	g.count += 1
 	show_info = False
 	if g.run_stoploss:
 		current_positions = get_positions(ContextInfo)
@@ -899,6 +897,8 @@ def stop_loss(ContextInfo):
 	
 	if show_info == True:
 		info_position(ContextInfo)
+
+	print('stop_loss count ',g.count)
 
 def is_limit_up(ContextInfo, stock, query_date):
 	current_price = get_current_price(ContextInfo, stock, query_date, 'front')
