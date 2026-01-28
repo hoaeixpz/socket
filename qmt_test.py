@@ -324,7 +324,7 @@ def init(ContextInfo):
 	g.stoploss_market = 0.05  # 市场趋势止损参数
 	g.etf = '511880.SH'  # 空仓月份持有银华日利ETF
 
-
+	g.count = 0
 	# 每天执行调仓函数
 	# 聚宽会自动将非交易日的触发顺延至下一个交易日
 	#ContextInfo.run_time("sell_func", "1nDay", "2025-01-03 10:00:00","SH")
@@ -363,6 +363,8 @@ def handlebar(ContextInfo):
 
 	if dt.hour == 9 and dt.minute == 35:
 		prepare_stock_list(ContextInfo)
+
+	if dt.hour == 10 and dt.minute == 2:
 		judge_date(ContextInfo)
 		trade_etf(ContextInfo)
 
@@ -406,12 +408,14 @@ def handlebar(ContextInfo):
 def judge_date(ContextInfo):
 	current_date = get_current_date(ContextInfo)
 	current_month = current_date.month
+	g.count += 1
 	if (current_month == 1 or current_month == 4):
 		if g.trade == True:
 			print('GGG========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
 	else:
 		g.trade = True
+	print('count ',g.count)
 
 def prepare_stock_list(ContextInfo):
 	#获取已持有列表
