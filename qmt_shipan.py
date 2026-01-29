@@ -313,7 +313,7 @@ def init(ContextInfo):
 	g.refresh_hold = False
 	g.trade = True
 	g.stock_num = 9  # 每月持有的股票数量 5
-	g.weekday = 4  #每周二调仓
+	g.weekday = 2  #每周二调仓
 	g.trade_day = False
 	g.each_cash = ContextInfo.capital / g.stock_num
 	g.sell_done = False
@@ -395,8 +395,7 @@ def judge_date(ContextInfo):
 	current_date = get_current_date(ContextInfo)
 	current_month = current_date.month
 	g.count += 1
-	#if (current_month == 1 or current_month == 4):
-	if current_month == 4:
+	if (current_month == 1 or current_month == 4):
 		if g.trade == True:
 			print('GGG========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
@@ -476,8 +475,9 @@ def rebalance_sell(ContextInfo):
 	print(f'GGG========== 执行周度调仓，日期：{current_date} ==========')
 
 	info_position(ContextInfo)
-	yesterday = current_date - timedelta(days=1)
-	query_date = yesterday.replace(hour=15, minute=0, second=0, microsecond=0)
+	#yesterday = current_date - timedelta(days=1)
+	#query_date = yesterday.replace(hour=15, minute=0, second=0, microsecond=0)
+	query_date = current_date
 
 	no_st_codes = get_normal_stocks(ContextInfo, query_date.strftime('%Y%m%d'))
 	g.stock_pool = no_st_codes
@@ -1147,11 +1147,11 @@ def sell_target_value(ContextInfo, stock, target_value):
 
 	positions = get_positions(ContextInfo)
 	pos = positions.get(stock)
-	if pos is not None:
+	if pos is None:
 		print(f'{stock} 没有持仓，无法卖出')
 	else:
 		if target_value == 0:
-			passorder(24, 1101, ContextInfo.account, stock, 6, -1, pos['total_amount'], 2, 'qingkong', ContextInfo)
+			passorder(24, 1101, ContextInfo.account, stock, 6, -1, pos['total_amount'], '', 2, 'qingkong', ContextInfo)
 		else:
 			volume = pos['value'] - target_value
 			passorder(24, 1102, ContextInfo.account, stock, 6, -1, volume, 2, ContextInfo)
