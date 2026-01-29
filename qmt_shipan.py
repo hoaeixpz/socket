@@ -628,11 +628,10 @@ def calc_position(ContextInfo):
 					g.stocks_to_buy.append(stock)
 					cash -= diff_pos*total_value
 				else:
-					sell_target_value(ContextInfo, stock, exce_pos*total_value)
-					#if order_info != None and order_info.m_dPrice != 0:
-					if True:
+					if not ContextInfo.is_suspended_stock(stock) and not is_limit_down(ContextInfo, stock, get_current_date(ContextInfo)):
+						sell_target_value(ContextInfo, stock, exce_pos*total_value)
 						cash -= diff_pos*total_value
-						print(f'调整{stock_name}市值，卖出{order_info.m_nVolume}股 * {order_info.m_dPrice}')
+						print(f'调整{stock_name}市值，卖出{abs(diff_pos) * total_value:.2f}元')
 						#update_stock_price(stock, order_info.m_dPrice, -order_info.m_nVolume)
 						
 		
@@ -1119,7 +1118,7 @@ def buy_stocks(ContextInfo):
 			else:
 				if g.excepted_position.get(stock) is not None:
 					target_value_per_stock = g.excepted_position[stock] * total_value
-				order_info = buy_target_value(ContextInfo, stock, target_value_per_stock, current_price)
+				buy_target_value(ContextInfo, stock, target_value_per_stock, current_price)
 				raw_amount = target_value_per_stock / current_price
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
 				print(f'委托买入: {ContextInfo.get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'

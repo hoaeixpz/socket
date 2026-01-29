@@ -324,7 +324,7 @@ def init(ContextInfo):
 	g.stoploss_market = 0.05  # 市场趋势止损参数
 	g.etf = '511880.SH'  # 空仓月份持有银华日利ETF
 
-	g.count = 0
+
 	# 每天执行调仓函数
 	# 聚宽会自动将非交易日的触发顺延至下一个交易日
 	#ContextInfo.run_time("sell_func", "1nDay", "2025-01-03 10:00:00","SH")
@@ -363,8 +363,6 @@ def handlebar(ContextInfo):
 
 	if dt.hour == 9 and dt.minute == 35:
 		prepare_stock_list(ContextInfo)
-
-	if dt.hour == 10 and dt.minute == 2:
 		judge_date(ContextInfo)
 		trade_etf(ContextInfo)
 
@@ -385,37 +383,17 @@ def handlebar(ContextInfo):
 
 	if dt.hour == 15 and dt.minute == 0:
 		after_trading_end(ContextInfo)
-		#stocklist = get_normal_stocks(ContextInfo, dt.strftime('%Y%m%d'))
-		#get_small_cap_stocks(ContextInfo, stocklist, dt, g.stock_num)
 
-	# 同样，判断是否为上午10点
-	if dt.hour == 19 and dt.minute == 0:
-		return
-		#这里是你的卖出逻辑
-		print(dt)
-		print("执行卖出511880")
-		
-
-		objlist = get_trade_detail_data(ContextInfo.account,'STOCK','TASK')
-		print('task')
-		for obj in objlist:
-			if get_task_status_str(obj.m_eStatus) == '完成':
-				continue
-			print_task_info(obj)
-		# passorder(...)
-		pass
 
 def judge_date(ContextInfo):
 	current_date = get_current_date(ContextInfo)
 	current_month = current_date.month
-	g.count += 1
 	if (current_month == 1 or current_month == 4):
 		if g.trade == True:
 			print('GGG========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
 	else:
 		g.trade = True
-	print('count ',g.count)
 
 def prepare_stock_list(ContextInfo):
 	#获取已持有列表
@@ -457,7 +435,6 @@ def collect_sell_buy_stocks(ContextInfo):
 			g.stocks_to_buy.append(stock)
 
 def trade_etf(ContextInfo):
-	print("trade_etf")
 	if g.trade is False:
 		current_holdings = get_current_holding_stocks(ContextInfo)
 		if current_holdings != [g.etf]:
@@ -466,14 +443,6 @@ def trade_etf(ContextInfo):
 			collect_sell_buy_stocks(ContextInfo)
 			sell_stocks(ContextInfo)
 			buy_stocks(ContextInfo)
-
-	account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
-	info = account_info[0]
-	available_cash = info.m_dAvailable
-	print(f"当前可买ETF现金为 {available_cash}")
-	if available_cash > 10200:
-		g.stocks_to_buy = [g.etf]
-		buy_stocks(ContextInfo)
 
 def rebalance_sell(ContextInfo):
 	if g.trade is False:
@@ -633,11 +602,12 @@ def calc_position(ContextInfo):
 					g.stocks_to_buy.append(stock)
 					cash -= diff_pos*total_value
 				else:
-					order_info= sell_target_value(ContextInfo, stock, exce_pos*total_value)
-					if order_info != None and order_info.m_dPrice != 0:
-						cash -= diff_pos*total_value
-						print(f'调整{stock_name}市值，卖出{order_info.m_nVolume}股 * {order_info.m_dPrice}')
-						#update_stock_price(stock, order_info.m_dPrice, -order_info.m_nVolume)
+					if not ContextInfo.is_suspended_stock(stock) and not is_limit_down(ContextInfo, stock, get_current_date(ContextInfo)):
+					    order_info = sell_target_value(ContextInfo, stock, exce_pos*total_value)
+					    if order_info != None and order_info.m_dPrice != 0:
+						    cash -= diff_pos*total_value
+						    print(f'调整{stock_name}市值，卖出{order_info.m_nVolume}股 * {order_info.m_dPrice}')
+						    #update_stock_price(stock, order_info.m_dPrice, -order_info.m_nVolume)
 						
 		
 		avai_cash += cash
