@@ -389,10 +389,11 @@ def handlebar(ContextInfo):
 	if dt.hour == 14 and dt.minute == 0:
 		trade_afternoon(ContextInfo)
 
-	if dt.hour == 14 and dt.minute == 45:
-		print_hold_stock_info(ContextInfo)
-		
+
 	if dt.hour == 15 and dt.minute == 0:
+		objlist = get_trade_detail_data(ContextInfo.account,'STOCK',"POSITION")
+		for obj in objlist:
+			print_hold_stock_info(obj)
 		after_trading_end(ContextInfo)
 
 
