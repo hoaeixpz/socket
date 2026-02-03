@@ -166,15 +166,15 @@ def get_order_type_str(operation_code: int) -> str:
 		raise ValueError(f"无效的操作代码: {operation_code}")
 
 def print_hold_stock_info(obj):
-	print('stock code: ', obj.m_strInstrumentID, '.', obj.m_strExchangeID)
-	print('stock name: ', obj.m_strInstrumentName)
-	print('持仓: ', obj.m_nVolume)
-	print('可用持仓: ', obj.m_nCanUseVolume)
-	print('最新价: ', obj.m_dSettlementPrice)
-	print('市值: ', obj.m_dMarketValue)
-	print('成本价: ', obj.m_dOpenPrice)
-	print('盈亏: ', obj.m_dFloatProfit)
-	print('')
+	info_str = 'stock code: '+ obj.m_strInstrumentID + '.' + obj.m_strExchangeID + "\t" \
+			+ '持仓: '+ str(obj.m_nVolume) + "\t" \
+			+ '可用持仓: '+ str(obj.m_nCanUseVolume) + "\t" \
+			+ '最新价: '+ str(obj.m_dSettlementPrice) + "\t" \
+			+ '市值: '+ str(round(obj.m_dMarketValue, 1)) + "\t" \
+			+ '成本价: '+ str(obj.m_dOpenPrice) + "\t" \
+			+ '盈亏: ' + str(round(obj.m_dFloatProfit,1)) + "\t" \
+			+ 'stock name: '+ obj.m_strInstrumentName
+	print(info_str)
 
 def print_task_info(obj):
 	print('task id: ', obj.m_nTaskId)
