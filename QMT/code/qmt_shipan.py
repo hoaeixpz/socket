@@ -169,9 +169,9 @@ def print_hold_stock_info(obj):
 	info_str = 'stock code: '+ obj.m_strInstrumentID + '.' + obj.m_strExchangeID + "\t" \
 			+ '持仓: '+ str(obj.m_nVolume) + "\t" \
 			+ '可用持仓: '+ str(obj.m_nCanUseVolume) + "\t" \
-			+ '最新价: '+ str(obj.m_dSettlementPrice) + "\t" \
+			+ '最新价: '+ str(round(obj.m_dSettlementPrice,2)) + "\t" \
 			+ '市值: '+ str(round(obj.m_dMarketValue, 1)) + "\t" \
-			+ '成本价: '+ str(obj.m_dOpenPrice) + "\t" \
+			+ '成本价: '+ str(round(obj.m_dOpenPrice,2)) + "\t" \
 			+ '盈亏: ' + str(round(obj.m_dFloatProfit,1)) + "\t" \
 			+ 'stock name: '+ obj.m_strInstrumentName
 	print(info_str)
@@ -296,6 +296,8 @@ def init(ContextInfo):
 	print(period)
 	ContextInfo.account = '8885388757'
 	ContextInfo.set_account(ContextInfo.account)
+	account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
+	available_cash = account_info[0].m_dAvailable
 
 	# 设置全局变量
 	g.stock_pool = []
@@ -316,7 +318,7 @@ def init(ContextInfo):
 	g.stock_num = 9  # 每月持有的股票数量 5
 	g.weekday = 2  #每周二调仓
 	g.trade_day = False
-	g.each_cash = ContextInfo.capital / g.stock_num
+	g.each_cash = available_cash / g.stock_num
 	g.sell_done = False
 	g.last_month = None
 	g.run_stoploss = True
@@ -331,7 +333,7 @@ def init(ContextInfo):
 	#ContextInfo.run_time("sell_func", "1nDay", "2025-01-03 10:00:00","SH")
 	#ContextInfo.run_time("buy_func", "1nDay", "2025-01-03 14:00:00","SH")
 	#ContextInfo.run_time("myHandlebar","5nSecond","2025-01-03 13:20:00","SH")
-	print(f'策略初始化完成：每月初调仓，持有市值最小的{g.stock_num}只股票, 初始资金{ContextInfo.capital}')
+	print(f'策略初始化完成：每月初调仓，持有市值最小的{g.stock_num}只股票, 初始资金{available_cash}')
 
 def is_weekday_job(ContextInfo):
 	current_date = get_current_date(ContextInfo)
@@ -868,7 +870,7 @@ def stop_loss(ContextInfo):
 			query_date = yesterday.replace(hour=15, minute=0, second=0, microsecond=0)
 			dt_str = query_date.strftime('%Y%m%d%H%M%S')
 			#stocklist = ContextInfo.get_stock_list_in_sector('中小综指')
-			price_data = ContextInfo.get_market_data_ex(['open', 'close'], ['399101.SZ'], period='1d', start_time='', end_time=dt_str, count=1,dividend_type='none', fill_data=True,subscribe=False)
+			price_data = ContextInfo.get_market_data_ex(['open', 'close'], ['399101.SZ'], period='1d', start_time='', end_time=dt_str, count=1,dividend_type='none', fill_data=True,subscribe=True)
 			#print(price_data)
 			df = list(price_data.values())[0]
 			#stock_df = get_price(security=get_index_stocks('399101.XSHE'), end_date=context.previous_date, frequency='daily', fields=['close','open'], count=1, panel=False)
@@ -952,7 +954,7 @@ def is_limit_down(ContextInfo, stock, query_date):
 
 def get_current_price(ContextInfo, stock, query_date, type='none'):
 	dt_str = query_date.strftime('%Y%m%d%H%M%S')
-	price_data=ContextInfo.get_market_data_ex(['close'], [stock], period='5m', start_time='', end_time=dt_str, count=1,dividend_type=type, fill_data=True,subscribe=False)
+	price_data=ContextInfo.get_market_data_ex(['close'], [stock], period='1m', start_time='', end_time=dt_str, count=1,dividend_type=type, fill_data=True,subscribe=True)
 	for key, price in price_data.items():
 		if not price.empty:
 			return price.iloc[0]['close']
@@ -967,7 +969,7 @@ def get_market(ContextInfo, stock_list, query_date):
 	#print(result)
 	
 	dt_str = query_date.strftime('%Y%m%d%H%M%S')
-	price_data=ContextInfo.get_market_data_ex(['close'], stock_list, period='5m', start_time='', end_time=dt_str, count=1,dividend_type='none',fill_data=True,subscribe=False)
+	price_data=ContextInfo.get_market_data_ex(['close'], stock_list, period='1m', start_time='', end_time=dt_str, count=1,dividend_type='none',fill_data=True,subscribe=True)
 	#print(price_data)
 	guben = result['total_capital']
 	market = {}
