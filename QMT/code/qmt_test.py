@@ -547,6 +547,12 @@ def calc_position(ContextInfo):
 			print(f'涨停股 {ContextInfo.get_stock_name(stock)} 占仓位比重为 {fp*100:.2f}%')
 				
 	g.excepted_position = {}
+	if holding_num - len(g.stocks_fail_sell) - HL_count <= 1:
+		print("涨停股个数 ", HL_count)
+		print("异常股个数 ", len(g.stocks_fail_sell))
+		print("可调整股票个数 ", holding_num - len(g.stocks_fail_sell) - HL_count)
+		print("无需调整")
+		return
 	p = (1 - fail_pos) / (holding_num - len(g.stocks_fail_sell) - HL_count)
 	
 	#计算买入之后期望每只股票的持仓占比
@@ -798,7 +804,7 @@ def stop_loss(ContextInfo):
 				print(f"{stock} 股价{price} 成本{avg_cost}")
 				# 个股盈利止盈
 				if price >= avg_cost * 2:
-					order_target_value(stock, 0, 'BUY1', ContextInfo, ContextInfo.account)
+					#order_target_value(stock, 0, 'BUY1', ContextInfo, ContextInfo.account)
 					print("⭕ 收益100%止盈,卖出{}".format(stock))
 				# 个股止损
 				elif price < avg_cost * (1 - g.stoploss_limit):
