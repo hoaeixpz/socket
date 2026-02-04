@@ -316,7 +316,7 @@ def init(ContextInfo):
 	g.refresh_hold = False
 	g.trade = True
 	g.stock_num = 9  # 每月持有的股票数量 5
-	g.weekday = 3  #每周二调仓
+	g.weekday = 2  #每周二调仓
 	g.trade_day = False
 	g.each_cash = available_cash / g.stock_num
 	g.sell_done = False
@@ -374,18 +374,6 @@ def handlebar(ContextInfo):
 
 	if dt.hour == 9 and dt.minute == 35:
 		trade_etf(ContextInfo)
-		
-	'''
-	if dt.hour == 14 and dt.minute == 56:
-		stocks = get_current_holding_stocks(ContextInfo)
-		stocks.append('603381.SH')
-		stocks.append('600072.SH')
-		for s in stocks:
-			p = get_last_price(ContextInfo, s)
-			print(s, " ", p, "zhangting ", is_limit_up(ContextInfo, s))
-
-		prepare_stock_list(ContextInfo)
-	'''	
 
 	if dt.hour == 10 and dt.minute == 0 and is_weekday_job(ContextInfo):
 		rebalance_sell(ContextInfo)
@@ -409,6 +397,12 @@ def handlebar(ContextInfo):
 		for obj in objlist:
 			print_hold_stock_info(obj)
 		after_trading_end(ContextInfo)
+
+	'''
+	#TEST
+	if dt.hour == 15 and dt.minute == 0:
+		check_limit_up(ContextInfo)
+	'''
 
 
 def judge_date(ContextInfo):
@@ -532,7 +526,6 @@ def rebalance_sell(ContextInfo):
 		print('未选到符合条件的股票，本日不调仓')
 
 	print('rebalance_sell count ',g.count)
-			
 
 def rebalance_buy(ContextInfo):
 	if g.trade is False:
@@ -629,7 +622,7 @@ def calc_position(ContextInfo):
 		stock_name = ContextInfo.get_stock_name(stock)
 		target_value = total_value * g.excepted_position[stock]
 		current_price = get_last_price(ContextInfo, stock)
-		if current_price is None:
+		if current_price is None or current_price == 0:
 			g.excepted_position.pop(stock)
 			continue
 		amount = int(target_value / current_price / 100) * 100
@@ -779,14 +772,13 @@ def check_limit_up(ContextInfo):
 	if g.yesterday_HL_list != []:
 		#对昨日涨停股票观察到尾盘如不涨停则提前卖出，如果涨停即使不在应买入列表仍暂时持有
 		for stock in g.yesterday_HL_list:
-			current_price = get_specified_date_price(ContextInfo, stock, now_time, 'front')
-			yesterday = now_time - timedelta(days=1)
-			query_date = yesterday.replace(hour=15, minute=0, second=0, microsecond=0)
-			prev_price = get_specified_date_price(ContextInfo, stock, query_date, 'front')
+			info = ContextInfo.get_instrumentdetail(stock)
+			current_price = get_last_price(ContextInfo, stock)
+			prev_price = info['PreClose']
 			rise_ratio = (current_price - prev_price) / prev_price * 100
-			print(f'{now_time} {stock} {ContextInfo.get_stock_name(stock)} 股价{current_price} 涨幅{rise_ratio:.2f}%')
+			print(f'{stock} {ContextInfo.get_stock_name(stock)} 股价{current_price} 涨幅{rise_ratio:.2f}%')
 
-			limit_up_price = prev_price * 1.099
+			limit_up_price = info['UpStopPrice']
 			if current_price < limit_up_price:
 				print(f"{stock} {ContextInfo.get_stock_name(stock)}涨停打开，卖出")
 				sell_target_value(ContextInfo, stock, 0)
@@ -985,7 +977,7 @@ def is_limit_down(ContextInfo, stock):
 
 def get_specified_date_price(ContextInfo, stock, query_date, type='none'):
 	dt_str = query_date.strftime('%Y%m%d%H%M%S')
-	price_data=ContextInfo.get_market_data_ex(['close'], [stock], period='5m', start_time='', end_time=dt_str, count=1,dividend_type=type, fill_data=True,subscribe=False)
+	price_data=ContextInfo.get_market_data_ex(['close'], [stock], period='1m', start_time='', end_time=dt_str, count=1,dividend_type=type, fill_data=True,subscribe=True)
 	for key, price in price_data.items():
 		if not price.empty:
 			return price.iloc[0]['close']
