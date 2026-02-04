@@ -316,7 +316,7 @@ def init(ContextInfo):
 	g.refresh_hold = False
 	g.trade = True
 	g.stock_num = 9  # 每月持有的股票数量 5
-	g.weekday = 2  #每周二调仓
+	g.weekday = 3  #每周二调仓
 	g.trade_day = False
 	g.each_cash = available_cash / g.stock_num
 	g.sell_done = False
@@ -374,6 +374,18 @@ def handlebar(ContextInfo):
 
 	if dt.hour == 9 and dt.minute == 35:
 		trade_etf(ContextInfo)
+		
+	'''
+	if dt.hour == 14 and dt.minute == 56:
+		stocks = get_current_holding_stocks(ContextInfo)
+		stocks.append('603381.SH')
+		stocks.append('600072.SH')
+		for s in stocks:
+			p = get_last_price(ContextInfo, s)
+			print(s, " ", p, "zhangting ", is_limit_up(ContextInfo, s))
+
+		prepare_stock_list(ContextInfo)
+	'''	
 
 	if dt.hour == 10 and dt.minute == 0 and is_weekday_job(ContextInfo):
 		rebalance_sell(ContextInfo)
@@ -430,7 +442,7 @@ def prepare_stock_list(ContextInfo):
 		last_date = last_date[0]
 		query_date = datetime.strptime(last_date+'150000', '%Y%m%d%H%M%S')
 
-		if is_limit_up(ContextInfo, stock, query_date):
+		if is_specified_date_limit_up(ContextInfo, stock, query_date):
 			g.yesterday_HL_list.append(stock)
 
 	if g.yesterday_HL_list != []:
@@ -606,7 +618,9 @@ def calc_position(ContextInfo):
 	position_sum = 0
 	#计算已有持仓的股票占比
 	for stock, pos in positions.items():
-		current_price = get_current_price(ContextInfo, stock, get_current_date(ContextInfo))
+		current_price = get_last_price(ContextInfo, stock)
+		if current_price is None or current_price == 0:
+			continue
 		position_sum += pos['value']
 		position_dict[stock] = pos['value'] / total_value, current_price
 	
@@ -614,8 +628,8 @@ def calc_position(ContextInfo):
 	for stock in g.stocks_to_buy:
 		stock_name = ContextInfo.get_stock_name(stock)
 		target_value = total_value * g.excepted_position[stock]
-		current_price = get_current_price(ContextInfo, stock, get_current_date(ContextInfo))
-		if math.isnan(current_price):
+		current_price = get_last_price(ContextInfo, stock)
+		if current_price is None:
 			g.excepted_position.pop(stock)
 			continue
 		amount = int(target_value / current_price / 100) * 100
@@ -642,10 +656,12 @@ def calc_position(ContextInfo):
 					g.stocks_to_buy.append(stock)
 					cash -= diff_pos*total_value
 				else:
-					current_price = get_current_price(ContextInfo, stock, get_current_date(ContextInfo))
+					current_price = get_last_price(ContextInfo, stock)
+					if current_price is None or current_price == 0:
+						current_price = abs(avai_cash)
 					amount = abs(avai_cash) / current_price
 					is_paused = ContextInfo.is_suspended_stock(stock)
-					is_dieting = is_limit_down(ContextInfo, stock, get_current_date(ContextInfo))
+					is_dieting = is_limit_down(ContextInfo, stock)
 					canuse_amount = positions[stock]['canuse_amount']
 					if not is_paused and not is_dieting and not amount < 100 and not canuse_amount < 100:
 						sell_target_value(ContextInfo, stock, exce_pos*total_value)
@@ -713,7 +729,9 @@ def calc_position(ContextInfo):
 		diff_value = (exce_pos - pos) * total_value
 		
 		stock_name = ContextInfo.get_stock_name(stock)
-		current_price = get_current_price(ContextInfo, stock, get_current_date(ContextInfo))
+		current_price = get_last_price(ContextInfo, stock)
+		if current_price is None or current_price == 0:
+			continue
 		'''
 		如果这个股票是在买入清单中，那么调整买入数量
 		如果这只股票已经持有，那么看与预期的占比份额是不是差别很大，差别很大则调仓
@@ -761,10 +779,10 @@ def check_limit_up(ContextInfo):
 	if g.yesterday_HL_list != []:
 		#对昨日涨停股票观察到尾盘如不涨停则提前卖出，如果涨停即使不在应买入列表仍暂时持有
 		for stock in g.yesterday_HL_list:
-			current_price = get_current_price(ContextInfo, stock, now_time, 'front')
+			current_price = get_specified_date_price(ContextInfo, stock, now_time, 'front')
 			yesterday = now_time - timedelta(days=1)
 			query_date = yesterday.replace(hour=15, minute=0, second=0, microsecond=0)
-			prev_price = get_current_price(ContextInfo, stock, query_date, 'front')
+			prev_price = get_specified_date_price(ContextInfo, stock, query_date, 'front')
 			rise_ratio = (current_price - prev_price) / prev_price * 100
 			print(f'{now_time} {stock} {ContextInfo.get_stock_name(stock)} 股价{current_price} 涨幅{rise_ratio:.2f}%')
 
@@ -918,14 +936,14 @@ def stop_loss(ContextInfo):
 
 	print('stop_loss count ',g.count)
 
-def is_limit_up(ContextInfo, stock, query_date):
-	current_price = get_current_price(ContextInfo, stock, query_date, 'front')
+def is_specified_date_limit_up(ContextInfo, stock, query_date):
+	current_price = get_specified_date_price(ContextInfo, stock, query_date, 'front')
 	if math.isnan(current_price):
 		return False
 
 	yesterday = query_date - timedelta(days=1)
 	query_date = yesterday.replace(hour=15, minute=0, second=0, microsecond=0)
-	prev_price = get_current_price(ContextInfo, stock, query_date, 'front')
+	prev_price = get_specified_date_price(ContextInfo, stock, query_date, 'front')
 	if math.isnan(prev_price):
 		return False
 
@@ -935,49 +953,72 @@ def is_limit_up(ContextInfo, stock, query_date):
 
 	return False
 
-def is_limit_down(ContextInfo, stock, query_date):
-	current_price = get_current_price(ContextInfo, stock, query_date, 'front')
-	if math.isnan(current_price):
+def is_limit_up(ContextInfo, stock):
+	current_price = get_last_price(ContextInfo, stock)
+	if current_price is None or current_price == 0:
 		return False
 
-	yesterday = query_date - timedelta(days=1)
-	query_date = yesterday.replace(hour=15, minute=0, second=0, microsecond=0)
-	prev_price = get_current_price(ContextInfo, stock, query_date, 'front')
-	if math.isnan(prev_price):
+	info = ContextInfo.get_instrumentdetail(stock)
+	limit_up_price = info['UpStopPrice']
+	if math.isnan(limit_up_price) or limit_up_price is None:
 		return False
 
-	limit_up_price = prev_price * 0.901
-	if current_price <= limit_up_price:
+	if current_price >= limit_up_price:
 		return True
 
 	return False
 
-def get_current_price(ContextInfo, stock, query_date, type='none'):
+def is_limit_down(ContextInfo, stock):
+	current_price = get_last_price(ContextInfo, stock)
+	if current_price is None or current_price == 0:
+		return False
+
+	info = ContextInfo.get_instrumentdetail(stock)
+	limit_down_price = info['DownStopPrice']
+	if math.isnan(limit_down_price) or limit_down_price is None:
+		return False
+
+	if current_price <= limit_down_price:
+		return True
+
+	return False
+
+def get_specified_date_price(ContextInfo, stock, query_date, type='none'):
 	dt_str = query_date.strftime('%Y%m%d%H%M%S')
-	price_data=ContextInfo.get_market_data_ex(['close'], [stock], period='1m', start_time='', end_time=dt_str, count=1,dividend_type=type, fill_data=True,subscribe=True)
+	price_data=ContextInfo.get_market_data_ex(['close'], [stock], period='5m', start_time='', end_time=dt_str, count=1,dividend_type=type, fill_data=True,subscribe=False)
 	for key, price in price_data.items():
 		if not price.empty:
 			return price.iloc[0]['close']
 		else:
 			return float('nan')
 
+def get_last_price(ContextInfo, stock):
+	price_data = ContextInfo.get_full_tick([stock])
+	for key, price in price_data.items():
+		if price['lastPrice'] == 0:
+			print(stock, " 获取当前价格异常,股价为0")
+		return price['lastPrice']
+
+	print(stock, " 获取当前价格异常")
+	return None
+
 def get_market(ContextInfo, stock_list, query_date):
-	fieldList = ['CAPITALSTRUCTURE.total_capital']
 	dt_str = query_date.strftime('%Y%m%d %H:%M:%S')
-	result = ContextInfo.get_financial_data(fieldList, stock_list, dt_str, dt_str)
-	#print("市值")
-	#print(result)
+	guben = {}
+	for stock in stock_list:
+		info = ContextInfo.get_instrumentdetail(stock)
+		#print("市值 ", info['TotalVolumn'])
+		guben[stock] = info['TotalVolumn']
 	
 	dt_str = query_date.strftime('%Y%m%d%H%M%S')
-	price_data=ContextInfo.get_market_data_ex(['close'], stock_list, period='1m', start_time='', end_time=dt_str, count=1,dividend_type='none',fill_data=True,subscribe=True)
+	price_data = ContextInfo.get_full_tick(stock_list)
 	#print(price_data)
-	guben = result['total_capital']
 	market = {}
 	for key, price in price_data.items():
 		gb = guben[key]
-		value = price.iloc[0]['close']
+		value = price['lastPrice']
 		#print(gb, " ", value)
-		if math.isnan(gb) or math.isnan(value):
+		if gb is None or math.isnan(gb) or math.isnan(value):
 			continue
 		market[key] = gb * value
 
@@ -987,7 +1028,7 @@ def get_small_cap_stocks(ContextInfo, stock_list, query_date, n=5):
 	#获取市值最小的n只股票（修正版：全局排序）
 	# 用于存储所有查询到的市值数据
 	market = get_market(ContextInfo, stock_list, query_date)
-	print('market')
+	#print('market')
 	#print(market)
 	sorted_market = dict(sorted(market.items(), key=lambda x:x[1], reverse=False))
 	#print(sorted_market)
@@ -1065,15 +1106,18 @@ def filter_paused_stocks(ContextInfo, stock_list):
 		return trading_stocks
 
 	current_holdings = get_current_holding_stocks(ContextInfo)
-	current_date = get_current_date(ContextInfo)
 	for stock in stock_list:
 		if ContextInfo.is_suspended_stock(stock):
 			#print(f'停牌 {stock} {ContextInfo.get_stock_name(stock)}')
 			continue
-		if stock not in current_holdings and is_limit_up(ContextInfo, stock, current_date):  # 涨停
+		info = ContextInfo.get_instrumentdetail(stock)
+		if info['InstrumentID'] is None:
+			print(f"可能退市 {stock} {ContextInfo.get_stock_name(stock)}")
+			continue
+		if stock not in current_holdings and is_limit_up(ContextInfo, stock):  # 涨停
 			print(f'涨停 {stock} {ContextInfo.get_stock_name(stock)}')
 			continue
-		if stock not in current_holdings and is_limit_down(ContextInfo, stock, current_date):  # 跌停
+		if stock not in current_holdings and is_limit_down(ContextInfo, stock):  # 跌停
 			print(f'跌停 {stock} {ContextInfo.get_stock_name(stock)}')
 			continue
 		trading_stocks.append(stock)
@@ -1122,8 +1166,8 @@ def buy_stocks(ContextInfo):
 		target_value_per_stock = g.each_cash
 		#buy_num  = len(g.stocks_to_buy)
 		for stock in g.stocks_to_buy:
-			current_price = get_current_price(ContextInfo, stock, dt)
-			if math.isnan(current_price):
+			current_price = get_last_price(ContextInfo, stock)
+			if current_price is None or current_price == 0:
 				continue
 
 			account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
