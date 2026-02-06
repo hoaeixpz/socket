@@ -368,7 +368,7 @@ def handlebar(ContextInfo):
 	dt = get_current_date(ContextInfo)
 	#print(dt)
 
-	if dt.hour == 9 and dt.minute == 30:
+	if dt.hour == 9 and dt.minute == 31:
 		judge_date(ContextInfo)
 		prepare_stock_list(ContextInfo)
 
@@ -665,7 +665,7 @@ def calc_position(ContextInfo):
 		
 		avai_cash += cash
 		if cash != 0:
-			print(f'重新分配之后资金为{avai_cash}')
+			print(f'重新分配之后资金为{avai_cash:.2f}')
 		
 		if avai_cash > 5000:
 			print(f'重新分配之后资金仍有剩余，追加买入')
@@ -713,7 +713,7 @@ def calc_position(ContextInfo):
 	position_dict = dict(sorted(position_dict.items(), key=lambda x: x[0]))
 	for stock, pos in position_dict.items():
 		stock_name = ContextInfo.get_stock_name(stock)
-		print(f' 预估持仓: {stock_name}({stock}), 占比 {pos[0] * 100:.2f}% 单价 {pos[1]}')
+		print(f' 预估持仓: {stock_name}({stock}), 占比 {pos[0] * 100:.2f}% 单价 {pos[1]:.2f}')
 		
 	for stock, exce_pos in g.excepted_position.items():
 		if stock in g.stocks_fail_sell:
@@ -739,11 +739,11 @@ def calc_position(ContextInfo):
 				current_value = pos * total_value
 				#num = 1
 				num = int((excepted_value - current_value) / current_price / 100)
-				print(f'调整{stock_name}买入数量，期望买入{excepted_value:.2f},当前{current_value},相差{diff_value:.2f}')
+				print(f'调整{stock_name}买入数量，期望买入{excepted_value:.2f},当前{current_value:.2f},相差{diff_value:.2f}')
 				while True:
 					new_value = current_value + current_price * num * 100
 					diff_v = excepted_value - new_value
-					print(f'单价{current_price}，新市值{new_value:.2f}，差值{diff_v:.2f}')
+					print(f'单价{current_price:.2f}，新市值{new_value:.2f}，差值{diff_v:.2f}')
 					if abs(round(diff_v,2)) <= abs(round(diff_value,2)):
 						diff_value = diff_v
 						num += 1
@@ -857,7 +857,7 @@ def stop_loss(ContextInfo):
 			for stock in current_positions.keys():
 				price = current_positions[stock]['price']
 				avg_cost = current_positions[stock]['avg_cost']
-				print(f"{stock} 股价{price} 成本{avg_cost}")
+				print(f"{stock} 股价{price:.2f} 成本{avg_cost:.2f}")
 				# 个股盈利止盈
 				if price >= avg_cost * 2:
 					#order_target_value(stock, 0, 'BUY1', ContextInfo, ContextInfo.account)
@@ -1212,7 +1212,7 @@ def sell_target_value(ContextInfo, stock, target_value):
 		else:
 			volume = pos['value'] - target_value
 			passorder(24, 1102, ContextInfo.account, stock, 6, -1, volume, 2, ContextInfo)
-			print(f"sell passorder target value {target_value} current {pos['value']} volume {volume}")
+			print(f"sell passorder target value {target_value:.2f} current {pos['value']:.2f} volume {volume:.2f}")
 
 	#order_target_value(stock, target_value, 'BUY1', ContextInfo, ContextInfo.account)
 
@@ -1235,7 +1235,7 @@ def buy_target_value(ContextInfo, stock, target_value, current_price):
 
 	volume = target_value - current_value + current_price * 5
 	passorder(23, 1102, ContextInfo.account, stock, 4, -1, volume, 2, ContextInfo)
-	print(f"buy passorder target value {target_value} current {current_value} volume {volume}")
+	print(f"buy passorder target value {target_value:.2f} current {current_value:.2f} volume {volume:.2f}")
 	#order_target_value(stock, target_value + current_price * 10, 'SALE1', ContextInfo, ContextInfo.account)
 
 def buy_target_shares(ContextInfo, stock, target_share):
