@@ -855,6 +855,9 @@ def stop_loss(ContextInfo):
 
 		if g.stoploss_strategy == 1 or g.stoploss_strategy == 3:
 			for stock in current_positions.keys():
+				if current_positions[stock]['total_amount'] == 0:
+					continue
+
 				price = current_positions[stock]['price']
 				avg_cost = current_positions[stock]['avg_cost']
 				print(f"{stock} 股价{price:.2f} 成本{avg_cost:.2f}")
@@ -1046,7 +1049,7 @@ def get_small_cap_stocks(ContextInfo, stock_list, query_date, n=5):
 	if flag:
 		print(f"get_small_cap_stocks   {query_date}    head {n}")
 		rank = 0
-		for stock, cap in list(sorted_market.items())[0:10]:
+		for stock, cap in list(sorted_market.items())[0:20]:
 			stock_name = ContextInfo.get_stock_name(stock)
 			cap_in_10k = round(cap/100000000.0, 2)
 			rank = rank + 1
@@ -1204,7 +1207,7 @@ def sell_target_value(ContextInfo, stock, target_value):
 
 	positions = get_positions(ContextInfo)
 	pos = positions.get(stock)
-	if pos is None:
+	if pos is None or pos['total_amount'] == 0:
 		print(f'{stock} 没有持仓，无法卖出')
 	else:
 		if target_value == 0:
@@ -1231,7 +1234,7 @@ def buy_target_value(ContextInfo, stock, target_value, current_price):
 	positions = get_positions(ContextInfo)
 	pos = positions.get(stock)
 	if pos is not None:
-		current_value = {pos['value']}
+		current_value = pos['value']
 
 	volume = target_value - current_value + current_price * 5
 	passorder(23, 1102, ContextInfo.account, stock, 4, -1, volume, 2, ContextInfo)
@@ -1267,7 +1270,7 @@ def deal_callback(ContextInfo, dealInfo):
 		print(f'实际买入 {dealInfo.m_strInstrumentID} {dealInfo.m_nVolume}股，每股{dealInfo.m_dPrice}元，合计:{order_info.m_dTradeAmount:.2f}, 手续费{dealInfo.m_dComssion:.2f}')
 
 	if buy_sell_str == '卖出':
-		if dealinfo.m_strRemark == 'qingkong':
+		if dealInfo.m_strRemark == 'qingkong':
 			print(f'卖出 {dealInfo.m_strInstrumentID} {dealInfo.m_nVolume}股 * {dealInfo.m_dPrice:.2f}元')
 
 def get_positions(ContextInfo):
