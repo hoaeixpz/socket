@@ -1267,7 +1267,7 @@ def deal_callback(ContextInfo, dealInfo):
 	#print(f"{buy_sell_str} {dealInfo.m_strInstrumentID} {dealInfo.m_nVolume} 股 * {dealInfo.m_dPrice:.2f} 元, 成交额 {dealInfo.m_dTradeAmount}, 手续费{dealInfo.m_dComssion}")
 
 	if buy_sell_str == '买入':
-		print(f'实际买入 {dealInfo.m_strInstrumentID} {dealInfo.m_nVolume}股，每股{dealInfo.m_dPrice}元，合计:{order_info.m_dTradeAmount:.2f}, 手续费{dealInfo.m_dComssion:.2f}')
+		print(f'实际买入 {dealInfo.m_strInstrumentID} {dealInfo.m_nVolume}股，每股{dealInfo.m_dPrice}元，合计:{dealInfo.m_dTradeAmount:.2f}, 手续费{dealInfo.m_dComssion:.2f}')
 
 	if buy_sell_str == '卖出':
 		if dealInfo.m_strRemark == 'qingkong':
