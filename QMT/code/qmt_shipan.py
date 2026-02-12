@@ -326,6 +326,7 @@ def init(ContextInfo):
 	g.stoploss_limit = 0.1  # 止损线
 	g.stoploss_market = 0.05  # 市场趋势止损参数
 	g.etf = '511880.SH'  # 空仓月份持有银华日利ETF
+	#g.etf = '513500.SH'
 	g.all_weather_list = ["518880.SH", "511220.SH", "513100.SH", "601288.SH"]
 
 	g.count = 0
@@ -510,6 +511,7 @@ def exec_all_weather(ContextInfo):
 	
 	# 标准化weight
 	total_weight = sum([w for w in weights.values()])
+	
 	fin_weights = {key: value/total_weight for key, value in weights.items()}
 		
 	for stock, w in fin_weights.items():
@@ -531,8 +533,7 @@ def exec_all_weather(ContextInfo):
 			print(f'{stock} {ContextInfo.get_stock_name(stock)} 目标市值{target_value:.2f}, 买入{amount}股 * {current_price}元')
 			buy_target_shares(ContextInfo, stock, amount)
 			g.refresh_hold = True
-	
-	
+
 def rebalance_sell(ContextInfo):
 	if g.trade is False:
 		return
@@ -934,18 +935,10 @@ def stop_loss(ContextInfo):
 			yesterday = query_date - timedelta(days=1)
 			query_date = yesterday.replace(hour=15, minute=0, second=0, microsecond=0)
 			dt_str = query_date.strftime('%Y%m%d%H%M%S')
-			#stocklist = ContextInfo.get_stock_list_in_sector('中小综指')
 			price_data = ContextInfo.get_market_data_ex(['open', 'close'], ['399101.SZ'], period='1d', start_time='', end_time=dt_str, count=1,dividend_type='none', fill_data=True,subscribe=True)
 			#print(price_data)
 			df = list(price_data.values())[0]
-			#stock_df = get_price(security=get_index_stocks('399101.XSHE'), end_date=context.previous_date, frequency='daily', fields=['close','open'], count=1, panel=False)
-			#print(stock_df)
-			#pre_stock_df = get_price(security='399101.XSHE', end_date=context.previous_date - datetime.timedelta(days=1), frequency='daily', fields=['close'], count=1, panel=False)
-			#down_ratio = abs(stock_df.close[0] / pre_stock_df.close[0] - 1)
-			#print("⭕ 大盘降幅{:.2%}".format(stock_df.close[0] / pre_stock_df.close[0] - 1))
 			down_ratio = (df.iloc[0]['close'] / df.iloc[0]['open'] - 1)
-			#rise_ratio = (stock_df['close'] / pre_stock_df['close'] - 1).mean()
-			#down_ratio = abs(down_ratio)
 			print("大盘降幅{:.2%}".format(down_ratio))
 			# 市场大跌止损
 			if abs(down_ratio) >= g.stoploss_market:
@@ -955,6 +948,8 @@ def stop_loss(ContextInfo):
 					print("⭕ 大盘惨跌,平均降幅{:.2%}".format(down_ratio))
 					for stock in current_positions.keys():
 						if stock == g.etf:
+							continue
+						if stock in g.all_weather_list:
 							continue
 						print(f'⭕ 清仓{stock} {ContextInfo.get_stock_name(stock)}')
 						sell_target_value(ContextInfo, stock, 0)
@@ -967,6 +962,8 @@ def stop_loss(ContextInfo):
 					print("⭕ 大盘大涨,平均涨幅{:.2%}".format(down_ratio))
 					for stock in current_positions.keys():
 						if stock == g.etf:
+							continue
+						if stock in g.all_weather_list:
 							continue
 						if stock in g.yesterday_HL_list:
 							continue
@@ -1309,6 +1306,12 @@ def buy_target_shares(ContextInfo, stock, target_share):
 def order_callback(ContextInfo, orderInfo):
 	print("order_callback")
 	print_order_info(orderInfo)
+    '''
+    if get_entrust_status_str(orderInfo.m_nOrderStatus) == '废单':
+	    if orderInfo.m_nOffsetFlag == 49:
+	        stock = obj.m_strInstrumentID + '.' + obj.m_strInstrumentName
+	        g.stocks_fail_sell.append(stock)
+    '''
 	#print('委托更新 id ', orderInfo.m_strOrderSysID)
 	#print('股票:', orderInfo.m_strInstrumentID, ' ', orderInfo.m_strInstrumentName)
 	#print(f"方向: {'买入' if orderInfo.m_nDirection == 48 else '卖出'}")
