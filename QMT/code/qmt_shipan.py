@@ -1306,12 +1306,12 @@ def buy_target_shares(ContextInfo, stock, target_share):
 def order_callback(ContextInfo, orderInfo):
 	print("order_callback")
 	print_order_info(orderInfo)
-    '''
-    if get_entrust_status_str(orderInfo.m_nOrderStatus) == '废单':
-	    if orderInfo.m_nOffsetFlag == 49:
-	        stock = obj.m_strInstrumentID + '.' + obj.m_strInstrumentName
-	        g.stocks_fail_sell.append(stock)
-    '''
+	'''
+	if get_entrust_status_str(orderInfo.m_nOrderStatus) == '废单':
+		if orderInfo.m_nOffsetFlag == 49:
+			stock = obj.m_strInstrumentID + '.' + obj.m_strInstrumentName
+			g.stocks_fail_sell.append(stock)
+	'''
 	#print('委托更新 id ', orderInfo.m_strOrderSysID)
 	#print('股票:', orderInfo.m_strInstrumentID, ' ', orderInfo.m_strInstrumentName)
 	#print(f"方向: {'买入' if orderInfo.m_nDirection == 48 else '卖出'}")
