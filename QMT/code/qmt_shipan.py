@@ -1186,6 +1186,10 @@ def sell_stocks(ContextInfo):
 		print('GGG>>>>>>>>>>>>')
 		print('GGG卖出: ',ContextInfo.get_stock_name(stock))
 		sell_target_value(ContextInfo, stock, 0)
+		is_paused = ContextInfo.is_suspended_stock(stock)
+		is_dieting = is_limit_down(ContextInfo, stock)
+		if is_paused or is_dieting:
+			g.stocks_fail_sell.append(stock)
 		#order_target_value(stock, 0, 'BUY1', ContextInfo, ContextInfo.account)
 		#if order_info != None:
 		#	print(f'卖出 {order_info.m_nVolume}股 * {order_info.m_dPrice:.2f}元')
