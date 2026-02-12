@@ -326,6 +326,7 @@ def init(ContextInfo):
 	g.stoploss_limit = 0.1  # 止损线
 	g.stoploss_market = 0.05  # 市场趋势止损参数
 	g.etf = '511880.SH'  # 空仓月份持有银华日利ETF
+	g.all_weather_list = ["518880.SH", "511220.SH", "513100.SH", "601288.SH"]
 
 	g.count = 0
 	# 每天执行调仓函数
@@ -401,7 +402,8 @@ def handlebar(ContextInfo):
 	'''
 	#TEST
 	if dt.hour == 15 and dt.minute == 0:
-		check_limit_up(ContextInfo)
+		judge_date(ContextInfo)
+		trade_etf(ContextInfo)
 	'''
 
 
@@ -409,7 +411,7 @@ def judge_date(ContextInfo):
 	current_date = get_current_date(ContextInfo)
 	current_month = current_date.month
 	g.count = 1
-	if (current_month == 1 or current_month == 4):
+	if current_month == 1 or current_month == 4:
 		if g.trade == True:
 			print('GGG========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
@@ -466,21 +468,71 @@ def trade_etf(ContextInfo):
 	print("trade_etf")
 	if g.trade is False:
 		current_holdings = get_current_holding_stocks(ContextInfo)
-		if current_holdings != [g.etf]:
-			print('买入ETF')
-			g.selected_stocks = [g.etf]
+		all_weather = False
+		for stock in current_holdings:
+			if stock not in g.all_weather_list:
+				all_weather = True
+				break
+		if len(current_holdings) == 0:
+			all_weather = True
+
+		if all_weather:
+			print('使用全天候策略')
+			g.selected_stocks = g.all_weather_list.copy()
 			collect_sell_buy_stocks(ContextInfo)
 			sell_stocks(ContextInfo)
-			buy_stocks(ContextInfo)
+			exec_all_weather(ContextInfo)
 
-		account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
-		info = account_info[0]
-		available_cash = info.m_dAvailable
-		print(f"当前可买ETF现金为 {available_cash}")
-		if available_cash > 10000:
-			g.stocks_to_buy = [g.etf]
-			buy_stocks(ContextInfo)
+def exec_all_weather(ContextInfo):
+	query_date = get_current_date(ContextInfo)
+	yesterday = query_date - timedelta(days=200)
+	dt_str = yesterday.strftime('%Y%m%d')
+	#print(dt_str)
+	for stock in g.all_weather_list:
+		down_history_data(stock, '1d', dt_str, "")
 
+	price_data = ContextInfo.get_market_data_ex(['close'], g.all_weather_list, start_time='', end_time=query_date.strftime('%Y%m%d'), period='1d', dividend_type='none', count=120)
+	weights = {}
+	
+	for code, prices in price_data.items():
+		print(code)
+		if len(prices) < 120:
+			weight = 0
+		else:
+			prices['daily_return'] = prices['close'].pct_change() * 100
+			sorted_group = prices.sort_values(by='daily_return')
+			ES = sorted_group['daily_return'].head(6).mean()
+			print("ES ", ES)
+			weight = -1 / ES
+			
+		weights[code] = weight
+	print(f'权重:{weights}')
+	
+	# 标准化weight
+	total_weight = sum([w for w in weights.values()])
+	fin_weights = {key: value/total_weight for key, value in weights.items()}
+		
+	for stock, w in fin_weights.items():
+		print(f'{stock} {ContextInfo.get_stock_name(stock)} 权重{100*w:.2f}%')
+
+	account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
+	info = account_info[0]
+	available_cash = info.m_dAvailable
+	print('available_cash: ', available_cash)
+	for stock in g.all_weather_list:
+		current_price = get_last_price(ContextInfo, stock)
+		if current_price is None or current_price == 0:
+			continue
+		print(stock, " ", current_price)
+		target_value = available_cash * fin_weights[stock]
+		amount = int(target_value / current_price / 100) * 100
+		if amount > 0:
+			print('<<<<<<<<<<<<<<<<<买入<<<<<<<<<<<<<<<<<')
+			print(f'{stock} {ContextInfo.get_stock_name(stock)} 目标市值{target_value:.2f}, 买入{amount}股 * {current_price}元')
+			buy_target_shares(ContextInfo, stock, amount)
+			g.refresh_hold = True
+	
+	
 def rebalance_sell(ContextInfo):
 	if g.trade is False:
 		return
