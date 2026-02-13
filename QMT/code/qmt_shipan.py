@@ -194,6 +194,7 @@ def print_task_info(obj):
 	print('')
 
 def print_order_info(obj):
+	'''
 	print('股票:', obj.m_strInstrumentID, ' ', obj.m_strInstrumentName)
 	print('委托时间: ', obj.m_strInsertDate, ' ', obj.m_strInsertTime)
 	print('委托类型: ', ('买卖' if obj.m_eEntrustType == 48 else '未知'))
@@ -209,7 +210,23 @@ def print_order_info(obj):
 	print('委托初始量: ', obj.m_nVolumeTotalOriginal)
 	#print('合同编号:', obj.m_strOrderSysID)
 	#print('任务号:', obj.m_nTaskId)
-	print('')
+	'''
+	buy_or_sell_str = ''
+	if obj.m_nOffsetFlag == 48:
+		buy_or_sell_str = '买入'
+	elif obj.m_nOffsetFlag == 49:
+		buy_or_sell_str = '卖出'
+
+	info_str = 'code: '+ obj.m_strInstrumentID + '.' + obj.m_strExchangeID + " " + obj.m_strInstrumentName" + \t" \
+			+ '委托时间: ' + obj.m_strInsertDate + ' ' + obj.m_strInsertTime + "\t" \
+			+ '委托类型: '+ buy_or_sell_str + "\t" \
+			+ '委托价: ' + str(round(obj.m_dLimitPrice,2)) + "\t" \
+			+ '委托初始量: ' + obj.m_nVolumeTotalOriginal + "\t" \
+			+ '委托剩余量: ' + obj.m_nVolumeTotal + "\t" \
+			+ '成交量: ' + obj.m_nVolumeTraded + "\t" \
+			+ '成交额: ' + str(round(obj.m_dTradeAmount,2)) + "\t" \
+			+ '委托状态: ' + get_entrust_status_str(obj.m_nOrderStatus)
+	print(info_str)
 
 def print_deal_info(obj):
 	print('委托号: ', obj.m_strOrderSysID)
@@ -602,6 +619,7 @@ def rebalance_buy(ContextInfo):
 	buy_stocks(ContextInfo)
 	# 重置卖出标记
 	g.sell_done = False
+	sleep(5)
 	info_position(ContextInfo)
 	print('rebalance_buy count ',g.count)
 
@@ -1226,9 +1244,6 @@ def buy_stocks(ContextInfo):
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
 				#order_shares(stock, amount, ContextInfo, ContextInfo.account)
 				buy_target_shares(ContextInfo, stock, amount)
-				#if order_info != None:
-				#	print(f'买入: {ContextInfo.get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'
-				#		 f'\n预计买入{amount}股，每股{current_price}元，合计:{amount * current_price:.2f}')
 			else:
 				if g.excepted_position.get(stock) is not None:
 					target_value_per_stock = g.excepted_position[stock] * total_value
@@ -1237,15 +1252,6 @@ def buy_stocks(ContextInfo):
 				print(f'委托买入: {ContextInfo.get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'
 					f'\n预计买入{amount}股，每股{current_price}元，合计:{amount * current_price:.2f}')
 				buy_target_value(ContextInfo, stock, target_value_per_stock, current_price)
-				#if order_info != None:
-				#	print(f'实际买入{order_info.m_nVolume}股，每股{order_info.m_dPrice}元，合计:{order_info.m_dTradeAmount:.2f}')
-				#else:
-				#	print(f'股票 {stock} 买入失败，跳过')
-
-			positions = get_positions(ContextInfo)
-			pos = positions.get(stock)
-			if pos is not None:
-				print(f"持仓 {pos['total_amount']}股, 市值:{pos['value']}")
 
 def sell_target_value(ContextInfo, stock, target_value):
 	# passorder(opType, orderType, accountid, orderCode, prType, modelprice, volume
@@ -1321,7 +1327,7 @@ def order_callback(ContextInfo, orderInfo):
 	#print(f"方向: {'买入' if orderInfo.m_nDirection == 48 else '卖出'}")
 
 def deal_callback(ContextInfo, dealInfo):
-	#print_deal_info(dealInfo)
+	print("deal_callback")
 	buy_sell_str = '买入' if dealInfo.m_nOffsetFlag == 48 else '卖出'
 	#print(f"{buy_sell_str} {dealInfo.m_strInstrumentID} {dealInfo.m_nVolume} 股 * {dealInfo.m_dPrice:.2f} 元, 成交额 {dealInfo.m_dTradeAmount}, 手续费{dealInfo.m_dComssion}")
 
