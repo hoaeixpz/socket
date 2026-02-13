@@ -217,14 +217,14 @@ def print_order_info(obj):
 	elif obj.m_nOffsetFlag == 49:
 		buy_or_sell_str = '卖出'
 
-	info_str = 'code: '+ obj.m_strInstrumentID + '.' + obj.m_strExchangeID + " " + obj.m_strInstrumentName" + \t" \
-			+ '委托时间: ' + obj.m_strInsertDate + ' ' + obj.m_strInsertTime + "\t" \
-			+ '委托类型: '+ buy_or_sell_str + "\t" \
-			+ '委托价: ' + str(round(obj.m_dLimitPrice,2)) + "\t" \
-			+ '委托初始量: ' + obj.m_nVolumeTotalOriginal + "\t" \
-			+ '委托剩余量: ' + obj.m_nVolumeTotal + "\t" \
-			+ '成交量: ' + obj.m_nVolumeTraded + "\t" \
-			+ '成交额: ' + str(round(obj.m_dTradeAmount,2)) + "\t" \
+	info_str = 'code: '+ obj.m_strInstrumentID + '.' + obj.m_strExchangeID + " " + obj.m_strInstrumentName + "    \t" \
+			+ '委托时间: ' + obj.m_strInsertDate + ' ' + obj.m_strInsertTime + "    \t" \
+			+ '委托类型: '+ buy_or_sell_str + "    \t" \
+			+ '委托价: ' + str(round(obj.m_dLimitPrice,2)) + "    \t" \
+			+ '委托初始量: ' + str(obj.m_nVolumeTotalOriginal) + "    \t" \
+			+ '委托剩余量: ' + str(obj.m_nVolumeTotal) + "    \t" \
+			+ '成交量: ' + str(obj.m_nVolumeTraded) + "    \t" \
+			+ '成交额: ' + str(round(obj.m_dTradeAmount,2)) + "    \t" \
 			+ '委托状态: ' + get_entrust_status_str(obj.m_nOrderStatus)
 	print(info_str)
 
