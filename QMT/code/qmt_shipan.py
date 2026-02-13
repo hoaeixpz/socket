@@ -994,6 +994,7 @@ def stop_loss(ContextInfo):
 							g.selected_stocks.remove(stock)
 	
 	if show_info == True:
+		sleep(10)
 		info_position(ContextInfo)
 
 	print('stop_loss count ',g.count)
