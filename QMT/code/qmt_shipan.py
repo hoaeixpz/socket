@@ -332,7 +332,7 @@ def init(ContextInfo):
 	g.reason_to_sell = ''
 	g.refresh_hold = False
 	g.trade = True
-	g.stock_num = 9  # 每月持有的股票数量 5
+	g.stock_num = 9  # 每月持有的股票数量 9
 	g.weekday = 2  #每周二调仓
 	g.trade_day = False
 	g.each_cash = available_cash / g.stock_num
@@ -619,7 +619,7 @@ def rebalance_buy(ContextInfo):
 	buy_stocks(ContextInfo)
 	# 重置卖出标记
 	g.sell_done = False
-	sleep(5)
+	sleep(10)
 	info_position(ContextInfo)
 	print('rebalance_buy count ',g.count)
 
