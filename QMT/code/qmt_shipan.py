@@ -708,7 +708,7 @@ def calc_position(ContextInfo):
 	avai_cash = total_value - position_sum
 	print(f'预计持仓 {position_sum} 剩余金额 {avai_cash:.2f}')
 	if abs(avai_cash) > 5000 or avai_cash < 0:
-		print(f'❌❌剩余资金过大 {total_value - position_sum}')
+		print(f'❌❌剩余资金过大 {total_value - position_sum:.2f}')
 		cash = 0
 		for stock, exce_pos in g.excepted_position.items():
 			if stock in g.stocks_fail_sell:
@@ -838,6 +838,7 @@ def calc_position(ContextInfo):
 
 def trade_afternoon(ContextInfo):
 	check_limit_up(ContextInfo)
+	time.sleep(20)
 	check_remain_amount(ContextInfo)
 	
 def check_limit_up(ContextInfo):
@@ -918,6 +919,8 @@ def check_remain_amount(ContextInfo):
 		g.reason_to_sell = ''
 		g.refresh_hold = True
 
+	time.sleep(20)
+	info_position(ContextInfo)
 	print('check_remain_amount count ',g.count)
 
 #止盈止损
@@ -1261,7 +1264,7 @@ def buy_stocks(ContextInfo):
 				raw_amount = target_value_per_stock / current_price
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
 				print(f'委托买入: {ContextInfo.get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'
-					f'\n预计买入{amount}股，每股{current_price}元，合计:{amount * current_price:.2f}')
+					f'\n预计买入{amount}股，每股{current_price:.2f}元，合计:{amount * current_price:.2f}')
 				buy_target_value(ContextInfo, stock, target_value_per_stock, current_price)
 
 def sell_target_value(ContextInfo, stock, target_value):
