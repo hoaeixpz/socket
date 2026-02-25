@@ -344,7 +344,10 @@ def init(ContextInfo):
 	g.stoploss_market = 0.05  # 市场趋势止损参数
 	g.etf = '511880.SH'  # 空仓月份持有银华日利ETF
 	#g.etf = '513500.SH'
-	g.all_weather_list = ["518880.SH", "511220.SH", "513100.SH", "601288.SH"]
+	g.all_weather_list = ["518880.SH",    #黄金ETF
+							"511220.SH",  #城投ETF
+							"513100.SH",  #纳指ETF
+							"512890.SH"]  #红利低波ETF
 
 	g.count = 0
 	# 每天执行调仓函数
@@ -619,7 +622,7 @@ def rebalance_buy(ContextInfo):
 	buy_stocks(ContextInfo)
 	# 重置卖出标记
 	g.sell_done = False
-	sleep(10)
+	time.sleep(10)
 	info_position(ContextInfo)
 	print('rebalance_buy count ',g.count)
 
@@ -994,7 +997,7 @@ def stop_loss(ContextInfo):
 							g.selected_stocks.remove(stock)
 	
 	if show_info == True:
-		sleep(10)
+		time.sleep(10)
 		info_position(ContextInfo)
 
 	print('stop_loss count ',g.count)
@@ -1146,11 +1149,17 @@ def get_normal_stocks(ContextInfo, current_time):
 			for stkey, time_period in ST.items():
 				for tp in time_period:
 					if is_date_in_range(current_time, tp[0], tp[1]):
+						print(f"ST {stock}")
 						is_st = True
 						break
 				if is_st:
 					break
 			if is_st:
+				continue
+		else:
+			stock_name = ContextInfo.get_stock_name(stock)
+			if "ST" in stock_name:
+				print(f"ST {stock}")
 				continue
 
 		non_st_stocks.append(stock)
@@ -1248,6 +1257,7 @@ def buy_stocks(ContextInfo):
 			else:
 				if g.excepted_position.get(stock) is not None:
 					target_value_per_stock = g.excepted_position[stock] * total_value
+					target_value_per_stock = min(account_info[0].m_dAvailable, target_value_per_stock)
 				raw_amount = target_value_per_stock / current_price
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
 				print(f'委托买入: {ContextInfo.get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'
