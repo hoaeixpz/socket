@@ -502,6 +502,7 @@ def trade_etf(ContextInfo):
 			g.selected_stocks = g.all_weather_list.copy()
 			collect_sell_buy_stocks(ContextInfo)
 			sell_stocks(ContextInfo)
+			time.sleep(10)
 			exec_all_weather(ContextInfo)
 
 def exec_all_weather(ContextInfo):
@@ -725,18 +726,26 @@ def calc_position(ContextInfo):
 				else:
 					current_price = get_last_price(ContextInfo, stock)
 					if current_price is None or current_price == 0:
-						current_price = abs(avai_cash)
+						continue
 					amount = abs(avai_cash) / current_price
-					is_paused = ContextInfo.is_suspended_stock(stock)
-					is_dieting = is_limit_down(ContextInfo, stock)
-					canuse_amount = positions[stock]['canuse_amount']
-					if not is_paused and not is_dieting and not amount < 100 and not canuse_amount < 100:
-						sell_target_value(ContextInfo, stock, exce_pos*total_value)
-						cash -= diff_pos*total_value
-						print(f'调整{stock_name}市值，卖出{abs(diff_pos) * total_value:.2f}元')
-						#update_stock_price(stock, order_info.m_dPrice, -order_info.m_nVolume)
-						
-		
+					if amount < 100:
+						continue
+					if ContextInfo.is_suspended_stock(stock):
+						continue
+					if is_limit_down(ContextInfo, stock):
+						continue
+					if positions[stock]['canuse_amount'] < 100:
+						continue
+
+					sell_target_value(ContextInfo, stock, exce_pos*total_value)
+					cash -= diff_pos*total_value
+					print(f'调整{stock_name}市值，卖出{abs(diff_pos) * total_value:.2f}元')
+					#update_stock_price(stock, order_info.m_dPrice, -order_info.m_nVolume)
+
+		if cash > 0:
+			time.sleep(10)
+			print(f"卖出部分股票后，多出现金 {cash:.2f}")
+
 		avai_cash += cash
 		if cash != 0:
 			print(f'重新分配之后资金为{avai_cash:.2f}')
@@ -782,8 +791,7 @@ def calc_position(ContextInfo):
 			for stock in g.stocks_to_buy:
 				g.excepted_position[stock] = available_cash / len(g.stocks_to_buy) / total_value
 				print(f'期望持仓: {ContextInfo.get_stock_name(stock)}({stock})，占比{g.excepted_position[stock] * 100:.2f}%')
-			
-			
+
 	position_dict = dict(sorted(position_dict.items(), key=lambda x: x[0]))
 	for stock, pos in position_dict.items():
 		stock_name = ContextInfo.get_stock_name(stock)
