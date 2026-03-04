@@ -1378,7 +1378,7 @@ def get_positions(ContextInfo):
 
 def info_position(ContextInfo):
 	current_date = get_current_date(ContextInfo)
-	positions = get_positions(ContextInfo)	
+	positions = get_positions(ContextInfo)
 	
 	if len(positions) > 0:
 		account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
@@ -1393,11 +1393,11 @@ def info_position(ContextInfo):
 			stock_name = ContextInfo.get_stock_name(stock)
 			if pos['total_amount'] == 0:
 				continue
+			if pos['avg_cost'] <= 0:
+				continue
 			price = pos['value'] / pos['total_amount']
-			#ratio = (price / (g.stock_prices[stock][0]/g.stock_prices[stock][1]) - 1) * 100
-			#diff_price = price - g.stock_prices[stock][0]/g.stock_prices[stock][1]
-			ratio = 0
-			diff_price = 0
+			ratio = (price / pos['avg_cost'] - 1) * 100
+			diff_price = price - pos['avg_cost']
 			print(f"GGG持仓: {stock_name}({stock}), 占比 {pos['value'] / total_value * 100:.1f}%, 涨跌幅: {ratio:.1f}% ({diff_price * pos['total_amount']:.1f}), 数量: {pos['total_amount']}, 市值: {pos['value']:.1f}元")
 		
 		for stock, pos in positions.items():
@@ -1430,13 +1430,12 @@ def after_trading_end(ContextInfo):
 			stock_name = ContextInfo.get_stock_name(stock)
 			if pos['total_amount'] == 0:
 				continue
+			if pos['avg_cost'] <= 0:
+				continue
 			price = pos['value'] / pos['total_amount']
-			#ratio = (price / (g.stock_prices[stock][0]/g.stock_prices[stock][1]) - 1) * 100
-			#diff_price = price - g.stock_prices[stock][0]/g.stock_prices[stock][1]
-			ratio = 0
-			diff_price = 0
+			ratio = (price / pos['avg_cost'] - 1) * 100
+			diff_price = price - pos['avg_cost']
 			print(f"GGG持仓: {stock_name}({stock}), 占比 {pos['value'] / total_value * 100:.1f}%, 涨跌幅: {ratio:.1f}% ({diff_price * pos['total_amount']:.1f}), 数量: {pos['total_amount']}, 市值: {pos['value']:.1f}元")
-			#g.stock_prices[stock] = [pos.value, pos.total_amount]
 		
 		for stock, pos in positions.items():
 			stock_name = ContextInfo.get_stock_name(stock)
