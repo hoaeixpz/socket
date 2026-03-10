@@ -503,7 +503,7 @@ def trade_etf(ContextInfo):
 			g.selected_stocks = g.all_weather_list.copy()
 			collect_sell_buy_stocks(ContextInfo)
 			sell_stocks(ContextInfo)
-			time.sleep(10)
+			time.sleep(30)
 			exec_all_weather(ContextInfo)
 
 def exec_all_weather(ContextInfo):
@@ -624,7 +624,7 @@ def rebalance_buy(ContextInfo):
 	buy_stocks(ContextInfo)
 	# 重置卖出标记
 	g.sell_done = False
-	time.sleep(10)
+	time.sleep(30)
 	info_position(ContextInfo)
 	print('rebalance_buy count ',g.count)
 
@@ -744,7 +744,7 @@ def calc_position(ContextInfo):
 					#update_stock_price(stock, order_info.m_dPrice, -order_info.m_nVolume)
 
 		if cash > 0:
-			time.sleep(10)
+			time.sleep(30)
 			print(f"卖出部分股票后，多出现金 {cash:.2f}")
 
 		avai_cash += cash
@@ -1009,7 +1009,7 @@ def stop_loss(ContextInfo):
 							g.selected_stocks.remove(stock)
 	
 	if show_info == True:
-		time.sleep(10)
+		time.sleep(30)
 		info_position(ContextInfo)
 
 	print('stop_loss count ',g.count)
