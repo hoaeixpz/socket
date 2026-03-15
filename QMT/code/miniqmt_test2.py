@@ -215,7 +215,7 @@ def prepare_stock_list():
 
 	g.stock_pool = get_normal_stocks()
 
-	print('\nprepare_stock_list count ',g.count, '\n')
+	print('prepare_stock_list count ',g.count)
 
 def collect_sell_buy_stocks():
 	g.stocks_to_sell = []
@@ -346,7 +346,7 @@ def rebalance_sell():
 	else:
 		print('未选到符合条件的股票，本日不调仓')
 
-	print('\nrebalance_sell count ',g.count, '\n')
+	print('rebalance_sell count ',g.count)
 
 def rebalance_buy():
 	if g.trade is False:
@@ -371,7 +371,7 @@ def rebalance_buy():
 	g.sell_done = False
 	#time.sleep(30)
 	info_position()
-	print('\nrebalance_buy count ',g.count, '\n')
+	print('rebalance_buy count ',g.count)
 
 def calc_position():
 	info = g.xt_trader.query_stock_asset(g.account)
@@ -618,7 +618,7 @@ def check_limit_up():
 			else:
 				print(f"{stock} {get_stock_name(stock)}涨停，继续持有")
 
-	print('\ncheck_limit_up count ',g.count, '\n')
+	print('check_limit_up count ',g.count)
 
 #如果昨天有股票卖出或者买入失败，剩余的金额今天买入
 def check_remain_amount():
@@ -676,7 +676,7 @@ def check_remain_amount():
 
 	#time.sleep(20)
 	info_position()
-	print('\ncheck_remain_amount count ',g.count, '\n')
+	print('check_remain_amount count ',g.count)
 
 #止盈止损
 def stop_loss():
@@ -764,7 +764,7 @@ def stop_loss():
 		#time.sleep(30)
 		info_position()
 
-	print('\nstop_loss count ',g.count, '\n')
+	print('stop_loss count ',g.count)
 
 def is_specified_date_limit_up(stock, query_date):
 	current_price = get_specified_date_price(stock, query_date, 'front')
@@ -788,7 +788,7 @@ def is_limit_up(stock):
 	current_price = get_last_price(stock)
 	if current_price is None or current_price == 0:
 		return False
-	
+
 	detail = xtdata.get_instrument_detail(stock)
 	limit_up_price = detail["UpStopPrice"]
 	if math.isnan(limit_up_price) or limit_up_price is None:
@@ -958,8 +958,8 @@ def sell_stocks():
 	for stock in g.stocks_to_sell:
 		print('GGG>>>>>>>>>>>>')
 		print('GGG卖出: ',get_stock_name(stock))
-		detail = xtdata.get_instrument_detail(stock)
 		sell_target_value(stock, 0)
+		detail = xtdata.get_instrument_detail(stock)
 		is_paused = detail['InstrumentStatus'] < 0
 		is_dieting = is_limit_down(stock)
 		if is_paused or is_dieting:
