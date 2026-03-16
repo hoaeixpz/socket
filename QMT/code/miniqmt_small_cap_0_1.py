@@ -115,7 +115,7 @@ def init():
 	g.refresh_hold = False
 	g.trade = True
 	g.stock_num = 9  # 每月持有的股票数量 9
-	g.weekday = 1  #每周二调仓
+	g.weekday = 2  #每周二调仓
 	g.trade_day = False
 	g.each_cash = available_cash / g.stock_num
 	g.sell_done = False
@@ -323,7 +323,7 @@ def trade_etf():
 			g.selected_stocks = g.all_weather_list.copy()
 			collect_sell_buy_stocks()
 			sell_stocks()
-			#time.sleep(30)
+			time.sleep(30)
 			exec_all_weather()
 
 def exec_all_weather():
@@ -446,7 +446,7 @@ def rebalance_buy():
 	buy_stocks()
 	# 重置卖出标记
 	g.sell_done = False
-	#time.sleep(30)
+	time.sleep(30)
 	info_position()
 	print('rebalance_buy count ',g.count)
 
@@ -568,7 +568,7 @@ def calc_position():
 					#update_stock_price(stock, order_info.m_dPrice, -order_info.m_nVolume)
 
 		if cash > 0:
-			#time.sleep(30)
+			time.sleep(30)
 			print(f"卖出部分股票后，多出现金 {cash:.2f}")
 
 		avai_cash += cash
@@ -671,7 +671,7 @@ def calc_position():
 
 def trade_afternoon():
 	check_limit_up()
-	#time.sleep(20)
+	time.sleep(20)
 	check_remain_amount()
 	
 def check_limit_up():
@@ -751,7 +751,7 @@ def check_remain_amount():
 		g.reason_to_sell = ''
 		g.refresh_hold = True
 
-	#time.sleep(20)
+	time.sleep(20)
 	info_position()
 	print('check_remain_amount count ',g.count)
 
@@ -838,7 +838,7 @@ def stop_loss():
 							g.selected_stocks.remove(stock)
 	
 	if show_info == True:
-		#time.sleep(30)
+		time.sleep(30)
 		info_position()
 
 	print('stop_loss count ',g.count)
@@ -944,7 +944,6 @@ def get_market(stock_list):
 def get_small_cap_stocks(stock_list, query_date, n=5):
 	#获取市值最小的n只股票（修正版：全局排序）
 	# 用于存储所有查询到的市值数据
-	#print("get_small_cap_stocks")
 	market = get_market(stock_list)
 	#print('market')
 	#print(market)
