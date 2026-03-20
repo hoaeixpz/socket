@@ -178,7 +178,7 @@ def judge_date():
 	g.count = 1
 	if current_month == 1 or current_month == 4:
 		if g.trade == True:
-			print('GGG========== 一月和四月份清仓，日期：%s ==========' % current_date)
+			print('✅========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
 	else:
 		g.trade = True
@@ -191,7 +191,6 @@ def prepare_stock_list():
 	g.limitup_stocks = []
 	g.trade_day = False
 	g.hold_list = get_current_holding_stocks()
-	
 	#获取昨日涨停列表
 	current_date = datetime.now()
 	yesterday = current_date - timedelta(days=1)
@@ -310,7 +309,7 @@ def rebalance_sell():
 	g.count += 1
 	
 	current_date = datetime.now()
-	print(f'GGG========== 执行周度调仓，日期：{current_date} ==========')
+	print(f'✅========== 执行周度调仓，日期：{current_date} ==========')
 
 	info_position()
 	#yesterday = current_date - timedelta(days=1)
@@ -322,21 +321,21 @@ def rebalance_sell():
 	current_holdings = get_current_holding_stocks()
 
 	if len(g.stocks_to_buy) > 0 or len(g.stocks_to_sell) > 0:
-		print(f"GGG当前持股 {len(current_holdings)}只")
+		print(f"✅当前持股 {len(current_holdings)}只")
 		current_holdings.sort()
 		for stock in current_holdings:
-			print(f"GGG{get_stock_name(stock)}")
+			print(f"✅{get_stock_name(stock)}")
 			
-		print(f"GGG需要买入股票 {len(g.stocks_to_buy)}只")
-		print(f"GGG需要卖出股票 {len(g.stocks_to_sell)}只")
+		print(f"✅需要买入股票 {len(g.stocks_to_buy)}只")
+		print(f"✅需要卖出股票 {len(g.stocks_to_sell)}只")
 		for stock in g.stocks_to_buy:
-			print("GGG待买入 ", get_stock_name(stock))
+			print("✅待买入 ", get_stock_name(stock))
 		for stock in g.stocks_to_sell:
-			print('GGG待卖出: %s' % get_stock_name(stock))
+			print('✅待卖出: %s' % get_stock_name(stock))
 			
 			
-		print(f"GGG今日({current_date})为卖出时间，执行卖出操作")
-		print('GGG------------------------------------------')
+		print(f"✅今日({current_date})为卖出时间，执行卖出操作")
+		print('✅------------------------------------------')
 		# 执行卖出逻辑
 		sell_stocks()
 		# 标记卖出已完成
@@ -356,12 +355,12 @@ def rebalance_buy():
 	g.count += 1
 	
 	current_date = datetime.now()
-	print(f'GGG========== 执行周度调仓，日期：{current_date} ==========')
+	print(f'✅========== 执行周度调仓，日期：{current_date} ==========')
 	# 执行买入逻辑
 	if len(g.stocks_to_buy):
-		print(f"GGG今日({current_date})为买入时间，执行买入操作")
-		print('GGG+++++++++++++++++++++++++++++++++++++++++')
-		print(f"GGG需要买入股票 {len(g.stocks_to_buy)}只")
+		print(f"✅今日({current_date})为买入时间，执行买入操作")
+		print('✅+++++++++++++++++++++++++++++++++++++++++')
+		print(f"✅需要买入股票 {len(g.stocks_to_buy)}只")
 		for stock in g.stocks_to_buy:
 			print(get_stock_name(stock))
 		
@@ -627,8 +626,7 @@ def check_remain_amount():
 	available_cash = info.cash
 	if g.reason_to_sell is 'limitup': #判断提前售出原因，如果是涨停售出则次日再次交易，如果是止损售出则不交易
 		g.hold_list = get_current_holding_stocks()
-		flag = True
-		if len(g.hold_list) < g.stock_num or flag:
+		if len(g.hold_list) < g.stock_num:
 			print(f'现有持仓:')
 			for stock_code in g.hold_list:
 				stock_name = get_stock_name(stock_code)
@@ -884,7 +882,8 @@ def get_small_cap_stocks(stock_list, query_date, n=5):
 			marker = '  <== 选中' if rank <= n else ''
 			print(f'    第{rank:>2}名: {stock_name}({stock}), 流通市值: {cap_in_10k} 亿元{marker}')
 
-	selected_stocks = list(sorted_market)[0:n]
+	#selected_stocks = list(sorted_market)[0:n]
+	selected_stocks = small_cap_get_stock_industry(list(sorted_market)[:100], n)
 
 	flag = False
 	for stock_code in selected_stocks:
@@ -898,12 +897,35 @@ def get_small_cap_stocks(stock_list, query_date, n=5):
 		for stock, cap in list(sorted_market.items())[0:20]:
 			stock_name = get_stock_name(stock)
 			cap_in_10k = round(cap/100000000.0, 2)
+			industry = g.industry_dict[stock]
 			rank = rank + 1
-			marker = '  <== 选中' if rank <= n else ''
-			print(f'    第{rank:>2}名: {stock_name}({stock}), 流通市值: {cap_in_10k} 亿元{marker}')
+			marker = '  <== 选中' if stock in selected_stocks else ''
+			print(f'    第{rank:>2}名: {stock_name}({stock}), 流通市值: {cap_in_10k} 亿元 {industry} {marker}')
 
 	return selected_stocks
 
+def small_cap_get_stock_industry(stock_list, num):
+    #return stock_list[:num]
+    """行业分散选股"""
+    try:
+        selected_stocks = []
+        industry_list = []
+        
+        for stock_code in stock_list:
+            if stock_code in g.industry_dict:
+                info = g.industry_dict[stock_code]
+                if True:
+                    industry_name = info
+                    if industry_name not in industry_list:
+                        industry_list.append(industry_name)
+                        selected_stocks.append(stock_code)
+                        if len(industry_list) >= num:
+                            break
+        return selected_stocks
+    except Exception as e:
+        print(f"行业筛选错误: {e}")
+        return stock_list[:num]
+	
 def get_normal_stocks():
 	stocklist = xtdata.get_stock_list_in_sector('399101.SZ')
 	print(f"中小综指成分股数量：{len(stocklist)}")
@@ -956,8 +978,8 @@ def get_current_holding_stocks():
 def sell_stocks():
 	# 执行卖出
 	for stock in g.stocks_to_sell:
-		print('GGG>>>>>>>>>>>>')
-		print('GGG卖出: ',get_stock_name(stock))
+		print('✅>>>>>>>>>>>>')
+		print('✅卖出: ',get_stock_name(stock))
 		sell_target_value(stock, 0)
 		detail = xtdata.get_instrument_detail(stock)
 		is_paused = detail['InstrumentStatus'] < 0
@@ -1094,15 +1116,15 @@ def info_position():
 			ratio = (price / pos.avg_price - 1) * 100
 			diff_price = price - pos.avg_price
 			industry = g.industry_dict[stock]
-			print(f"GGG持仓: {stock_name}({stock}), 占比 {pos.market_value / total_value * 100:.1f}%, 涨跌幅: {ratio:.1f}% ({diff_price * pos.volume:.1f}), 数量: {pos.volume}, 市值: {pos.market_value:.1f}元 {industry}")
+			print(f"✅持仓: {stock_name}({stock}), 占比 {pos.market_value / total_value * 100:.1f}%, 涨跌幅: {ratio:.1f}% ({diff_price * pos.volume:.1f}), 数量: {pos.volume}, 市值: {pos.market_value:.1f}元 {industry}")
 		
 		for pos in positions:
 			stock = pos.stock_code
 			stock_name = get_stock_name(stock)
 			if pos.volume == 0:
-				print(f"GGG持仓: {stock_name}({stock}) 0股")
+				print(f"✅持仓: {stock_name}({stock}) 0股")
 
-		print(f'GGG*******************总资产 {total_value:.2f}  剩余可用金额 {available_cash:.2f}元*******************\n\n')
+		print(f'✅*******************总资产 {total_value:.2f}  剩余可用金额 {available_cash:.2f}元*******************\n\n')
 
 def get_sw2_industry():
 	'''
@@ -1133,11 +1155,23 @@ if __name__ == "__main__":
 	#info_position()
 	#get_current_holding_stocks()
 	judge_date()
+	time.sleep(15)
+
 	prepare_stock_list()
+	time.sleep(15)
+
 	trade_etf()
+	time.sleep(15)
+
 	rebalance_sell()
+	time.sleep(15)
+
 	stop_loss()
+	time.sleep(15)
+
 	rebalance_buy()
+	time.sleep(15)
+
 	trade_afternoon()
 	#get_normal_stocks()
 	#print(get_last_price('399101.SZ'))
