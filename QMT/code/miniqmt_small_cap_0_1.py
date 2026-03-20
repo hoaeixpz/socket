@@ -168,7 +168,7 @@ def is_weekday_job():
 	for day in range(1, g.weekday + 1):
 		yesterday = current_date - timedelta(days=day)
 		dt_str = yesterday.strftime('%Y%m%d')
-		last_date = date[-day]
+		last_date = date[-(day+1)]
 		#print("yesterday: ", yesterday)
 		#print(dt_str)
 		#print("last date: ", last_date)
@@ -193,7 +193,7 @@ def run_strategy():
 				[15, 0]]
 	'''
 	while True:
-		time.sleep(5)
+		time.sleep(10)
 		try:
 			dt = datetime.now()
 			print(dt)
@@ -207,7 +207,7 @@ def run_strategy():
 				trade_etf()
 				sleep_mins(2)
 
-			if dt.hour == 9 and dt.minute == 53 and is_weekday_job():
+			if dt.hour == 9 and dt.minute == 53: #and is_weekday_job():
 				rebalance_sell()
 				sleep_mins(1)
 
@@ -215,31 +215,33 @@ def run_strategy():
 				stop_loss()
 				sleep_mins(3)
 
-			if dt.hour == 9 and dt.minute == 59 and is_weekday_job():
+			if dt.hour == 9 and dt.minute == 59: #and is_weekday_job():
 				if g.sell_done:
 					rebalance_buy()
 				else:
 					print(f"今日({dt})非调仓日，不执行操作")
+				sleep_mins(1)
 			
 			if ((dt.hour == 10 and dt.minute > 15) or dt.hour > 10) and dt.hour	< 13:
 				sleep_mins(30)
+				print("10~13 ", datetime.now())
 
 			if dt.hour == 13 and dt.minute == 40:
 				trade_afternoon()
 				sleep_mins(78)
+				print("13:40 ", datetime.now())
 
 			if dt.hour == 15 and dt.minute == 0:
 				info_position()
 
-			if dt.hour > 14 or dt.hour < 8:
-				print("sleep an hour")
-				sleep_hours(1)
-
-			if dt.hour == 8:
-				sleep_mins(60 - dt.minute)
+			if dt.hour > 14 or dt.hour < 9:
+				print("sleep 15 minutes")
+				sleep_mins(15)
+				print("14~9 ", datetime.now())
 
 			if dt.hour == 9 and dt.minute < 25:
 				sleep_mins(25 - dt.minute)
+				print("9:25 ", datetime.now())
 
 		except KeyboardInterrupt:
 			print("\n程序被用户中断")
@@ -702,7 +704,7 @@ def check_remain_amount():
 	g.count += 1
 	info = g.xt_trader.query_stock_asset(g.account)
 	available_cash = info.cash
-	if g.reason_to_sell is 'limitup': #判断提前售出原因，如果是涨停售出则次日再次交易，如果是止损售出则不交易
+	if g.reason_to_sell == 'limitup': #判断提前售出原因，如果是涨停售出则次日再次交易，如果是止损售出则不交易
 		g.hold_list = get_current_holding_stocks()
 		flag = True
 		if len(g.hold_list) < g.stock_num or flag:
@@ -744,7 +746,7 @@ def check_remain_amount():
 			#info_position()
 			g.refresh_hold = True
 		g.reason_to_sell = ''
-	elif g.reason_to_sell is 'stoploss':
+	elif g.reason_to_sell == 'stoploss':
 		print('止盈止损后，有余额可用'+str(round((available_cash),2))+'元。买入'+ str(g.etf))
 		g.stocks_to_buy = [g.etf]
 		buy_stocks()
@@ -1206,6 +1208,8 @@ def get_sw2_industry():
 
 if __name__ == "__main__":
 	init()
+	judge_date()
+	prepare_stock_list()
 	run_strategy()
 	#exec_all_weather()
 	#print(is_weekday_job())
