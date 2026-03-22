@@ -201,27 +201,40 @@ def shutdown_scheduler(signum, frame):
 	sys.exit(0)
 
 def run_strategy():
-	'''
-	task_time = [[9,30],  #judge_date prepare_stock_list
+
+	task_time = [[9,30],  #judge_date
+				[ 9,31],  #prepare_stock_list
 				[ 9,35],  #trade_etf
 				[10, 0],  #rebalance_sell
 				[10, 2],  #stop_loss
 				[10,10],  #rebalance_buy
-				[14, 0],  #check_limit_up check_remain_amount
+				[14, 0],  #check_limit_up
+				[14, 2],  #check_remain_amount
 				[15, 0]]  #info_position
+	'''
+	task_time = [["*",55],  #judge_date
+				["*",56],  #prepare_stock_list
+				["*",57],  #trade_etf
+				["*",58],  #rebalance_sell
+				["*",59],  #stop_loss
+				["*",0],  #rebalance_buy
+				["*",1],  #check_limit_up
+				["*",2],  #check_remain_amount
+				["*",3]]  #info_position
 	'''
 	signal.signal(signal.SIGINT, shutdown_scheduler)
 	signal.signal(signal.SIGTERM, shutdown_scheduler)
 
-	scheduler.add_job(judge_date,         'cron', hour=9,  minute=30)
-	scheduler.add_job(prepare_stock_list, 'cron', hour=9,  minute=31)
-	scheduler.add_job(trade_etf,          'cron', hour=9,  minute=35)
-	scheduler.add_job(rebalance_sell,     'cron', hour=10, minute=0)
-	scheduler.add_job(stop_loss,          'cron', hour=10, minute=2)
-	scheduler.add_job(rebalance_buy,      'cron', hour=10, minute=10)
-	scheduler.add_job(check_limit_up,     'cron', hour=14, minute=0)
-	scheduler.add_job(check_remain_amount,'cron', hour=14, minute=2)
-	scheduler.add_job(info_position,      'cron', hour=15, minute=0)
+	scheduler.add_job(judge_date,         'cron', hour=task_time[0][0],  minute=task_time[0][1])
+	scheduler.add_job(prepare_stock_list, 'cron', hour=task_time[1][0],  minute=task_time[1][1])
+	scheduler.add_job(trade_etf,          'cron', hour=task_time[2][0],  minute=task_time[2][1])
+	scheduler.add_job(rebalance_sell,     'cron', hour=task_time[3][0],  minute=task_time[3][1])
+	scheduler.add_job(stop_loss,          'cron', hour=task_time[4][0],  minute=task_time[4][1])
+	scheduler.add_job(rebalance_buy,      'cron', hour=task_time[5][0],  minute=task_time[5][1])
+	scheduler.add_job(check_limit_up,     'cron', hour=task_time[6][0],  minute=task_time[6][1])
+	scheduler.add_job(check_remain_amount,'cron', hour=task_time[7][0],  minute=task_time[7][1])
+	scheduler.add_job(info_position,      'cron', hour=task_time[8][0],  minute=task_time[8][1])
+
 	try:
 		print("start")
 		scheduler.start()
@@ -364,6 +377,8 @@ def exec_all_weather():
 			g.refresh_hold = True
 
 def rebalance_sell():
+	if not is_weekday_job():
+		return
 	if g.trade is False:
 		return
 	g.trade_day = True
@@ -410,6 +425,10 @@ def rebalance_sell():
 	print('rebalance_sell count ',g.count)
 
 def rebalance_buy():
+	if not is_weekday_job():
+		return
+	if not g.sell_done:
+		return
 	if g.trade is False:
 		return
 	g.trade_day = True
