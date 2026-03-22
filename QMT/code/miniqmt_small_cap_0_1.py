@@ -6,6 +6,11 @@ import time
 from datetime import datetime, timedelta
 import math
 import sys
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
+import signal
+
+scheduler = BackgroundScheduler()
 
 class G():
 	pass
@@ -75,8 +80,13 @@ class MyXtQuantTraderCallback(XtQuantTraderCallback):
         """
         print(datetime.datetime.now(), sys._getframe().f_code.co_name)
 
+def sleep_sec(seconds):
+	time.sleep(seconds)
+
 def sleep_mins(minutes):
-	time.sleep(minutes * 60 + 1)
+	min = minutes * 60 + 1
+	print("sleep ", min)
+	time.sleep(min)
 
 def sleep_hours(hours):
 	time.sleep(3600 * hours)
@@ -84,7 +94,8 @@ def sleep_hours(hours):
 def init():
 	print("demo test")
 	# path为mini qmt客户端安装目录下userdata_mini路径
-	path = 'D:\\国金证券QMT交易端\\userdata_mini'
+	#path = 'D:\\国金证券QMT交易端\\userdata_mini'
+	path = 'C:\\QMT\\userdata_mini'
 	session_id = int(time.time())
 	g.xt_trader = XtQuantTrader(path, session_id)
 	callback = MyXtQuantTraderCallback()
@@ -168,7 +179,7 @@ def is_weekday_job():
 	for day in range(1, g.weekday + 1):
 		yesterday = current_date - timedelta(days=day)
 		dt_str = yesterday.strftime('%Y%m%d')
-		last_date = date[-day]
+		last_date = date[-(day+1)]
 		#print("yesterday: ", yesterday)
 		#print(dt_str)
 		#print("last date: ", last_date)
@@ -182,72 +193,44 @@ def is_weekday_job():
 				return True
 	return False
 
+def shutdown_scheduler(signum, frame):
+	"""信号处理函数"""
+	print(f"\n收到信号 {signum}，正在关闭调度器...")
+	scheduler.shutdown(wait=False)
+	print("调度器已安全关闭")
+	sys.exit(0)
+
 def run_strategy():
 	'''
-	task_time = [[9,30],
-				[ 9,35],
-				[10, 0],
-				[10, 2],
-				[10,10],
-				[14, 0],
-				[15, 0]]
+	task_time = [[9,30],  #judge_date prepare_stock_list
+				[ 9,35],  #trade_etf
+				[10, 0],  #rebalance_sell
+				[10, 2],  #stop_loss
+				[10,10],  #rebalance_buy
+				[14, 0],  #check_limit_up check_remain_amount
+				[15, 0]]  #info_position
 	'''
+	signal.signal(signal.SIGINT, shutdown_scheduler)
+	signal.signal(signal.SIGTERM, shutdown_scheduler)
+
+	scheduler.add_job(judge_date,         'cron', hour=9,  minute=30)
+	scheduler.add_job(prepare_stock_list, 'cron', hour=9,  minute=31)
+	scheduler.add_job(trade_etf,          'cron', hour=9,  minute=35)
+	scheduler.add_job(rebalance_sell,     'cron', hour=10, minute=0)
+	scheduler.add_job(stop_loss,          'cron', hour=10, minute=2)
+	scheduler.add_job(rebalance_buy,      'cron', hour=10, minute=10)
+	scheduler.add_job(check_limit_up,     'cron', hour=14, minute=0)
+	scheduler.add_job(check_remain_amount,'cron', hour=14, minute=2)
+	scheduler.add_job(info_position,      'cron', hour=15, minute=0)
+	try:
+		print("start")
+		scheduler.start()
+	except (KeyboardInterrupt, SystemExit):
+		print("服务已手动停止")
+
 	while True:
-		time.sleep(5)
-		try:
-			dt = datetime.now()
-			print(dt)
-
-			if dt.hour == 9 and dt.minute == 45:
-				judge_date()
-				prepare_stock_list()
-				sleep_mins(3)
-
-			if dt.hour == 9 and dt.minute == 50:
-				trade_etf()
-				sleep_mins(2)
-
-			if dt.hour == 9 and dt.minute == 53 and is_weekday_job():
-				rebalance_sell()
-				sleep_mins(1)
-
-			if dt.hour == 9 and dt.minute == 55:
-				stop_loss()
-				sleep_mins(3)
-
-			if dt.hour == 9 and dt.minute == 59 and is_weekday_job():
-				if g.sell_done:
-					rebalance_buy()
-				else:
-					print(f"今日({dt})非调仓日，不执行操作")
-			
-			if ((dt.hour == 10 and dt.minute > 15) or dt.hour > 10) and dt.hour	< 13:
-				sleep_mins(30)
-
-			if dt.hour == 13 and dt.minute == 40:
-				trade_afternoon()
-				sleep_mins(78)
-
-			if dt.hour == 15 and dt.minute == 0:
-				info_position()
-
-			if dt.hour > 14 or dt.hour < 8:
-				print("sleep an hour")
-				sleep_hours(1)
-
-			if dt.hour == 8:
-				sleep_mins(60 - dt.minute)
-
-			if dt.hour == 9 and dt.minute < 25:
-				sleep_mins(25 - dt.minute)
-
-		except KeyboardInterrupt:
-			print("\n程序被用户中断")
-			sys.exit(0)
-		
-		except Exception as e:
-			print(f"发生错误: {e}")
-			time.sleep(30)  # 出错后等待30s再继续
+		print("sleep a day")
+		sleep_hours(24)
 
 def judge_date():
 	current_date = datetime.now()
@@ -323,7 +306,8 @@ def trade_etf():
 			g.selected_stocks = g.all_weather_list.copy()
 			collect_sell_buy_stocks()
 			sell_stocks()
-			time.sleep(30)
+			print("sleep 30s")
+			sleep_sec(30)
 			exec_all_weather()
 
 def exec_all_weather():
@@ -446,7 +430,8 @@ def rebalance_buy():
 	buy_stocks()
 	# 重置卖出标记
 	g.sell_done = False
-	time.sleep(30)
+	print("sleep 30s")
+	sleep_sec(30)
 	info_position()
 	print('rebalance_buy count ',g.count)
 
@@ -568,7 +553,8 @@ def calc_position():
 					#update_stock_price(stock, order_info.m_dPrice, -order_info.m_nVolume)
 
 		if cash > 0:
-			time.sleep(30)
+			print("sleep 30s")
+			sleep_sec(30)
 			print(f"卖出部分股票后，多出现金 {cash:.2f}")
 
 		avai_cash += cash
@@ -668,11 +654,6 @@ def calc_position():
 				g.stocks_to_buy.append(stock)
 			print(f'{stock_name}({stock}) 可以再买入{amount}')
 		'''
-
-def trade_afternoon():
-	check_limit_up()
-	time.sleep(20)
-	check_remain_amount()
 	
 def check_limit_up():
 	g.count += 1
@@ -702,7 +683,7 @@ def check_remain_amount():
 	g.count += 1
 	info = g.xt_trader.query_stock_asset(g.account)
 	available_cash = info.cash
-	if g.reason_to_sell is 'limitup': #判断提前售出原因，如果是涨停售出则次日再次交易，如果是止损售出则不交易
+	if g.reason_to_sell == 'limitup': #判断提前售出原因，如果是涨停售出则次日再次交易，如果是止损售出则不交易
 		g.hold_list = get_current_holding_stocks()
 		flag = True
 		if len(g.hold_list) < g.stock_num or flag:
@@ -744,14 +725,15 @@ def check_remain_amount():
 			#info_position()
 			g.refresh_hold = True
 		g.reason_to_sell = ''
-	elif g.reason_to_sell is 'stoploss':
+	elif g.reason_to_sell == 'stoploss':
 		print('止盈止损后，有余额可用'+str(round((available_cash),2))+'元。买入'+ str(g.etf))
 		g.stocks_to_buy = [g.etf]
 		buy_stocks()
 		g.reason_to_sell = ''
 		g.refresh_hold = True
 
-	time.sleep(20)
+	print("sleep 20s")
+	sleep_sec(20)
 	info_position()
 	print('check_remain_amount count ',g.count)
 
@@ -838,7 +820,8 @@ def stop_loss():
 							g.selected_stocks.remove(stock)
 	
 	if show_info == True:
-		time.sleep(30)
+		print("sleep 30s")
+		sleep_sec(30)
 		info_position()
 
 	print('stop_loss count ',g.count)
@@ -1080,7 +1063,7 @@ def buy_stocks():
 				buy_target_shares(stock, amount)
 
 def sell_target_value(stock, target_value):
-	return
+	#return
 	positions = g.xt_trader.query_stock_positions(g.account)
 	async_seq = None
 	for pos in positions:
@@ -1091,7 +1074,7 @@ def sell_target_value(stock, target_value):
 			print(f'{stock} 没有持仓，无法卖出')
 			break
 
-		if target_value == 0:
+		if target_value == 0 and not is_limit_down(stock):
 			async_seq = g.xt_trader.order_stock_async(g.account, 
 											 		stock,                                #stock_code
 											 		xtconstant.STOCK_SELL,                #order_type
@@ -1117,17 +1100,17 @@ def sell_target_value(stock, target_value):
 															xtconstant.FIX_PRICE,			#price_type: 以固定价格卖出
 															current_price,					#price: 当price_type是FIXED时，需要填确切价格
 															'',                             #strategy_name
-															f'卖出{stock}，target {target_value}元 '   #order_remark
+															f'卖出{stock} {target_value}元 '   #order_remark
 					)
 
-					print(f"sell passorder target value {target_value:.2f} current {pos.market_value:.2f} volume {volume:.2f}")
+					print(f"sell passorder target value {target_value:.2f} current {pos.market_value:.2f} amount {amount:.2f}")
 		break
-
+	print("async_seq ", async_seq)
 	if async_seq == -1:
 		print(f"sell_target_value failed {stock} {get_stock_name(stock)}")
 
 def buy_target_shares(stock, target_share):
-	return
+	#return
 	async_seq = g.xt_trader.order_stock_async(g.account, 
 											stock,                               #stock_code
 											xtconstant.STOCK_BUY,                #order_type
@@ -1171,7 +1154,7 @@ def info_position():
 			price = pos.market_value / pos.volume
 			ratio = (price / pos.avg_price - 1) * 100
 			diff_price = price - pos.avg_price
-			industry = g.industry_dict[stock]
+			industry = g.industry_dict.get(stock,None)
 			print(f"GGG持仓: {stock_name}({stock}), 占比 {pos.market_value / total_value * 100:.1f}%, 涨跌幅: {ratio:.1f}% ({diff_price * pos.volume:.1f}), 数量: {pos.volume}, 市值: {pos.market_value:.1f}元 {industry}")
 		
 		for pos in positions:
