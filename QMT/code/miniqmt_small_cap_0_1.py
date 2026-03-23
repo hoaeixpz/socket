@@ -6,6 +6,11 @@ import time
 from datetime import datetime, timedelta
 import math
 import sys
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
+import signal
+
+scheduler = BackgroundScheduler()
 
 class G():
 	pass
@@ -75,8 +80,13 @@ class MyXtQuantTraderCallback(XtQuantTraderCallback):
         """
         print(datetime.datetime.now(), sys._getframe().f_code.co_name)
 
+def sleep_sec(seconds):
+	time.sleep(seconds)
+
 def sleep_mins(minutes):
-	time.sleep(minutes * 60 + 1)
+	min = minutes * 60 + 1
+	print("sleep ", min)
+	time.sleep(min)
 
 def sleep_hours(hours):
 	time.sleep(3600 * hours)
@@ -84,7 +94,8 @@ def sleep_hours(hours):
 def init():
 	print("demo test")
 	# path为mini qmt客户端安装目录下userdata_mini路径
-	path = 'D:\\国金证券QMT交易端\\userdata_mini'
+	#path = 'D:\\国金证券QMT交易端\\userdata_mini'
+	path = 'C:\\QMT\\userdata_mini'
 	session_id = int(time.time())
 	g.xt_trader = XtQuantTrader(path, session_id)
 	callback = MyXtQuantTraderCallback()
@@ -182,74 +193,57 @@ def is_weekday_job():
 				return True
 	return False
 
+def shutdown_scheduler(signum, frame):
+	"""信号处理函数"""
+	print(f"\n收到信号 {signum}，正在关闭调度器...")
+	scheduler.shutdown(wait=False)
+	print("调度器已安全关闭")
+	sys.exit(0)
+
 def run_strategy():
+
+	task_time = [[9,30],  #judge_date
+				[ 9,31],  #prepare_stock_list
+				[ 9,35],  #trade_etf
+				[10, 0],  #rebalance_sell
+				[10, 2],  #stop_loss
+				[10,10],  #rebalance_buy
+				[14, 0],  #check_limit_up
+				[14, 2],  #check_remain_amount
+				[15, 0]]  #info_position
 	'''
-	task_time = [[9,30],
-				[ 9,35],
-				[10, 0],
-				[10, 2],
-				[10,10],
-				[14, 0],
-				[15, 0]]
+	task_time = [["*",55],  #judge_date
+				["*",56],  #prepare_stock_list
+				["*",57],  #trade_etf
+				["*",58],  #rebalance_sell
+				["*",59],  #stop_loss
+				["*",0],  #rebalance_buy
+				["*",1],  #check_limit_up
+				["*",2],  #check_remain_amount
+				["*",3]]  #info_position
 	'''
+	signal.signal(signal.SIGINT, shutdown_scheduler)
+	signal.signal(signal.SIGTERM, shutdown_scheduler)
+
+	scheduler.add_job(judge_date,         'cron', hour=task_time[0][0],  minute=task_time[0][1])
+	scheduler.add_job(prepare_stock_list, 'cron', hour=task_time[1][0],  minute=task_time[1][1])
+	scheduler.add_job(trade_etf,          'cron', hour=task_time[2][0],  minute=task_time[2][1])
+	scheduler.add_job(rebalance_sell,     'cron', hour=task_time[3][0],  minute=task_time[3][1])
+	scheduler.add_job(stop_loss,          'cron', hour=task_time[4][0],  minute=task_time[4][1])
+	scheduler.add_job(rebalance_buy,      'cron', hour=task_time[5][0],  minute=task_time[5][1])
+	scheduler.add_job(check_limit_up,     'cron', hour=task_time[6][0],  minute=task_time[6][1])
+	scheduler.add_job(check_remain_amount,'cron', hour=task_time[7][0],  minute=task_time[7][1])
+	scheduler.add_job(info_position,      'cron', hour=task_time[8][0],  minute=task_time[8][1])
+
+	try:
+		print("start")
+		scheduler.start()
+	except (KeyboardInterrupt, SystemExit):
+		print("服务已手动停止")
+
 	while True:
-		time.sleep(10)
-		try:
-			dt = datetime.now()
-			print(dt)
-
-			if dt.hour == 9 and dt.minute == 45:
-				judge_date()
-				prepare_stock_list()
-				sleep_mins(3)
-
-			if dt.hour == 9 and dt.minute == 50:
-				trade_etf()
-				sleep_mins(2)
-
-			if dt.hour == 9 and dt.minute == 53: #and is_weekday_job():
-				rebalance_sell()
-				sleep_mins(1)
-
-			if dt.hour == 9 and dt.minute == 55:
-				stop_loss()
-				sleep_mins(3)
-
-			if dt.hour == 9 and dt.minute == 59: #and is_weekday_job():
-				if g.sell_done:
-					rebalance_buy()
-				else:
-					print(f"今日({dt})非调仓日，不执行操作")
-				sleep_mins(1)
-			
-			if ((dt.hour == 10 and dt.minute > 15) or dt.hour > 10) and dt.hour	< 13:
-				sleep_mins(30)
-				print("10~13 ", datetime.now())
-
-			if dt.hour == 13 and dt.minute == 40:
-				trade_afternoon()
-				sleep_mins(78)
-				print("13:40 ", datetime.now())
-
-			if dt.hour == 15 and dt.minute == 0:
-				info_position()
-
-			if dt.hour > 14 or dt.hour < 9:
-				print("sleep 15 minutes")
-				sleep_mins(15)
-				print("14~9 ", datetime.now())
-
-			if dt.hour == 9 and dt.minute < 25:
-				sleep_mins(25 - dt.minute)
-				print("9:25 ", datetime.now())
-
-		except KeyboardInterrupt:
-			print("\n程序被用户中断")
-			sys.exit(0)
-		
-		except Exception as e:
-			print(f"发生错误: {e}")
-			time.sleep(30)  # 出错后等待30s再继续
+		print("sleep a day")
+		sleep_hours(24)
 
 def judge_date():
 	current_date = datetime.now()
@@ -257,7 +251,7 @@ def judge_date():
 	g.count = 1
 	if current_month == 1 or current_month == 4:
 		if g.trade == True:
-			print('GGG========== 一月和四月份清仓，日期：%s ==========' % current_date)
+			print('✅========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
 	else:
 		g.trade = True
@@ -325,7 +319,8 @@ def trade_etf():
 			g.selected_stocks = g.all_weather_list.copy()
 			collect_sell_buy_stocks()
 			sell_stocks()
-			time.sleep(30)
+			print("sleep 30s")
+			sleep_sec(30)
 			exec_all_weather()
 
 def exec_all_weather():
@@ -382,6 +377,8 @@ def exec_all_weather():
 			g.refresh_hold = True
 
 def rebalance_sell():
+	if not is_weekday_job():
+		return
 	if g.trade is False:
 		return
 	g.trade_day = True
@@ -389,7 +386,7 @@ def rebalance_sell():
 	g.count += 1
 	
 	current_date = datetime.now()
-	print(f'GGG========== 执行周度调仓，日期：{current_date} ==========')
+	print(f'✅========== 执行周度调仓，日期：{current_date} ==========')
 
 	info_position()
 	#yesterday = current_date - timedelta(days=1)
@@ -401,21 +398,21 @@ def rebalance_sell():
 	current_holdings = get_current_holding_stocks()
 
 	if len(g.stocks_to_buy) > 0 or len(g.stocks_to_sell) > 0:
-		print(f"GGG当前持股 {len(current_holdings)}只")
+		print(f"✅当前持股 {len(current_holdings)}只")
 		current_holdings.sort()
 		for stock in current_holdings:
-			print(f"GGG{get_stock_name(stock)}")
+			print(f"✅{get_stock_name(stock)}")
 			
-		print(f"GGG需要买入股票 {len(g.stocks_to_buy)}只")
-		print(f"GGG需要卖出股票 {len(g.stocks_to_sell)}只")
+		print(f"✅需要买入股票 {len(g.stocks_to_buy)}只")
+		print(f"✅需要卖出股票 {len(g.stocks_to_sell)}只")
 		for stock in g.stocks_to_buy:
-			print("GGG待买入 ", get_stock_name(stock))
+			print("✅待买入 ", get_stock_name(stock))
 		for stock in g.stocks_to_sell:
-			print('GGG待卖出: %s' % get_stock_name(stock))
+			print('✅待卖出: %s' % get_stock_name(stock))
 			
 			
-		print(f"GGG今日({current_date})为卖出时间，执行卖出操作")
-		print('GGG------------------------------------------')
+		print(f"✅今日({current_date})为卖出时间，执行卖出操作")
+		print('✅------------------------------------------')
 		# 执行卖出逻辑
 		sell_stocks()
 		# 标记卖出已完成
@@ -428,6 +425,10 @@ def rebalance_sell():
 	print('rebalance_sell count ',g.count)
 
 def rebalance_buy():
+	if not is_weekday_job():
+		return
+	if not g.sell_done:
+		return
 	if g.trade is False:
 		return
 	g.trade_day = True
@@ -435,12 +436,12 @@ def rebalance_buy():
 	g.count += 1
 	
 	current_date = datetime.now()
-	print(f'GGG========== 执行周度调仓，日期：{current_date} ==========')
+	print(f'✅========== 执行周度调仓，日期：{current_date} ==========')
 	# 执行买入逻辑
 	if len(g.stocks_to_buy):
-		print(f"GGG今日({current_date})为买入时间，执行买入操作")
-		print('GGG+++++++++++++++++++++++++++++++++++++++++')
-		print(f"GGG需要买入股票 {len(g.stocks_to_buy)}只")
+		print(f"✅今日({current_date})为买入时间，执行买入操作")
+		print('✅+++++++++++++++++++++++++++++++++++++++++')
+		print(f"✅需要买入股票 {len(g.stocks_to_buy)}只")
 		for stock in g.stocks_to_buy:
 			print(get_stock_name(stock))
 		
@@ -448,7 +449,8 @@ def rebalance_buy():
 	buy_stocks()
 	# 重置卖出标记
 	g.sell_done = False
-	time.sleep(30)
+	print("sleep 30s")
+	sleep_sec(30)
 	info_position()
 	print('rebalance_buy count ',g.count)
 
@@ -570,7 +572,8 @@ def calc_position():
 					#update_stock_price(stock, order_info.m_dPrice, -order_info.m_nVolume)
 
 		if cash > 0:
-			time.sleep(30)
+			print("sleep 30s")
+			sleep_sec(30)
 			print(f"卖出部分股票后，多出现金 {cash:.2f}")
 
 		avai_cash += cash
@@ -670,11 +673,6 @@ def calc_position():
 				g.stocks_to_buy.append(stock)
 			print(f'{stock_name}({stock}) 可以再买入{amount}')
 		'''
-
-def trade_afternoon():
-	check_limit_up()
-	time.sleep(20)
-	check_remain_amount()
 	
 def check_limit_up():
 	g.count += 1
@@ -753,7 +751,8 @@ def check_remain_amount():
 		g.reason_to_sell = ''
 		g.refresh_hold = True
 
-	time.sleep(20)
+	print("sleep 20s")
+	sleep_sec(20)
 	info_position()
 	print('check_remain_amount count ',g.count)
 
@@ -840,7 +839,8 @@ def stop_loss():
 							g.selected_stocks.remove(stock)
 	
 	if show_info == True:
-		time.sleep(30)
+		print("sleep 30s")
+		sleep_sec(30)
 		info_position()
 
 	print('stop_loss count ',g.count)
@@ -962,7 +962,8 @@ def get_small_cap_stocks(stock_list, query_date, n=5):
 			marker = '  <== 选中' if rank <= n else ''
 			print(f'    第{rank:>2}名: {stock_name}({stock}), 流通市值: {cap_in_10k} 亿元{marker}')
 
-	selected_stocks = list(sorted_market)[0:n]
+	#selected_stocks = list(sorted_market)[0:n]
+	selected_stocks = small_cap_get_stock_industry(list(sorted_market)[:100], n)
 
 	flag = False
 	for stock_code in selected_stocks:
@@ -976,12 +977,35 @@ def get_small_cap_stocks(stock_list, query_date, n=5):
 		for stock, cap in list(sorted_market.items())[0:20]:
 			stock_name = get_stock_name(stock)
 			cap_in_10k = round(cap/100000000.0, 2)
+			industry = g.industry_dict[stock]
 			rank = rank + 1
-			marker = '  <== 选中' if rank <= n else ''
-			print(f'    第{rank:>2}名: {stock_name}({stock}), 流通市值: {cap_in_10k} 亿元{marker}')
+			marker = '  <== 选中' if stock in selected_stocks else ''
+			print(f'    第{rank:>2}名: {stock_name}({stock}), 流通市值: {cap_in_10k} 亿元 {industry} {marker}')
 
 	return selected_stocks
 
+def small_cap_get_stock_industry(stock_list, num):
+    return stock_list[:num]
+    """行业分散选股"""
+    try:
+        selected_stocks = []
+        industry_list = []
+        
+        for stock_code in stock_list:
+            if stock_code in g.industry_dict:
+                info = g.industry_dict[stock_code]
+                if True:
+                    industry_name = info
+                    if industry_name not in industry_list:
+                        industry_list.append(industry_name)
+                        selected_stocks.append(stock_code)
+                        if len(industry_list) >= num:
+                            break
+        return selected_stocks
+    except Exception as e:
+        print(f"行业筛选错误: {e}")
+        return stock_list[:num]
+	
 def get_normal_stocks():
 	stocklist = xtdata.get_stock_list_in_sector('399101.SZ')
 	print(f"中小综指成分股数量：{len(stocklist)}")
@@ -1034,8 +1058,8 @@ def get_current_holding_stocks():
 def sell_stocks():
 	# 执行卖出
 	for stock in g.stocks_to_sell:
-		print('GGG>>>>>>>>>>>>')
-		print('GGG卖出: ',get_stock_name(stock))
+		print('✅>>>>>>>>>>>>')
+		print('✅卖出: ',get_stock_name(stock))
 		sell_target_value(stock, 0)
 		detail = xtdata.get_instrument_detail(stock)
 		is_paused = detail['InstrumentStatus'] < 0
@@ -1082,7 +1106,7 @@ def buy_stocks():
 				buy_target_shares(stock, amount)
 
 def sell_target_value(stock, target_value):
-	return
+	#return
 	positions = g.xt_trader.query_stock_positions(g.account)
 	async_seq = None
 	for pos in positions:
@@ -1093,7 +1117,7 @@ def sell_target_value(stock, target_value):
 			print(f'{stock} 没有持仓，无法卖出')
 			break
 
-		if target_value == 0:
+		if target_value == 0 and not is_limit_down(stock):
 			async_seq = g.xt_trader.order_stock_async(g.account, 
 											 		stock,                                #stock_code
 											 		xtconstant.STOCK_SELL,                #order_type
@@ -1119,17 +1143,17 @@ def sell_target_value(stock, target_value):
 															xtconstant.FIX_PRICE,			#price_type: 以固定价格卖出
 															current_price,					#price: 当price_type是FIXED时，需要填确切价格
 															'',                             #strategy_name
-															f'卖出{stock}，target {target_value}元 '   #order_remark
+															f'卖出{stock} {target_value}元 '   #order_remark
 					)
 
-					print(f"sell passorder target value {target_value:.2f} current {pos.market_value:.2f} volume {volume:.2f}")
+					print(f"sell passorder target value {target_value:.2f} current {pos.market_value:.2f} amount {amount:.2f}")
 		break
-
+	print("async_seq ", async_seq)
 	if async_seq == -1:
 		print(f"sell_target_value failed {stock} {get_stock_name(stock)}")
 
 def buy_target_shares(stock, target_share):
-	return
+	#return
 	async_seq = g.xt_trader.order_stock_async(g.account, 
 											stock,                               #stock_code
 											xtconstant.STOCK_BUY,                #order_type
@@ -1173,16 +1197,16 @@ def info_position():
 			price = pos.market_value / pos.volume
 			ratio = (price / pos.avg_price - 1) * 100
 			diff_price = price - pos.avg_price
-			industry = g.industry_dict[stock]
-			print(f"GGG持仓: {stock_name}({stock}), 占比 {pos.market_value / total_value * 100:.1f}%, 涨跌幅: {ratio:.1f}% ({diff_price * pos.volume:.1f}), 数量: {pos.volume}, 市值: {pos.market_value:.1f}元 {industry}")
+			industry = g.industry_dict.get(stock,None)
+			print(f"✅持仓: {stock_name}({stock}), 占比 {pos.market_value / total_value * 100:.1f}%, 涨跌幅: {ratio:.1f}% ({diff_price * pos.volume:.1f}), 数量: {pos.volume}, 市值: {pos.market_value:.1f}元 {industry}")
 		
 		for pos in positions:
 			stock = pos.stock_code
 			stock_name = get_stock_name(stock)
 			if pos.volume == 0:
-				print(f"GGG持仓: {stock_name}({stock}) 0股")
+				print(f"✅持仓: {stock_name}({stock}) 0股")
 
-		print(f'GGG*******************总资产 {total_value:.2f}  剩余可用金额 {available_cash:.2f}元*******************\n\n')
+		print(f'✅*******************总资产 {total_value:.2f}  剩余可用金额 {available_cash:.2f}元*******************\n\n')
 
 def get_sw2_industry():
 	'''
