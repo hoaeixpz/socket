@@ -253,6 +253,11 @@ def judge_date():
 		if g.trade == True:
 			print('✅========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
+	elif (current_month == 12 or current_month == 3) and current_date.day > 27:
+		if 5 - current_date.weekday + current_date.day > 31:
+			if g.trade == True:
+				print('✅========== 一月和四月份清仓，日期：%s ==========' % current_date)
+			g.trade = False
 	else:
 		g.trade = True
 	print('judge_date count ',g.count)
@@ -1232,8 +1237,8 @@ def get_sw2_industry():
 
 if __name__ == "__main__":
 	init()
-	judge_date()
-	prepare_stock_list()
+	#judge_date()
+	#prepare_stock_list()
 	run_strategy()
 	#exec_all_weather()
 	#print(is_weekday_job())
