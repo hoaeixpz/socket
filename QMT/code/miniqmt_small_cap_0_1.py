@@ -249,7 +249,7 @@ def judge_date():
 	current_date = datetime.now()
 	current_month = current_date.month
 	g.count = 1
-	if current_month == 1 or current_month == 4:
+	if current_month == 1 or current_month == 4 or current_month == 3:
 		if g.trade == True:
 			print('✅========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
@@ -380,6 +380,9 @@ def exec_all_weather():
 			print(f'{stock} {get_stock_name(stock)} 目标市值{target_value:.2f}, 买入{amount}股 * {current_price}元')
 			buy_target_shares(stock, amount)
 			g.refresh_hold = True
+		else:
+			print('=====================================')
+			print(f"{stock} {get_stock_name(stock)} 未买入, 目标市值{target_value:.2f}, 股价 {current_price}元, amount {target_value / current_price:.2f}")
 
 def rebalance_sell():
 	if not is_weekday_job():
