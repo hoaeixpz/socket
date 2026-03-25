@@ -94,8 +94,8 @@ def sleep_hours(hours):
 def init():
 	print("demo test")
 	# path为mini qmt客户端安装目录下userdata_mini路径
-	#path = 'D:\\国金证券QMT交易端\\userdata_mini'
-	path = 'C:\\QMT\\userdata_mini'
+	path = 'D:\\国金证券QMT交易端\\userdata_mini'
+	#path = 'C:\\QMT\\userdata_mini'
 	session_id = int(time.time())
 	g.xt_trader = XtQuantTrader(path, session_id)
 	callback = MyXtQuantTraderCallback()
@@ -172,6 +172,7 @@ def get_trading_dates(stock, dt_str, days = 7):
 	return dates
 
 def is_weekday_job():
+	return True
 	current_date = datetime.now()
 	dt_str = current_date.strftime('%Y%m%d')
 	date = get_trading_dates('399101.SZ', dt_str)
@@ -201,26 +202,26 @@ def shutdown_scheduler(signum, frame):
 	sys.exit(0)
 
 def run_strategy():
-
-	task_time = [[9,30],  #judge_date
-				[ 9,31],  #prepare_stock_list
-				[ 9,35],  #trade_etf
-				[10, 0],  #rebalance_sell
-				[10, 2],  #stop_loss
-				[10,10],  #rebalance_buy
-				[14, 0],  #check_limit_up
-				[14, 2],  #check_remain_amount
+	#'''
+	task_time = [[9,40],  #judge_date
+				[ 9,41],  #prepare_stock_list
+				[ 9,43],  #trade_etf
+				[ 9,46],  #rebalance_sell
+				[ 9,48],  #stop_loss
+				[ 9,50],  #rebalance_buy
+				[13,40],  #check_limit_up
+				[13,42],  #check_remain_amount
 				[15, 0]]  #info_position
 	'''
-	task_time = [["*",55],  #judge_date
-				["*",56],  #prepare_stock_list
-				["*",57],  #trade_etf
-				["*",58],  #rebalance_sell
-				["*",59],  #stop_loss
-				["*",0],  #rebalance_buy
-				["*",1],  #check_limit_up
-				["*",2],  #check_remain_amount
-				["*",3]]  #info_position
+	task_time = [["*",46],  #judge_date
+				["*",47],  #prepare_stock_list
+				["*",48],  #trade_etf
+				["*",49],  #rebalance_sell
+				["*",50],  #stop_loss
+				["*",51],  #rebalance_buy
+				["*",52],  #check_limit_up
+				["*",53],  #check_remain_amount
+				["*",54]]  #info_position
 	'''
 	signal.signal(signal.SIGINT, shutdown_scheduler)
 	signal.signal(signal.SIGTERM, shutdown_scheduler)
@@ -1115,7 +1116,7 @@ def buy_stocks():
 				buy_target_shares(stock, amount)
 
 def sell_target_value(stock, target_value):
-	#return
+	return
 	positions = g.xt_trader.query_stock_positions(g.account)
 	async_seq = None
 	for pos in positions:
@@ -1162,7 +1163,7 @@ def sell_target_value(stock, target_value):
 		print(f"sell_target_value failed {stock} {get_stock_name(stock)}")
 
 def buy_target_shares(stock, target_share):
-	#return
+	return
 	async_seq = g.xt_trader.order_stock_async(g.account, 
 											stock,                               #stock_code
 											xtconstant.STOCK_BUY,                #order_type
@@ -1241,6 +1242,7 @@ def get_sw2_industry():
 
 if __name__ == "__main__":
 	init()
+	#get_stock_name('511880.SH')
 	#judge_date()
 	#prepare_stock_list()
 	run_strategy()
