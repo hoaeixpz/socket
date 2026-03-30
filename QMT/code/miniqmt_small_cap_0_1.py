@@ -249,12 +249,12 @@ def judge_date():
 	current_date = datetime.now()
 	current_month = current_date.month
 	g.count = 1
-	if current_month == 1 or current_month == 4 or current_month == 3:
+	if current_month == 1 or current_month == 4:
 		if g.trade == True:
 			print('✅========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
 	elif (current_month == 12 or current_month == 3) and current_date.day > 27:
-		if 5 - current_date.weekday + current_date.day > 31:
+		if 5 - current_date.weekday() + current_date.day > 31:
 			if g.trade == True:
 				print('✅========== 一月和四月份清仓，日期：%s ==========' % current_date)
 			g.trade = False
@@ -1023,9 +1023,10 @@ def get_normal_stocks():
 	current_holdings = get_current_holding_stocks()
 	for stock in stocklist:
 		detail = xtdata.get_instrument_detail(stock)
+        if not detail:
+            print('f{stock} cannot get instrument detail !!!')
+            continue
 		stock_name = detail['InstrumentName']
-		#print(detail)
-		#break
 		if 'ST' in stock_name or 'st' in stock_name:
 			#print(stock, " ", stock_name)
 			continue

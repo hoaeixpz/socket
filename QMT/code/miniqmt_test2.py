@@ -78,7 +78,8 @@ class MyXtQuantTraderCallback(XtQuantTraderCallback):
 def init():
 	print("demo test")
 	# path为mini qmt客户端安装目录下userdata_mini路径
-	path = 'C:\\QMT\\国金证券QMT交易端\\userdata_mini'
+	#path = 'D:\\国金证券QMT交易端\\userdata_mini'
+	path = 'C:\\QMT\\userdata_mini'
 	session_id = int(time.time())
 	g.xt_trader = XtQuantTrader(path, session_id)
 	callback = MyXtQuantTraderCallback()
@@ -161,7 +162,7 @@ def is_weekday_job():
 	for day in range(1, g.weekday + 1):
 		yesterday = current_date - timedelta(days=day)
 		dt_str = yesterday.strftime('%Y%m%d')
-		last_date = date[-day]
+		last_date = date[-(day+1)]
 		if day < g.weekday:
 			if last_date != dt_str:
 				return False
@@ -935,9 +936,10 @@ def get_normal_stocks():
 	current_holdings = get_current_holding_stocks()
 	for stock in stocklist:
 		detail = xtdata.get_instrument_detail(stock)
+        if not detail:
+            print('f{stock} cannot get instrument detail !!!')
+            continue
 		stock_name = detail['InstrumentName']
-		#print(detail)
-		#break
 		if 'ST' in stock_name or 'st' in stock_name:
 			#print(stock, " ", stock_name)
 			continue
