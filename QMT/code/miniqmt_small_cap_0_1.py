@@ -1023,9 +1023,9 @@ def get_normal_stocks():
 	current_holdings = get_current_holding_stocks()
 	for stock in stocklist:
 		detail = xtdata.get_instrument_detail(stock)
-        if not detail:
-            print('f{stock} cannot get instrument detail !!!')
-            continue
+		if not detail:
+			print('f{stock} cannot get instrument detail !!!')
+			continue
 		stock_name = detail['InstrumentName']
 		if 'ST' in stock_name or 'st' in stock_name:
 			#print(stock, " ", stock_name)
