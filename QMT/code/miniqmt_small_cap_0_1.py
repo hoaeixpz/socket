@@ -993,7 +993,7 @@ def get_small_cap_stocks(stock_list, query_date, n=5):
 	return selected_stocks
 
 def small_cap_get_stock_industry(stock_list, num):
-    return stock_list[:num]
+    #return stock_list[:num]
     """行业分散选股"""
     try:
         selected_stocks = []
@@ -1024,7 +1024,7 @@ def get_normal_stocks():
 	for stock in stocklist:
 		detail = xtdata.get_instrument_detail(stock)
 		if not detail:
-			print('f{stock} cannot get instrument detail !!!')
+			print(f'{stock} cannot get instrument detail !!!')
 			continue
 		stock_name = detail['InstrumentName']
 		if 'ST' in stock_name or 'st' in stock_name:
@@ -1260,3 +1260,4 @@ if __name__ == "__main__":
 	#get_normal_stocks()
 	#print(get_last_price('399101.SZ'))
 	#print(get_specified_date_price('399101.SZ', '20260315'))
+	#get_small_cap_stocks(g.stock_pool, datetime.now(), g.stock_num)
