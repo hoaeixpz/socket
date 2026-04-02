@@ -201,6 +201,9 @@ def shutdown_scheduler(signum, frame):
 	print("调度器已安全关闭")
 	sys.exit(0)
 
+def job_every_hour():
+    print(datetime.now())
+
 def run_strategy():
 	#'''
 	task_time = [[9,40],  #judge_date
@@ -235,6 +238,7 @@ def run_strategy():
 	scheduler.add_job(check_limit_up,     'cron', hour=task_time[6][0],  minute=task_time[6][1])
 	scheduler.add_job(check_remain_amount,'cron', hour=task_time[7][0],  minute=task_time[7][1])
 	scheduler.add_job(info_position,      'cron', hour=task_time[8][0],  minute=task_time[8][1])
+	scheduler.add_job(job_every_hour, 'cron', minute=0, timezone='Asia/Shanghai')
 
 	try:
 		print("start")
