@@ -437,6 +437,11 @@ def judge_date(ContextInfo):
 		if g.trade == True:
 			print('GGG========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
+	elif (current_month == 12 or current_month == 3) and current_date.day > 27:
+		if 5 - current_date.weekday() + current_date.day > 31:
+			if g.trade == True:
+				print('✅========== 一月和四月份清仓，日期：%s ==========' % current_date)
+			g.trade = False
 	else:
 		g.trade = True
 	print('judge_date count ',g.count)
