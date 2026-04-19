@@ -14,13 +14,18 @@ import matplotlib.pyplot as plt
 plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'WenQuanYi Micro Hei']
 plt.rcParams['axes.unicode_minus'] = False
 
+# 日期范围设置 (格式: 'YYYY-MM-DD')
+DATE_START = '2022-08-19'
+DATE_END = '2022-10-31'
+
 # 图片输出目录
-OUTPUT_DIR = r'C:\socket\stock_charts'
+OUTPUT_DIR = rf'C:\socket\stock_charts_{DATE_START.replace("-", "")}_{DATE_END.replace("-", "")}'
 
 def parse_weekly_holdings(filepath):
     """
-    解析日志文件，提取每周持仓记录
+    解析日志文件，提取每周持仓记录（含当天卖出的股票）
     根据"当日(周几)持仓市值:"关键字识别，每周只取最早出现的那条记录
+    同时收集当天10:00前卖出的股票
     """
     from datetime import datetime, timedelta
     
@@ -30,21 +35,21 @@ def parse_weekly_holdings(filepath):
     # 存储每周的持仓数据，格式: {周一日期: {'date': 实际日期, 'weekday': 周几, 'stocks': [...]}}
     weekly_data = {}
     
-    # 记录已处理的周一（用于判断同一周）
-    processed_mondays = set()
-    
     current_date = None
     
-    # 先收集所有15:30的持仓行
-    all_holdings = []  # [(date, name, code, quantity, market_value), ...]
+    # 收集所有15:30的持仓行
+    all_holdings = []
     
-    for line in lines:
+    # 收集所有卖出记录 {(date, stock_name): {'quantity': int, 'price': float, 'sell_type': str}}
+    sell_records = {}  # sell_type: '10点' 或 '涨停'
+    
+    for i, line in enumerate(lines):
         # 匹配日期
         date_match = re.search(r'^(\d{4}-\d{2}-\d{2})', line)
         if date_match:
             current_date = date_match.group(1)
         
-        # 匹配持仓行
+        # 匹配持仓行 (15:30)
         holding_match = re.search(r'✅持仓:\s*([^ (（]+)\(([^)]+)\).*?数量[：:]\s*(\d+).*?市值[：:]\s*([\d.]+)元', line)
         if holding_match and '15:30' in line:
             stock_name = holding_match.group(1).strip()
@@ -52,7 +57,6 @@ def parse_weekly_holdings(filepath):
             quantity = int(holding_match.group(3))
             market_value = float(holding_match.group(4))
             
-            # 只保留小市值股票
             if stock_code.endswith('.XSHE'):
                 all_holdings.append({
                     'date': current_date,
@@ -61,9 +65,51 @@ def parse_weekly_holdings(filepath):
                     'quantity': quantity,
                     'market_value': market_value
                 })
+        
+        # 匹配10:00卖出行
+        sell_match = re.search(r'✅卖出:\s*([^ (（]+)', line)
+        if sell_match and '10:' in line:
+            stock_name = sell_match.group(1).strip()
+            # 查找下一行的卖出价格
+            if i + 1 < len(lines):
+                price_line = lines[i + 1]
+                price_match = re.search(r'卖出\s*(\d+)股\s*\*\s*([\d.]+)元', price_line)
+                if price_match:
+                    quantity = int(price_match.group(1))
+                    price = float(price_match.group(2))
+                    key = (current_date, stock_name)
+                    if key not in sell_records:  # 只记录第一次卖出
+                        sell_records[key] = {
+                            'quantity': quantity,
+                            'price': price,
+                            'sell_type': '10点卖出'
+                        }
+        
+        # 匹配涨停卖出行 (14:00)
+        if '涨停卖出' in line and '14:00' in line:
+            # 查找下一行，获取涨停卖出的股票
+            if i + 1 < len(lines):
+                next_line = lines[i + 1].strip()
+                # 格式: 股票名称 股票代码
+                limit_up_match = re.search(r'([^\s]+)\s+([0-9]{6}\.XSHE)', next_line)
+                if limit_up_match:
+                    stock_name = limit_up_match.group(1).strip()
+                    stock_code = limit_up_match.group(2).strip()
+                    # 在持仓记录中查找该股票的买入价作为参考
+                    price = 0
+                    for h in all_holdings:
+                        if h['code'] == stock_code:
+                            price = round(h['market_value'] / h['quantity'], 2) if h['quantity'] > 0 else 0
+                            break
+                    key = (current_date, stock_name)
+                    if key not in sell_records:
+                        sell_records[key] = {
+                            'quantity': 0,
+                            'price': price,
+                            'sell_type': '涨停卖出'
+                        }
     
     # 找出所有"当日持仓市值"行
-    holdings_by_date = defaultdict(list)
     daily_holdings_dates = []
     
     for i, line in enumerate(lines):
@@ -74,28 +120,28 @@ def parse_weekly_holdings(filepath):
                 daily_holdings_dates.append((i, date, line))
     
     # 按周分组，优先选择周2
-    week_records = {}  # {monday_str: (date, line)}
+    week_records = {}  # {monday_str: (date, weekday, line)}
     
     for idx, (line_num, date, line) in enumerate(daily_holdings_dates):
-        # 提取周几
         weekday_match = re.search(r'当日\((周\d+)\)', line)
         if not weekday_match:
             continue
         weekday = weekday_match.group(1)
         
-        # 计算当前日期对应的周一
         date_obj = datetime.strptime(date, '%Y-%m-%d')
         weekday_num = date_obj.weekday()
         monday_of_week = date_obj - timedelta(days=weekday_num)
         monday_str = monday_of_week.strftime('%Y-%m-%d')
         
-        # 如果这周还没有记录，或者当前是周2，则更新
         if monday_str not in week_records or weekday == '周2':
             week_records[monday_str] = (date, weekday, line)
     
     # 处理每周选中的记录
     for monday_str, (date, weekday, line) in week_records.items():
         stocks_with_price = []
+        existing_codes = set()  # 记录已添加的股票代码
+        
+        # 先添加当天15:30的持仓
         for h in all_holdings:
             if h['date'] == date and h['quantity'] > 0:
                 stocks_with_price.append({
@@ -103,8 +149,31 @@ def parse_weekly_holdings(filepath):
                     'code': h['code'],
                     'quantity': h['quantity'],
                     'market_value': h['market_value'],
-                    'price': round(h['market_value'] / h['quantity'], 2)
+                    'price': round(h['market_value'] / h['quantity'], 2),
+                    'sold': False
                 })
+                existing_codes.add(h['code'])
+        
+        # 添加当天卖出的股票（从持仓列表中查找代码）
+        for (sell_date, sell_name), sell_info in sell_records.items():
+            if sell_date == date:
+                # 在持仓记录中查找对应的股票代码
+                for h in all_holdings:
+                    if h['name'] == sell_name:
+                        code = h['code']
+                        # 如果该股票不在当前持仓中，添加为已卖出状态
+                        if code not in existing_codes:
+                            stocks_with_price.append({
+                                'name': sell_name,
+                                'code': code,
+                                'quantity': 0,
+                                'market_value': 0,
+                                'price': sell_info['price'],
+                                'sold': True,
+                                'sell_type': sell_info['sell_type']
+                            })
+                            existing_codes.add(code)
+                        break
         
         weekly_data[monday_str] = {
             'date': date,
@@ -114,9 +183,29 @@ def parse_weekly_holdings(filepath):
     
     return weekly_data
 
-def filter_2022(weekly_data):
-    """过滤只保留2022年的数据"""
-    return {k: v for k, v in weekly_data.items() if v['date'].startswith('2022')}
+def filter_by_date_range(weekly_data, start_date=None, end_date=None):
+    """
+    按日期范围过滤数据
+    
+    参数:
+        weekly_data: 原始数据
+        start_date: 开始日期 (YYYY-MM-DD)
+        end_date: 结束日期 (YYYY-MM-DD)
+    
+    返回:
+        过滤后的数据
+    """
+    from datetime import datetime
+    
+    result = {}
+    for k, v in weekly_data.items():
+        date = v['date']
+        if start_date and date < start_date:
+            continue
+        if end_date and date > end_date:
+            continue
+        result[k] = v
+    return result
 
 def count_stock_holdings(weekly_data):
     """统计每只股票的持仓周数，返回 {代码: {'name': 名称, 'weeks': 周数}}"""
@@ -339,14 +428,14 @@ def main():
     filepath = 'C:/socket/1'
     weekly_data = parse_weekly_holdings(filepath)
     
-    # 过滤2022年数据
-    weekly_2022 = filter_2022(weekly_data)
+    # 按日期范围过滤数据
+    filtered_data = filter_by_date_range(weekly_data, DATE_START, DATE_END)
     
     # 按实际日期排序输出
-    sorted_dates = sorted(weekly_2022.keys(), key=lambda x: weekly_2022[x]['date'])
+    sorted_dates = sorted(filtered_data.keys(), key=lambda x: filtered_data[x]['date'])
     
     print(f"总共找到 {len(weekly_data)} 周的持仓记录")
-    print(f"其中2022年有 {len(weekly_2022)} 周的持仓记录\n")
+    print(f"日期范围 {DATE_START} 至 {DATE_END} 内有 {len(filtered_data)} 周的持仓记录\n")
     
     # 输出每周持仓（含股价）
     print("=" * 90)
@@ -354,7 +443,7 @@ def main():
     print("=" * 90)
     
     for i, key in enumerate(sorted_dates, 1):
-        record = weekly_2022[key]
+        record = filtered_data[key]
         date = record['date']  # 实际日期
         weekday = record['weekday']
         stocks = record['stocks']
@@ -372,7 +461,7 @@ def main():
     print("=" * 70)
     print("各股票持仓周数统计表")
     print("=" * 70)
-    stock_info = count_stock_holdings(weekly_2022)
+    stock_info = count_stock_holdings(filtered_data)
     
     # 按持仓周数降序排序
     sorted_stocks = sorted(stock_info.items(), key=lambda x: x[1]['weeks'], reverse=True)
@@ -387,15 +476,14 @@ def main():
     # 绘制直方图
     plot_histogram(stock_info)
     
-    return weekly_2022, stock_info
+    return filtered_data, stock_info
 
 
 def demo_stock_trend(weekly_data):
     """绘制所有股票的持仓走势图"""
     # 创建输出目录
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
-        print(f"已创建输出目录: {OUTPUT_DIR}")
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    print(f"输出目录: {OUTPUT_DIR}")
     
     # 获取所有股票代码
     stock_codes = set()
@@ -404,6 +492,7 @@ def demo_stock_trend(weekly_data):
             stock_codes.add(stock['code'])
     
     print("\n" + "=" * 60)
+    print(f"日期范围: {DATE_START} 至 {DATE_END}")
     print(f"开始绘制所有股票走势图 (共 {len(stock_codes)} 只)...")
     print("=" * 60)
     
