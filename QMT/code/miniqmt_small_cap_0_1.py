@@ -1059,6 +1059,8 @@ def get_current_holding_stocks():
 	#print("get_current_holding_stocks")
 	positions = xt_trader.query_stock_positions(acc)
 	for pos in positions:
+		if pos.volume == 0:
+			continue
 		#print(pos.stock_code)
 		current_holdings.append(pos.stock_code)
 
