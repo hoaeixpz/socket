@@ -92,7 +92,7 @@ def sleep_hours(hours):
 	time.sleep(3600 * hours)
 
 def init():
-	print("demo test")
+	print("init")
 	# path为mini qmt客户端安装目录下userdata_mini路径
 	#path = 'D:\\国金证券QMT交易端\\userdata_mini'
 	path = 'C:\\QMT\\userdata_mini'
@@ -125,6 +125,7 @@ def init():
 	g.reason_to_sell = ''
 	g.refresh_hold = False
 	g.trade = True
+	g.is_trading_day = True
 	g.stock_num = 9  # 每月持有的股票数量 9
 	g.weekday = 2  #每周二调仓
 	g.trade_day = False
@@ -171,6 +172,13 @@ def get_trading_dates(stock, dt_str, days = 7):
 	dates = history_data[stock].index.tolist()
 	return dates
 
+def is_trading_day():
+	current_date = datetime.now()
+	today = current_date.strftime('%Y%m%d')
+	date = get_trading_dates('399101.SZ', today)
+	last_trading_day = date[-1]
+	return today == last_trading_day
+
 def is_weekday_job():
 	current_date = datetime.now()
 	dt_str = current_date.strftime('%Y%m%d')
@@ -210,7 +218,7 @@ def run_strategy():
 				[10,10],  #rebalance_buy
 				[14, 0],  #check_limit_up
 				[14, 2],  #check_remain_amount
-				[15, 0]]  #info_position
+				[15, 1]]  #info_position
 	'''
 	task_time = [["*",55],  #judge_date
 				["*",56],  #prepare_stock_list
@@ -246,6 +254,9 @@ def run_strategy():
 		sleep_hours(24)
 
 def judge_date():
+	g.is_trading_day = is_trading_day()
+	print(f'今天是交易日吗 {g.is_trading_day}')
+	
 	current_date = datetime.now()
 	current_month = current_date.month
 	g.count = 1
@@ -263,6 +274,8 @@ def judge_date():
 	print('judge_date count ',g.count)
 
 def prepare_stock_list():
+	if not g.is_trading_day:
+		return
 	#获取已持有列表
 	g.count += 1
 	g.hold_list= []
@@ -308,8 +321,10 @@ def collect_sell_buy_stocks():
 			g.stocks_to_buy.append(stock)
 
 def trade_etf():
-	print("trade_etf")
+	if not g.is_trading_day:
+		return
 	if g.trade is False:
+		print("trade_etf")
 		current_holdings = get_current_holding_stocks()
 		all_weather = False
 		for stock in current_holdings:
@@ -683,6 +698,8 @@ def calc_position():
 		'''
 	
 def check_limit_up():
+	if not g.is_trading_day:
+		return
 	g.count += 1
 	now_time = datetime.now()
 	if g.yesterday_HL_list != []:
@@ -707,6 +724,8 @@ def check_limit_up():
 
 #如果昨天有股票卖出或者买入失败，剩余的金额今天买入
 def check_remain_amount():
+	if not g.is_trading_day:
+		return
 	g.count += 1
 	info = g.xt_trader.query_stock_asset(g.account)
 	available_cash = info.cash
@@ -766,6 +785,8 @@ def check_remain_amount():
 
 #止盈止损
 def stop_loss():
+	if not g.is_trading_day:
+		return
 	g.count += 1
 	show_info = False
 	if g.run_stoploss:
