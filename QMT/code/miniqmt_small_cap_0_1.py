@@ -1232,7 +1232,7 @@ def info_position():
 			color = red_c if ratio > 0 else green_c
 			diff_price = price - pos.avg_price
 			industry = g.industry_dict.get(stock,None)
-			print(f"{green_c}✅\033[0m持仓: {stock_name}({stock}), 占比 {pos.market_value / total_value * 100:.1f}%, 涨跌幅: {color}{ratio:.1f}% ({diff_price * pos.volume:.1f})\033[0m, 数量: {pos.volume}, 市值: {pos.market_value:.1f}元 {industry}")
+			print(f"{green_c}✅\033[0m持仓: {stock_name}({stock}), 占比 {pos.market_value / total_value * 100:.2f}%, 涨跌幅: {color}{ratio:.2f}% ({diff_price * pos.volume:.2f})\033[0m, 数量: {pos.volume}, 市值: {pos.market_value:.1f}元 {industry}")
 
 		for pos in positions:
 			stock = pos.stock_code
