@@ -10,6 +10,36 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 import signal
 
+import re
+ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+
+class Tee:
+    """将输出同时写入终端和日志文件"""
+    def __init__(self, log_file_path):
+        self.terminal = sys.__stdout__      # 保留原始控制台输出流
+        self.log = open(log_file_path, 'a', encoding='utf-8')  # 追加模式
+
+    def write(self, message):
+        self.terminal.write(message)                  # 打印到控制台
+        clean_message = ansi_escape.sub('', message)  # 去除颜色代码
+        self.log.write(clean_message)                 # 写入日志文件
+        self.log.flush()                              # 实时写入磁盘
+
+    def flush(self):
+        try:
+            self.terminal.flush()
+            self.log.flush()
+        except ValueError:
+            pass
+
+    def close(self):
+        self.log.close()
+
+# 重定向 stdout，所有 print 都会经过 Tee 对象
+log_name = datetime.now().strftime('%Y%m%d')
+tee = Tee(f"logfiles/{log_name}.log")
+sys.stdout = tee
+
 red_c = '\033[31m'
 green_c = '\033[32m'
 
@@ -98,6 +128,7 @@ def init():
 	print("init")
 	# path为mini qmt客户端安装目录下userdata_mini路径
 	#path = 'C:\\QMT\\国金证券QMT交易端\\userdata_mini'
+	#path = 'D:\\国金证券QMT交易端\\userdata_mini'
 	path = 'C:\\QMT\\userdata_mini'
 	session_id = int(time.time())
 	g.xt_trader = XtQuantTrader(path, session_id)
@@ -207,6 +238,7 @@ def shutdown_scheduler(signum, frame):
 	print(f"\n收到信号 {signum}，正在关闭调度器...")
 	scheduler.shutdown(wait=False)
 	print("调度器已安全关闭")
+	tee.close()
 	sys.exit(0)
 
 def run_strategy():
