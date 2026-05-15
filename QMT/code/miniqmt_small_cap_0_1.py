@@ -427,6 +427,7 @@ def exec_all_weather():
 			print('<<<<<<<<<<<<<<<<<买入<<<<<<<<<<<<<<<<<')
 			print(f'{stock} {get_stock_name(stock)} 目标市值{target_value:.2f}, 买入{amount}股 * {current_price}元')
 			buy_target_shares(stock, amount)
+			sleep_sec(1)
 			g.refresh_hold = True
 		else:
 			print('=====================================')
@@ -1168,6 +1169,7 @@ def buy_stocks():
 				print(f'委托买入: {get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'
 					f'\n预计最终持股{amount}股，每股{current_price:.2f}元，合计:{amount * current_price:.2f}')
 				buy_target_value(stock, target_value_per_stock)
+			sleep_sec(1)
 
 def sell_target_value(stock, target_value):
 	#return
