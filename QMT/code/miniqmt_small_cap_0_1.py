@@ -1373,3 +1373,4 @@ if __name__ == "__main__":
 	#get_small_cap_stocks(g.stock_pool, datetime.now(), g.stock_num)
 	#buy_target_value('002486.SZ', 8713.3)
 	#buy_target_shares('002486.SZ', 3100)
+	#sleep_mins(1)
