@@ -512,6 +512,7 @@ def rebalance_buy():
 	print('rebalance_buy count ',g.count)
 
 def calc_position():
+	CASH_YU = 5000
 	info = g.xt_trader.query_stock_asset(g.account)
 	total_value = info.total_asset
 	current_holdings = get_current_holding_stocks()
@@ -592,7 +593,7 @@ def calc_position():
 		
 	avai_cash = total_value - position_sum
 	print(f'预计持仓 {position_sum} 剩余金额 {avai_cash:.2f}')
-	if abs(avai_cash) > 5000 or avai_cash < 0:
+	if abs(avai_cash) > CASH_YU or avai_cash < 0:
 		print(f'{red_c}❌❌\033[0m剩余资金过大 {total_value - position_sum:.2f}')
 		cash = 0
 		for stock, exce_pos in g.excepted_position.items():
@@ -601,7 +602,7 @@ def calc_position():
 			pos, stock_price = position_dict[stock]
 			diff_pos = exce_pos - pos
 			#if abs(diff_pos) > 0.04:
-			if abs(diff_pos) * total_value > 5000 or abs(diff_pos) > 0.04:
+			if abs(diff_pos) * total_value > CASH_YU or abs(diff_pos) > 0.04:
 				stock_name = get_stock_name(stock)
 				print(f'{stock_name} 持仓与期望相差较大，持仓{pos*100:.2f}%,期望{exce_pos*100:.2f}%,金额相差{diff_pos*total_value:.2f}')
 				if diff_pos > 0:
@@ -637,7 +638,7 @@ def calc_position():
 		if cash != 0:
 			print(f'重新分配之后资金为{avai_cash:.2f}')
 		
-		if avai_cash > 5000:
+		if avai_cash > CASH_YU:
 			print(f'重新分配之后资金仍有剩余，追加买入')
 			pos_dict = {}
 			for stock, exce_pos in g.excepted_position.items():
@@ -1163,7 +1164,12 @@ def buy_stocks():
 			else:
 				if g.excepted_position.get(stock) is not None:
 					target_value_per_stock = g.excepted_position[stock] * total_value
-					target_value_per_stock = min(info.cash, target_value_per_stock)
+					current_value = 0
+					positions = get_positions()
+					if stock in positions.keys():
+						current_value = positions[stock].market_value
+					target_value_per_stock = min(info.cash + current_value, target_value_per_stock)
+				
 				raw_amount = target_value_per_stock / current_price
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
 				print(f'委托买入: {get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'
@@ -1199,8 +1205,8 @@ def sell_target_value(stock, target_value):
 				current_price = get_last_price(stock)
 				amount = int(volume / current_price / 100) * 100
 				if amount < 100:
-					print(f"{stock} {get_stock_name(stock)} 现价{current_price:.2f} 期望持仓 {target_value:.2f}元, \
-							现有持仓 {pos.market_value:.2f}元，相差 {volume:.2f}元，需要卖出股数 {volume / current_price:.2f}不足100股，放弃交易")
+					print(f"{stock} {get_stock_name(stock)} 现价{current_price:.2f} 期望持仓 {target_value:.2f}元,")
+					print(f"现有持仓 {pos.market_value:.2f}元，相差 {volume:.2f}元，需要卖出股数 {volume / current_price:.2f}不足100股，放弃交易")
 				else:
 					async_seq = g.xt_trader.order_stock_async(g.account, 
 											 				stock,							#stock_code
@@ -1209,46 +1215,45 @@ def sell_target_value(stock, target_value):
 															xtconstant.FIX_PRICE,			#price_type: 以固定价格卖出
 															current_price,					#price: 当price_type是FIXED时，需要填确切价格
 															'',                             #strategy_name
-															f'卖出{stock} {target_value}元 '   #order_remark
+															f'Sell {stock} {target_value}元 '   #order_remark
 					)
 
-					print(f"sell passorder target value {target_value:.2f} current {pos.market_value:.2f} amount {amount:.2f}")
+					print(f"sell {stock} passorder target value {target_value:.2f} current {pos.market_value:.2f} amount {amount:.2f}")
 		break
 	print("async_seq ", async_seq)
-	if async_seq == -1:
+	if async_seq == -1 or async_seq == None:
 		print(f"sell_target_value failed {stock} {get_stock_name(stock)}")
 
 def buy_target_value(stock, target_value):
 	#return
-	positions = g.xt_trader.query_stock_positions(g.account)
+	positions = get_positions()
 	async_seq = None
-	for pos in positions:
-		if stock != pos.stock_code:
-			continue
+	current_value = 0
+	if stock in positions.keys():
+		current_value = positions[stock].market_value
 
-		volume = target_value - pos.market_value
-		if volume > 0:
-			current_price = get_last_price(stock)
-			amount = int(volume / current_price / 100) * 100
-			if amount < 100:
-				print(f"{stock} {get_stock_name(stock)} 现价{current_price:.2f} 期望持仓 {target_value:.2f}元, \
-						现有持仓 {pos.market_value:.2f}元，相差 {volume:.2f}元，需要买入股数 {volume / current_price:.2f}不足100股，放弃交易")
-			else:
-				async_seq = g.xt_trader.order_stock_async(g.account, 
-											 			stock,							     	#stock_code
-											 			xtconstant.STOCK_BUY,			     	#order_type
-														amount,							     	#order_volume
-														xtconstant.MARKET_PEER_PRICE_FIRST,  	#price_type: 以对手最优价买入，既卖一价
-														0,           					     	#price: 当price_type是FIXED时，需要填确切价格
-														'',                                  	#strategy_name
-														f'买入{stock} 期望持仓{target_value}元 '	#order_remark
-				)
+	volume = target_value - current_value
+	if volume > 0:
+		current_price = get_last_price(stock)
+		amount = int(volume / current_price / 100) * 100
+		if amount < 100:
+			print(f"{stock} {get_stock_name(stock)} 现价{current_price:.2f} 期望持仓 {target_value:.2f}元,")
+			print(f"现有持仓 {current_value:.2f}元，相差 {volume:.2f}元，需要买入股数 {volume / current_price:.2f}不足100股，放弃交易")
+		else:
+			async_seq = g.xt_trader.order_stock_async(g.account, 
+										 			stock,							     	#stock_code
+										 			xtconstant.STOCK_BUY,			     	#order_type
+													amount,							     	#order_volume
+													xtconstant.MARKET_PEER_PRICE_FIRST,  	#price_type: 以对手最优价买入，既卖一价
+													0,           					     	#price: 当price_type是FIXED时，需要填确切价格
+													'',                                  	#strategy_name
+													f'Buy {stock} Tgt {target_value}元 '	#order_remark
+			)
 
-				print(f"buy passorder target value {target_value:.2f} current {pos.market_value:.2f} amount {amount:.2f}")
+			print(f"buy {stock} passorder target value {target_value:.2f} current {current_value:.2f} amount {amount:.2f}")
 
-		break
 	print("async_seq ", async_seq)
-	if async_seq == -1:
+	if async_seq == -1 or async_seq == None:
 		print(f"buy_target_value failed {stock} {get_stock_name(stock)}")
 
 def buy_target_shares(stock, target_share):
@@ -1260,8 +1265,9 @@ def buy_target_shares(stock, target_share):
 											xtconstant.MARKET_PEER_PRICE_FIRST,  #price_type: 以对手最优价买入，既卖一价
 											0,									 #price: 当price_type是FIXED时，需要填确切价格
 											'',                                  #strategy_name
-											f'买入{stock} {target_share}股'       #order_remark
+											f'Buy {stock} {target_share}股'      #order_remark
 											)  
+	print(f"buy {stock} passorder share {target_share}")
 	if async_seq == -1:
 		print(f"buy_target_shares failed {stock} {get_stock_name(stock)}")
 
@@ -1365,5 +1371,5 @@ if __name__ == "__main__":
 	#print(get_last_price('399101.SZ'))
 	#print(get_specified_date_price('399101.SZ', '20260315'))
 	#get_small_cap_stocks(g.stock_pool, datetime.now(), g.stock_num)
-
-	#buy_target_value('002316.SZ', 9088)
+	#buy_target_value('002486.SZ', 8713.3)
+	#buy_target_shares('002486.SZ', 3100)
