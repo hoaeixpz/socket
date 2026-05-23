@@ -167,9 +167,10 @@ def init():
 	g.stoploss_strategy = 3  # 1为止损线止损，2为市场趋势止损, 3为联合1、2策略
 	g.stoploss_limit = 0.1  # 止损线
 	g.stoploss_market = 0.05  # 市场趋势止损参数
+	g.stoploss_map = {}    #记录止损股票，3日内该股票不再买入
 	g.etf = '511880.SH'  # 空仓月份持有银华日利ETF
 	#g.etf = '513500.SH'
-	g.all_weather_list = ["518880.SH",	#黄金ETF
+	g.all_weather_list = [  "518880.SH",  #黄金ETF
 							"511220.SH",  #城投ETF
 							"513100.SH",  #纳指ETF
 							"512890.SH"]  #红利低波ETF
@@ -338,6 +339,7 @@ def prepare_stock_list():
 
 
 	g.stock_pool = get_normal_stocks()
+	g.stoploss_map = {k: v-1 for k, v in g.stoploss_map.items() if v-1 > 0}
 
 	print('prepare_stock_list count ',g.count)
 
@@ -450,6 +452,11 @@ def rebalance_sell():
 	#query_date = yesterday.replace(hour=15, minute=0, second=0, microsecond=0)
 	query_date = current_date
 	g.selected_stocks = get_small_cap_stocks(g.stock_pool, query_date, g.stock_num)
+	for stock in g.stoploss_map.keys():
+		if stock in g.selected_stocks:
+			g.selected_stocks.remove(stock)
+			print(f"{stock} {get_security_info(stock).display_name} 前{3 - g.stoploss_map[stock]}日止损卖出，3日内不再买入")
+        
 
 	collect_sell_buy_stocks()
 	current_holdings = get_current_holding_stocks()
@@ -484,7 +491,9 @@ def rebalance_sell():
 def rebalance_buy():
 	if not is_weekday_job():
 		return
-	if not g.sell_done:
+	if not g.sell_done:                     #卖出股票后才有钱买入
+		return
+	if g.reason_to_sell == 'takeprofit':    #止盈之后不再买入
 		return
 	if g.trade is False:
 		return
@@ -784,6 +793,11 @@ def check_remain_amount():
 			for stock_code in g.limitup_stocks:
 				if stock_code in g.selected_stocks:
 					g.selected_stocks.remove(stock_code)
+
+			for stock_code in g.stoploss_map.keys():
+				if stock_code in g.selected_stocks:
+					g.selected_stocks.remove(stock_code)
+					print(f"{stock_code} {get_security_info(stock_code).display_name} 前{3 - g.stoploss_map[stock_code]}日止损卖出，3日内不再买入")
 			
 			current_holdings = get_current_holding_stocks()
 			if len(current_holdings) > 3:
@@ -806,7 +820,7 @@ def check_remain_amount():
 			#info_position()
 			g.refresh_hold = True
 		g.reason_to_sell = ''
-	elif g.reason_to_sell == 'stoploss':
+	elif g.reason_to_sell == 'stoploss' or g.reason_to_sell == 'takeprofit':
 		print('止盈止损后，有余额可用'+str(round((available_cash),2))+'元。买入'+ str(g.etf))
 		g.stocks_to_buy = [g.etf]
 		buy_stocks()
@@ -841,6 +855,7 @@ def stop_loss():
 				# 个股止损
 				elif price < avg_cost * (1 - g.stoploss_limit):
 					sell_target_value(stock, 0)
+					g.stoploss_map[stock] = g.stoploss_map.setdefault(stock, 3)
 					print(f"{stock} 股价{price:.2f} 成本{avg_cost:.2f}")
 					print(f"{red_c}❌\033[0m 收益止损,卖出{stock},跌幅 { (1 - price / avg_cost) * 100:.2f}%")
 					#if order_info != None:
@@ -869,14 +884,16 @@ def stop_loss():
 			print("大盘涨幅 {:.2%}".format(down_ratio))
 			# 市场大涨大跌止盈止损
 			if abs(down_ratio) >= g.stoploss_market:
-				g.reason_to_sell = 'stoploss'
 				g.refresh_hold = True
 				if down_ratio < 0:
+					g.reason_to_sell = 'stoploss'
 					print(f"{red_c}❌\033[0m 大盘惨跌,平均降幅{down_ratio:.2%}")
 					for stock in current_positions.keys():
 						if stock == g.etf:
 							continue
 						if stock in g.all_weather_list:
+							continue
+						if stock in g.yesterday_HL_list:
 							continue
 						print(f'{red_c}❌\033[0m 清仓{stock} {get_stock_name(stock)}')
 						sell_target_value(stock, 0)
@@ -886,6 +903,7 @@ def stop_loss():
 						if stock in g.selected_stocks:
 							g.selected_stocks.remove(stock)
 				else:
+					g.reason_to_sell = 'takeprofit'
 					print(f"{red_c}❌\033[0m 大盘大涨,平均涨幅{down_ratio:.2%}")
 					for stock in current_positions.keys():
 						if stock == g.etf:
