@@ -1289,7 +1289,7 @@ def info_position():
 		available_cash = info.cash
 		position_value = info.market_value
 		total_value = info.total_asset
-		print(f'******************当日({current_date})持仓市值: {position_value:.2f}元*******************')
+		print(f'******************当日({current_date}) (周{current_date.weekday()+1}) 持仓市值: {position_value:.2f}元*******************')
 
 		#sorted_pos = dict(sorted(positions.items(), key=lambda x: x[0]))
 		for pos in positions:
