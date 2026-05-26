@@ -1369,14 +1369,14 @@ def get_sw2_industry():
 
 def debug():
 	init()
+	g.stoploss_map['002828.SZ'] = 3
+	g.stoploss_map['002188.SZ'] = 2
+	g.stoploss_map['002524.SZ'] = 1
+	g.stoploss_map['002820.SZ'] = 2
+	g.stoploss_map['002910.SZ'] = 1
 	judge_date()
 	prepare_stock_list()
 	current_positions = get_positions()
-	g.stoploss_map['002828.SZ'] = 3
-	g.stoploss_map['002188.SZ'] = 3
-	g.stoploss_map['002524.SZ'] = 3
-	g.stoploss_map['002820.SZ'] = 3
-	g.stoploss_map['002910.SZ'] = 3
 	print(g.stoploss_map)
 
 	current_date = datetime.now()
@@ -1386,18 +1386,26 @@ def debug():
 		if stock in g.selected_stocks:
 			g.selected_stocks.remove(stock)
 			print(f"{stock} {get_stock_name(stock)} 前{3 - g.stoploss_map[stock]}日止损卖出，3日内不再买入")
+
+	#print(is_weekday_job())
+	#get_current_holding_stocks()
+	#get_normal_stocks()
+	#print(get_last_price('399101.SZ'))
+	#print(get_specified_date_price('399101.SZ', '20260315'))
+	#get_small_cap_stocks(g.stock_pool, datetime.now(), g.stock_num)
+	#buy_target_value('002486.SZ', 8713.3)
+	#buy_target_shares('002486.SZ', 3100)
+	#sleep_mins(1)
         
 
 if __name__ == "__main__":
 	#'''
 	init()
+	run_strategy()
 	#judge_date()
 	#prepare_stock_list()
-	run_strategy()
 	#exec_all_weather()
-	#print(is_weekday_job())
 	#info_position()
-	#get_current_holding_stocks()
 
 	#judge_date()
 	#prepare_stock_list()
@@ -1406,13 +1414,5 @@ if __name__ == "__main__":
 	#stop_loss()
 	#rebalance_buy()
 	#trade_afternoon()
-
-	#get_normal_stocks()
-	#print(get_last_price('399101.SZ'))
-	#print(get_specified_date_price('399101.SZ', '20260315'))
-	#get_small_cap_stocks(g.stock_pool, datetime.now(), g.stock_num)
-	#buy_target_value('002486.SZ', 8713.3)
-	#buy_target_shares('002486.SZ', 3100)
-	#sleep_mins(1)
 	#'''
 	#debug()
