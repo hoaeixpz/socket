@@ -213,6 +213,7 @@ def is_trading_day():
 	return today == last_trading_day
 
 def is_weekday_job():
+	#return True
 	current_date = datetime.now()
 	dt_str = current_date.strftime('%Y%m%d')
 	date = get_trading_dates('399101.SZ', dt_str)
@@ -455,7 +456,7 @@ def rebalance_sell():
 	for stock in g.stoploss_map.keys():
 		if stock in g.selected_stocks:
 			g.selected_stocks.remove(stock)
-			print(f"{stock} {get_security_info(stock).display_name} 前{3 - g.stoploss_map[stock]}日止损卖出，3日内不再买入")
+			print(f"{stock} {get_stock_name(stock)} 前{3 - g.stoploss_map[stock]}日止损卖出，3日内不再买入")
         
 
 	collect_sell_buy_stocks()
@@ -731,7 +732,7 @@ def calc_position():
 						break
 				if num > 0:
 					g.excepted_position[stock] = (current_value + current_price * num * 100) / total_value
-					print(f'调整买入数量，追加{num}手,仓位占比调整为{g.excepted_position[stock] * 100:.2f}%')
+					print(f'{green_c}✅\033[0m调整买入数量，追加{num}手,仓位占比调整为{g.excepted_position[stock] * 100:.2f}%')
 					
 		'''
 		amount = int(diff_value / current_price / 100) * 100
@@ -797,7 +798,7 @@ def check_remain_amount():
 			for stock_code in g.stoploss_map.keys():
 				if stock_code in g.selected_stocks:
 					g.selected_stocks.remove(stock_code)
-					print(f"{stock_code} {get_security_info(stock_code).display_name} 前{3 - g.stoploss_map[stock_code]}日止损卖出，3日内不再买入")
+					print(f"{stock_code} {get_stock_name(stock_code)} 前{3 - g.stoploss_map[stock_code]}日止损卖出，3日内不再买入")
 			
 			current_holdings = get_current_holding_stocks()
 			if len(current_holdings) > 3:
@@ -1366,8 +1367,29 @@ def get_sw2_industry():
 #print(get_specified_date_price('399101.SZ', datetime(2026,3,15)))
 #print(xtdata.get_instrument_detail('002883.SZ'))
 
+def debug():
+	init()
+	judge_date()
+	prepare_stock_list()
+	current_positions = get_positions()
+	g.stoploss_map['002828.SZ'] = 3
+	g.stoploss_map['002188.SZ'] = 3
+	g.stoploss_map['002524.SZ'] = 3
+	g.stoploss_map['002820.SZ'] = 3
+	g.stoploss_map['002910.SZ'] = 3
+	print(g.stoploss_map)
+
+	current_date = datetime.now()
+	query_date = current_date
+	g.selected_stocks = get_small_cap_stocks(g.stock_pool, query_date, g.stock_num)
+	for stock in g.stoploss_map.keys():
+		if stock in g.selected_stocks:
+			g.selected_stocks.remove(stock)
+			print(f"{stock} {get_stock_name(stock)} 前{3 - g.stoploss_map[stock]}日止损卖出，3日内不再买入")
+        
 
 if __name__ == "__main__":
+	#'''
 	init()
 	#judge_date()
 	#prepare_stock_list()
@@ -1392,3 +1414,5 @@ if __name__ == "__main__":
 	#buy_target_value('002486.SZ', 8713.3)
 	#buy_target_shares('002486.SZ', 3100)
 	#sleep_mins(1)
+	#'''
+	#debug()
