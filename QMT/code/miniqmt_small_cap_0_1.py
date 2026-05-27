@@ -9,8 +9,11 @@ import sys
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 import signal
-
 import re
+
+DEBUG_DAILY_MODE = False
+#DEBUG_DAILY_MODE = True
+
 ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
 class Tee:
@@ -213,7 +216,9 @@ def is_trading_day():
 	return today == last_trading_day
 
 def is_weekday_job():
-	#return True
+	if DEBUG_DAILY_MODE:
+		return True
+
 	current_date = datetime.now()
 	dt_str = current_date.strftime('%Y%m%d')
 	date = get_trading_dates('399101.SZ', dt_str)
@@ -1179,7 +1184,10 @@ def buy_stocks():
 
 			if stock == g.etf:
 				target_value_per_stock = min(info.cash, target_value_per_stock)
-				buy_target_value(stock, target_value_per_stock)
+				amount = int(target_value_per_stock / current_price / 100) * 100
+				if amount > 0:
+					print(f'买入ETF {stock} {get_stock_name(stock)} 目标市值{target_value_per_stock:.2f}, {amount}股 * {current_price}元')
+					buy_target_shares(stock, amount)
 			else:
 				if g.excepted_position.get(stock) is not None:
 					target_value_per_stock = g.excepted_position[stock] * total_value
@@ -1197,7 +1205,8 @@ def buy_stocks():
 			sleep_sec(1)
 
 def sell_target_value(stock, target_value):
-	#return
+	if DEBUG_DAILY_MODE:
+		return
 	positions = g.xt_trader.query_stock_positions(g.account)
 	async_seq = None
 	for pos in positions:
@@ -1244,7 +1253,8 @@ def sell_target_value(stock, target_value):
 		print(f"sell_target_value failed {stock} {get_stock_name(stock)}")
 
 def buy_target_value(stock, target_value):
-	#return
+	if DEBUG_DAILY_MODE:
+		return
 	positions = get_positions()
 	async_seq = None
 	current_value = 0
@@ -1276,7 +1286,8 @@ def buy_target_value(stock, target_value):
 		print(f"buy_target_value failed {stock} {get_stock_name(stock)}")
 
 def buy_target_shares(stock, target_share):
-	#return
+	if DEBUG_DAILY_MODE:
+		return
 	async_seq = g.xt_trader.order_stock_async(g.account, 
 											stock,                               #stock_code
 											xtconstant.STOCK_BUY,                #order_type
@@ -1399,14 +1410,21 @@ def debug():
         
 
 if __name__ == "__main__":
-	#'''
+	#=============================
+	#DEBUG_DAILY_MODE == False
+	#=============================
 	init()
 	run_strategy()
+
+	#=============================
+	#DEBUG_DAILY_MODE == True
+	#=============================
 	#judge_date()
 	#prepare_stock_list()
 	#exec_all_weather()
 	#info_position()
 
+	#init()
 	#judge_date()
 	#prepare_stock_list()
 	#trade_etf()
@@ -1414,5 +1432,4 @@ if __name__ == "__main__":
 	#stop_loss()
 	#rebalance_buy()
 	#trade_afternoon()
-	#'''
 	#debug()
