@@ -1431,5 +1431,6 @@ if __name__ == "__main__":
 	#rebalance_sell()
 	#stop_loss()
 	#rebalance_buy()
-	#trade_afternoon()
+	#check_limit_up()
+	#check_remain_amount()
 	#debug()
