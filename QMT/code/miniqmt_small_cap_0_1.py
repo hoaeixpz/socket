@@ -1433,4 +1433,5 @@ if __name__ == "__main__":
 	#rebalance_buy()
 	#check_limit_up()
 	#check_remain_amount()
+	#info_position()
 	#debug()
