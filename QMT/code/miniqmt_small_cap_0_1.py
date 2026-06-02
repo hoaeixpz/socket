@@ -1383,6 +1383,7 @@ def get_sw2_industry():
 
 def debug():
 	init()
+	'''
 	g.stoploss_map['002828.SZ'] = 3
 	g.stoploss_map['002188.SZ'] = 2
 	g.stoploss_map['002524.SZ'] = 1
@@ -1400,7 +1401,7 @@ def debug():
 		if stock in g.selected_stocks:
 			g.selected_stocks.remove(stock)
 			print(f"{stock} {get_stock_name(stock)} 前{3 - g.stoploss_map[stock]}日止损卖出，3日内不再买入")
-
+	'''
 	#print(is_weekday_job())
 	#get_current_holding_stocks()
 	#get_normal_stocks()
@@ -1409,6 +1410,8 @@ def debug():
 	#get_small_cap_stocks(g.stock_pool, datetime.now(), g.stock_num)
 	#buy_target_value('002486.SZ', 8713.3)
 	#buy_target_shares('002486.SZ', 3100)
+	#g.stocks_to_buy = ['002486.SZ']
+	#buy_stocks()
 	#sleep_mins(1)
         
 
