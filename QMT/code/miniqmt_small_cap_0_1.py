@@ -1201,6 +1201,9 @@ def buy_stocks():
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
 				print(f'委托买入: {get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'
 					f'\n预计最终持股{amount}股，每股{current_price:.2f}元，合计:{amount * current_price:.2f}')
+				if amount * current_price / info.cash > 0.95:
+					target_value_per_stock = (amount - 30) * current_price
+					print(f' {get_stock_name(stock)} {stock} 买入资金可能不足，目标市值降为{target_value_per_stock}')
 				buy_target_value(stock, target_value_per_stock)
 			sleep_sec(1)
 
