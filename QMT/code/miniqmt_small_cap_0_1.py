@@ -189,6 +189,12 @@ def init():
 
 	g.industry_dict = get_sw2_industry()
 
+def reconnect():
+	print("reconnect")
+	connect_result = g.xt_trader.connect()
+	print('建立交易连接，返回0表示连接成功', connect_result)
+	info_position()
+
 def get_stock_name(stock):
 	detail = xtdata.get_instrument_detail(stock)
 	if detail:
@@ -258,7 +264,8 @@ def run_strategy():
 				[10,10],  #rebalance_buy
 				[14, 0],  #check_limit_up
 				[14, 2],  #check_remain_amount
-				[15, 1]]  #info_position
+				[15, 1],  #info_position
+				[15,40]]
 	'''
 	task_time = [["*",55],  #judge_date
 				["*",56],  #prepare_stock_list
@@ -282,6 +289,7 @@ def run_strategy():
 	scheduler.add_job(check_limit_up,     'cron', hour=task_time[6][0],  minute=task_time[6][1])
 	scheduler.add_job(check_remain_amount,'cron', hour=task_time[7][0],  minute=task_time[7][1])
 	scheduler.add_job(info_position,      'cron', hour=task_time[8][0],  minute=task_time[8][1])
+	scheduler.add_job(reconnect,          'cron', hour=task_time[9][0],  minute=task_time[9][1])
 
 	try:
 		print("start")
