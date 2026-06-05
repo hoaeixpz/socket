@@ -12,6 +12,15 @@ Start-Sleep -Seconds 5
 Add-Type -AssemblyName Microsoft.VisualBasic
 Add-Type -AssemblyName System.Windows.Forms
 
+$allWindows = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 }
+
+# 查看进程的窗口信息
+foreach ($proc in $allWindows) {
+    # 获取窗口类名
+    $className = (Get-WindowClass -Hwnd $proc.MainWindowHandle)
+    Write-Host "$($proc.ProcessName) - 类名: $className"
+}
+
 # 3. 找到登录窗口
 $loginWindow = Get-Process | Where-Object {$_.MainWindowTitle -like "*登录*"}
 if ($loginWindow) {
