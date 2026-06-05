@@ -6,6 +6,8 @@ import time
 from datetime import datetime, timedelta
 import math
 import sys
+import subprocess
+import psutil
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 import signal
@@ -135,8 +137,8 @@ def init():
 	path = 'C:\\QMT\\userdata_mini'
 	session_id = int(time.time())
 	g.xt_trader = XtQuantTrader(path, session_id)
-	callback = MyXtQuantTraderCallback()
-	g.xt_trader.register_callback(callback)
+	g.callback = MyXtQuantTraderCallback()
+	g.xt_trader.register_callback(g.callback)
 	g.xt_trader.start()
 	connect_result = g.xt_trader.connect()
 	print('建立交易连接，返回0表示连接成功', connect_result)
@@ -191,9 +193,39 @@ def init():
 
 def reconnect():
 	print("reconnect")
+	kill_process_by_name("XtMiniQmt.exe")
+	sleep_sec(10)
+	open_QMT()
+	sleep_mins(1)
+	# path为mini qmt客户端安装目录下userdata_mini路径
+	#path = 'C:\\QMT\\国金证券QMT交易端\\userdata_mini'
+	#path = 'D:\\国金证券QMT交易端\\userdata_mini'
+	path = 'C:\\QMT\\userdata_mini'
+	session_id = int(time.time())
+	g.xt_trader = XtQuantTrader(path, session_id)
+	print("new g.xt_trader")
+	g.xt_trader.register_callback(g.callback)
+	g.xt_trader.start()
+	print("start")
 	connect_result = g.xt_trader.connect()
 	print('建立交易连接，返回0表示连接成功', connect_result)
 	info_position()
+
+
+def kill_process_by_name(name):
+	"""终止所有名称包含 name 的进程 (使用psutil)"""
+	try:
+		subprocess.run(['taskkill', '/f', '/im', name], capture_output=True,text=True,check=True)
+		print(f"close {name} success")
+	except subprocess.CalledProcessError as e:
+		print(f"close {name} failed {e.stderr}")
+
+def open_QMT():
+	try:
+		subprocess.run(['powershell.exe', '-File', 'login.ps1'], capture_output=True,text=True,check=True)
+		print(f"open QMT success")
+	except subprocess.CalledProcessError as e:
+		print(f"open QMT failed {e.stderr}")
 
 def get_stock_name(stock):
 	detail = xtdata.get_instrument_detail(stock)
@@ -265,7 +297,7 @@ def run_strategy():
 				[14, 0],  #check_limit_up
 				[14, 2],  #check_remain_amount
 				[15, 1],  #info_position
-				[15,40]]
+				[1, 58]]
 	'''
 	task_time = [["*",55],  #judge_date
 				["*",56],  #prepare_stock_list
