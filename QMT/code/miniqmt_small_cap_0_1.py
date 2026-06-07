@@ -191,12 +191,19 @@ def init():
 
 	g.industry_dict = get_sw2_industry()
 
-def reconnect():
-	print("reconnect")
+def reopenQMT():
+	current_date = datetime.now()
+	if is_trading_day() or current_date.weekday() != 5:
+		return
 	kill_process_by_name("XtMiniQmt.exe")
 	sleep_sec(10)
 	open_QMT()
-	sleep_mins(1)
+
+def reconnect():
+	current_date = datetime.now()
+	if is_trading_day() or current_date.weekday() != 5:
+		return
+	print("reconnect")
 	# path为mini qmt客户端安装目录下userdata_mini路径
 	#path = 'C:\\QMT\\国金证券QMT交易端\\userdata_mini'
 	#path = 'D:\\国金证券QMT交易端\\userdata_mini'
@@ -209,7 +216,6 @@ def reconnect():
 	print("start")
 	connect_result = g.xt_trader.connect()
 	print('建立交易连接，返回0表示连接成功', connect_result)
-	info_position()
 
 
 def kill_process_by_name(name):
@@ -297,7 +303,8 @@ def run_strategy():
 				[14, 0],  #check_limit_up
 				[14, 2],  #check_remain_amount
 				[15, 1],  #info_position
-				[1, 58]]
+				[6,  0],  #reopenQMT
+				[6, 10]]  #reconnect
 	'''
 	task_time = [["*",55],  #judge_date
 				["*",56],  #prepare_stock_list
@@ -321,7 +328,8 @@ def run_strategy():
 	scheduler.add_job(check_limit_up,     'cron', hour=task_time[6][0],  minute=task_time[6][1])
 	scheduler.add_job(check_remain_amount,'cron', hour=task_time[7][0],  minute=task_time[7][1])
 	scheduler.add_job(info_position,      'cron', hour=task_time[8][0],  minute=task_time[8][1])
-	scheduler.add_job(reconnect,          'cron', hour=task_time[9][0],  minute=task_time[9][1])
+	scheduler.add_job(reopenQMT,          'cron', hour=task_time[9][0],  minute=task_time[9][1])
+	scheduler.add_job(reconnect,          'cron', hour=task_time[10][0], minute=task_time[10][1])
 
 	try:
 		print("start")
@@ -1385,7 +1393,7 @@ def info_position():
 			if pos.volume == 0:
 				print(f"{green_c}✅\033[0m持仓: {stock_name}({stock}) 0股")
 
-		print(f'{green_c}✅\033[0m*******************总资产 {total_value:.2f}  剩余可用金额 {available_cash:.2f}元*******************\n\n')
+		print(f'{green_c}✅\033[0m*******************总资产 {total_value:.2f} | {info.total_asset:.2f} 剩余可用金额 {available_cash:.2f}元*******************\n\n')
 
 		if current_date.hour == 15:
 			if g.last_pos_value is None:
