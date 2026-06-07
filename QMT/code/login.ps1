@@ -1,7 +1,13 @@
 # auto_login.ps1
-param(
-    [string]$password = "271828"
-)
+Import-Module CredentialManager
+
+$cred = Get-StoredCredential -Target QMT_AutoLogin
+if (-not $cred) {
+    Write-Warning "Error not found QMT passward"
+    exit
+}
+
+$password = $cred.GetNetworkCredential().Password
 
 # 1. 启动应用
 Start-Process "C:\QMT\bin.x64\XtItClient.exe"
@@ -14,10 +20,10 @@ Add-Type -AssemblyName System.Windows.Forms
 $allWindows = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 }
 
 # 查看进程的窗口信息
-foreach ($proc in $allWindows) {
-    # 获取窗口类名
-    Write-Host "$($proc.ProcessName)"
-}
+#foreach ($proc in $allWindows) {
+#    # 获取窗口类名
+#    Write-Host "$($proc.ProcessName)"
+#}
 
 $qmtProcess = Get-Process -Name "XtItClient" -ErrorAction SilentlyContinue
 if (-not $qmtProcess) {
