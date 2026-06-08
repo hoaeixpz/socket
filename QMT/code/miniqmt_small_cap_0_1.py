@@ -193,7 +193,7 @@ def init():
 
 def reopenQMT():
 	current_date = datetime.now()
-	if is_trading_day() or current_date.weekday() != 5:
+	if current_date.weekday() != 4:
 		return
 	kill_process_by_name("XtMiniQmt.exe")
 	sleep_sec(10)
@@ -201,7 +201,7 @@ def reopenQMT():
 
 def reconnect():
 	current_date = datetime.now()
-	if is_trading_day() or current_date.weekday() != 5:
+	if current_date.weekday() != 4:
 		return
 	print("reconnect")
 	# path为mini qmt客户端安装目录下userdata_mini路径
@@ -302,9 +302,9 @@ def run_strategy():
 				[10,10],  #rebalance_buy
 				[14, 0],  #check_limit_up
 				[14, 2],  #check_remain_amount
-				[15, 1],  #info_position
-				[6,  0],  #reopenQMT
-				[6, 10]]  #reconnect
+				[15,10],  #info_position
+				[16, 0],  #reopenQMT
+				[16,10]]  #reconnect
 	'''
 	task_time = [["*",55],  #judge_date
 				["*",56],  #prepare_stock_list
@@ -1249,11 +1249,20 @@ def buy_stocks():
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
 				print(f'委托买入: {get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'
 					f'\n预计最终持股{amount}股，每股{current_price:.2f}元，合计:{amount * current_price:.2f}')
-				if amount * current_price / info.cash > 0.95:
-					target_value_per_stock = (amount - 30) * current_price
-					print(f' {get_stock_name(stock)} {stock} 买入资金可能不足，目标市值降为{target_value_per_stock}')
 				buy_target_value(stock, target_value_per_stock)
 			sleep_sec(1)
+
+def get_sell_one_price(stock):
+	#获取卖一价
+	tick_data = xtdata.get_full_tick([stock])
+	if stock in tick_data:
+		sell_price = tick_data[stock]['askPrice']
+		if len(sell_price) > 0:
+			return sell_price[0]
+		else:
+			print(f"{stock} 涨停，没有卖手价")
+
+	return None
 
 def sell_target_value(stock, target_value):
 	if DEBUG_DAILY_MODE:
@@ -1320,13 +1329,15 @@ def buy_target_value(stock, target_value):
 			print(f"{stock} {get_stock_name(stock)} 现价{current_price:.2f} 期望持仓 {target_value:.2f}元,")
 			print(f"现有持仓 {current_value:.2f}元，相差 {volume:.2f}元，需要买入股数 {volume / current_price:.2f}不足100股，放弃交易")
 		else:
+			sell_1_price = get_sell_one_price(stock)
+			buy_price = sell_1_price if sell_1_price else current_price
 			async_seq = g.xt_trader.order_stock_async(g.account, 
-										 			stock,							     	#stock_code
-										 			xtconstant.STOCK_BUY,			     	#order_type
-													amount,							     	#order_volume
-													xtconstant.MARKET_PEER_PRICE_FIRST,  	#price_type: 以对手最优价买入，既卖一价
-													0,           					     	#price: 当price_type是FIXED时，需要填确切价格
-													'',                                  	#strategy_name
+										 			stock,								#stock_code
+										 			xtconstant.STOCK_BUY,				#order_type
+													amount,								#order_volume
+													xtconstant.FIX_PRICE,				#price_type: 以对手最优价买入，既卖一价
+													buy_price,							#price: 当price_type是FIXED时，需要填确切价格
+													'',                                 #strategy_name
 													f'Buy {stock} Tgt {target_value}元 '	#order_remark
 			)
 
@@ -1339,14 +1350,18 @@ def buy_target_value(stock, target_value):
 def buy_target_shares(stock, target_share):
 	if DEBUG_DAILY_MODE:
 		return
+
+	current_price = get_last_price(stock)
+	sell_1_price = get_sell_one_price(stock)
+	buy_price = sell_1_price if sell_1_price else current_price
 	async_seq = g.xt_trader.order_stock_async(g.account, 
-											stock,                               #stock_code
-											xtconstant.STOCK_BUY,                #order_type
-											target_share,                        #order_volume
-											xtconstant.MARKET_PEER_PRICE_FIRST,  #price_type: 以对手最优价买入，既卖一价
-											0,									 #price: 当price_type是FIXED时，需要填确切价格
-											'',                                  #strategy_name
-											f'Buy {stock} {target_share}股'      #order_remark
+											stock,								#stock_code
+											xtconstant.STOCK_BUY,               #order_type
+											target_share,                       #order_volume
+											xtconstant.FIX_PRICE,               #price_type: 以对手最优价买入，既卖一价
+											buy_price,							#price: 当price_type是FIXED时，需要填确切价格
+											'',                                 #strategy_name
+											f'Buy {stock} {target_share}股'     #order_remark
 											)  
 	print(f"buy {stock} passorder share {target_share}")
 	if async_seq == -1:
@@ -1456,11 +1471,20 @@ def debug():
 	#print(get_last_price('399101.SZ'))
 	#print(get_specified_date_price('399101.SZ', '20260315'))
 	#get_small_cap_stocks(g.stock_pool, datetime.now(), g.stock_num)
-	#buy_target_value('002486.SZ', 8713.3)
-	#buy_target_shares('002486.SZ', 3100)
-	#g.stocks_to_buy = ['002486.SZ']
-	#buy_stocks()
-	#sleep_mins(1)
+
+	'''
+	buy_target_value('002817.SZ', 684.3)
+	buy_target_shares('002817.SZ', 100)
+	g.stocks_to_buy = ['002486.SZ']
+	buy_stocks()
+	sleep_mins(1)
+	'''
+
+	#stock = '002188.SZ'
+	#sell_1 = get_sell_one_price(stock)
+	#print("卖一价 ", sell_1)
+	#current_price = get_last_price(stock)
+	#print(current_price)
         
 
 if __name__ == "__main__":
