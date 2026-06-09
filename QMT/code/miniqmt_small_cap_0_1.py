@@ -1257,7 +1257,7 @@ def get_sell_one_price(stock):
 	tick_data = xtdata.get_full_tick([stock])
 	if stock in tick_data:
 		sell_price = tick_data[stock]['askPrice']
-		if len(sell_price) > 0:
+		if sell_price[0] > 0:
 			return sell_price[0]
 		else:
 			print(f"{stock} 涨停，没有卖手价")
@@ -1301,7 +1301,7 @@ def sell_target_value(stock, target_value):
 											 				xtconstant.STOCK_SELL,			#order_type
 															amount,							#order_volume
 															xtconstant.FIX_PRICE,			#price_type: 以固定价格卖出
-															current_price,					#price: 当price_type是FIXED时，需要填确切价格
+															current_price - 0.05,			#price: 当price_type是FIXED时，需要填确切价格
 															'',                             #strategy_name
 															f'Sell {stock} {target_value}元 '   #order_remark
 					)
@@ -1329,8 +1329,8 @@ def buy_target_value(stock, target_value):
 			print(f"{stock} {get_stock_name(stock)} 现价{current_price:.2f} 期望持仓 {target_value:.2f}元,")
 			print(f"现有持仓 {current_value:.2f}元，相差 {volume:.2f}元，需要买入股数 {volume / current_price:.2f}不足100股，放弃交易")
 		else:
-			sell_1_price = get_sell_one_price(stock)
-			buy_price = sell_1_price if sell_1_price else current_price
+			#sell_1_price = get_sell_one_price(stock)
+			buy_price = current_price + 0.05
 			async_seq = g.xt_trader.order_stock_async(g.account, 
 										 			stock,								#stock_code
 										 			xtconstant.STOCK_BUY,				#order_type
@@ -1352,8 +1352,8 @@ def buy_target_shares(stock, target_share):
 		return
 
 	current_price = get_last_price(stock)
-	sell_1_price = get_sell_one_price(stock)
-	buy_price = sell_1_price if sell_1_price else current_price
+	#sell_1_price = get_sell_one_price(stock)
+	buy_price = current_price + 0.05
 	async_seq = g.xt_trader.order_stock_async(g.account, 
 											stock,								#stock_code
 											xtconstant.STOCK_BUY,               #order_type
@@ -1479,12 +1479,15 @@ def debug():
 	buy_stocks()
 	sleep_mins(1)
 	'''
-
-	#stock = '002188.SZ'
-	#sell_1 = get_sell_one_price(stock)
-	#print("卖一价 ", sell_1)
-	#current_price = get_last_price(stock)
-	#print(current_price)
+	'''
+	stock = '688500.SH'
+	tick = xtdata.get_full_tick([stock])
+	print(tick)
+	sell_1 = get_sell_one_price(stock)
+	print("卖一价 ", sell_1)
+	current_price = get_last_price(stock)
+	print(current_price)
+	'''
         
 
 if __name__ == "__main__":
