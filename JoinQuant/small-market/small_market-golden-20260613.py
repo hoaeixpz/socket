@@ -7,11 +7,11 @@ import datetime
 # 初始化函数，设定基准等等
 def initialize(context):
 	#初始化函数，设定策略参数、基准、费用等
-	print('初始函数开始运行且全局只运行一次')
+	log.info('初始函数开始运行且全局只运行一次')
 	# 设置基准收益率对比（沪深300指数）
 	#set_benchmark('000300.XSHG')
 	# 中证500
-	set_benchmark('000905.XSHG')
+	set_benchmark('399101.XSHE')
 	# 使用真实价格回测
 	set_option('use_real_price', True)
 	
@@ -22,12 +22,14 @@ def initialize(context):
 							open_commission=0.0003, close_commission=0.0003, 
 							close_today_commission=0, min_commission=5), type='stock')
 	#set_order_cost(OrderCost(open_tax=0, close_tax=0, 
-	#						open_commission=0, close_commission=0, 
-	#					   close_today_commission=0, min_commission=0), type='stock')
+	#                        open_commission=0, close_commission=0, 
+	#                       close_today_commission=0, min_commission=0), type='stock')
 	# 设置滑点（可根据需要调整）
 	set_slippage(FixedSlippage(0.0003))
 	
 	log.set_level('order', 'warning')
+	#log.set_level('order', 'error')
+	#log.set_level('strategy', 'warning')
 	
 	# 设置全局变量
 	g.stock_pool = []
@@ -59,6 +61,8 @@ def initialize(context):
 	#g.etf = '513500.XSHG'
 	g.all_weather_list = ["518880.XSHG", "511010.XSHG", "513100.XSHG", "601288.XSHG"]
 	#g.SIGNAL = "small"
+	g.POOL = '399101.XSHE'
+	
 	current_date = context.current_dt.date()
 	
 	# 每天执行调仓函数
@@ -70,18 +74,22 @@ def initialize(context):
 	run_daily(stop_loss, time='10:02') # 止损函数
 	run_weekly(rebalance, g.weekday, time='10:10')
 	
-	run_daily(trade_afternoon, time='14:00', reference_security='399101.XSHE')
+	run_daily(trade_afternoon, time='14:00', reference_security=g.POOL)
 	#run_daily(create_signal_big_small_market, time='9:05')
 	
-	
-	print('策略初始化完成：每月初调仓，持有市值最小的{}只股票'.format(g.stock_num))
+	log.info('策略初始化完成：每月初调仓，持有市值最小的{}只股票'.format(g.stock_num))
 
+	g.limtup_map = {}
+	g.stoploss_map = {}
+	g.recordlist = []
+	g.record_max = 0
+	
 def judge_date(context):
 	current_date = context.current_dt.date()
 	current_month = current_date.month
 	if current_month == 1 or current_month == 4:
 		if g.trade == True:
-			print('✅========== 一月和四月份清仓，日期：%s ==========' % current_date)
+			log.info('✅========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
 	else:
 		g.trade = True
@@ -100,16 +108,21 @@ def prepare_stock_list(context):
 		df = df[df['close'] == df['high_limit']]
 		g.yesterday_HL_list = list(df.code)
 		if g.yesterday_HL_list != []:
-			print("")
-			print(f"************昨日({context.previous_date})涨停 **************")
-			print(list(df.code))
-			print("")
+			log.info("")
+			log.info(f"************昨日({context.previous_date})涨停 **************")
+			log.info(list(df.code))
+			log.info("")
+			
+		for stock in g.yesterday_HL_list:
+			g.limtup_map[stock] = g.limtup_map.setdefault(stock, 0) + 1
 	else:
 		g.yesterday_HL_list = []
 
 	date_str = str(context.previous_date)
 	if date_str > '2024-01-01':
 		g.all_weather_list = ["518880.XSHG", "511090.XSHG", "513100.XSHG", "601288.XSHG"]
+	
+	g.stoploss_map = {k: v-1 for k, v in g.stoploss_map.items() if v-1 > 0}
 
 def collect_sell_buy_stocks(context):
 	g.stocks_to_sell = []
@@ -122,14 +135,14 @@ def collect_sell_buy_stocks(context):
 	for stock in g.selected_stocks:
 		if (stock not in current_holdings) and (stock not in g.yesterday_HL_list):
 			g.stocks_to_buy.append(stock)
-			
+
 def trade_etf(context):
 	if g.trade is False:
 		current_holdings = list(context.portfolio.positions.keys())
 		date_str = str(context.previous_date)
 		if date_str < '2014-01-01':
 			if current_holdings != [g.etf]:
-				print('买入ETF')
+				log.info('买入ETF')
 				g.selected_stocks = [g.etf]
 				collect_sell_buy_stocks(context)
 				sell_stocks(context)
@@ -138,7 +151,7 @@ def trade_etf(context):
 			all_weather = False
 			for stock in current_holdings:
 				if stock not in g.all_weather_list:
-					print('使用全天候策略')
+					log.info('使用全天候策略')
 					all_weather = True
 					break
 			if all_weather:
@@ -171,21 +184,22 @@ def exec_all_weather(context):
 			weight = -1 / ES
 			
 		weights[code] = weight
-	print(f'权重:{weights}')
+		
+	log.info(f'权重:{weights}')
 	
 	# 标准化weight
 	total_weight = sum([w for w in weights.values()])
 	
 	fin_weights = {key: value/total_weight for key, value in weights.items()}
 	#for key, value in weights.items():
-	#	w = value / total_weight
-	#	fin_weights[key] = w
+	#    w = value / total_weight
+	#    fin_weights[key] = w
 		
 	for stock, w in fin_weights.items():
-		print(f'{stock} {get_security_info(stock).display_name} 权重{100*w:.2f}%')
+		log.info(f'{stock} {get_security_info(stock).display_name} 权重{100*w:.2f}%')
 
 	available_cash = context.portfolio.available_cash
-	print('available_cash: ', available_cash)
+	log.info('available_cash: ', available_cash)
 	current_data = get_current_data()
 	for stock in g.all_weather_list:
 		stock_data = current_data[stock]
@@ -195,8 +209,8 @@ def exec_all_weather(context):
 		target_value = available_cash * fin_weights[stock]
 		amount = int(target_value / current_price / 100) * 100
 		if amount > 0:
-			print('<<<<<<<<<<<<<<<<<买入<<<<<<<<<<<<<<<<<')
-			print(f'{stock} {get_security_info(stock).display_name} 目标市值{target_value:.2f}, 买入{amount}股 * {current_price}元')
+			log.info('<<<<<<<<<<<<<<<<<买入<<<<<<<<<<<<<<<<<')
+			log.info(f'{stock} {get_security_info(stock).display_name} 目标市值{target_value:.2f}, 买入{amount}股 * {current_price}元')
 			#order_target_value(stock, target_value)
 			order(stock, amount)
 			g.refresh_hold = True
@@ -223,8 +237,8 @@ def rebalance(context):
 
 	
 	#if current_date.weekday() != g.weekday:  # 周二
-	#	return
-	print('✅========== 执行周度调仓，日期：%s ==========' % current_date)
+	#    return
+	log.info('✅========== 执行周度调仓，日期：%s ==========' % current_date)
 	prev_date = current_date - datetime.timedelta(days=1)
 	# 判断是否为每月第一个交易日（卖出日）
 	if current_time == morning_sell_time:
@@ -234,24 +248,29 @@ def rebalance(context):
 		g.stock_pool = no_st_codes
 		# 3. 获取市值数据（使用前一交易日数据，避免未来函数）
 		g.selected_stocks = get_small_cap_stocks(g.stock_pool, prev_date, g.stock_num)
-		
+		for stock in g.stoploss_map.keys():
+			if stock in g.selected_stocks:
+				g.selected_stocks.remove(stock)
+				log.error(f"{stock} {get_security_info(stock).display_name} 前{3 - g.stoploss_map[stock]}日止损卖出")
+				
 		collect_sell_buy_stocks(context)
 		current_holdings = list(context.portfolio.positions.keys())
 		if len(g.stocks_to_buy) > 0 or len(g.stocks_to_sell) > 0:
-			print(f"✅当前持股 {len(current_holdings)}只")
+			log.info(f"✅当前持股 {len(current_holdings)}只")
 			for stock in current_holdings:
-				print(f"✅{get_security_info(stock).display_name}")
+				log.info(f"✅{get_security_info(stock).display_name}")
 				
-			print(f"✅需要买入股票 {len(g.stocks_to_buy)}只")
-			print(f"✅需要卖出股票 {len(g.stocks_to_sell)}只")
+			log.info(f"✅需要买入股票 {len(g.stocks_to_buy)}只")
+			log.info(f"✅需要卖出股票 {len(g.stocks_to_sell)}只")
 			for stock in g.stocks_to_buy:
-				print("✅待买入 ", get_security_info(stock).display_name)
+				log.info("✅待买入 ", get_security_info(stock).display_name)
 			for stock in g.stocks_to_sell:
-				print('✅待卖出: %s' % get_security_info(stock).display_name)
+				log.info('✅待卖出: %s' % get_security_info(stock).display_name)
 				
 				
-			print(f"✅今日({current_time})为卖出时间，执行卖出操作")
-			print('✅------------------------------------------')
+			log.info(f"✅今日({current_time})为卖出时间，执行卖出操作")
+			log.info('✅------------------------------------------')
+
 			# 执行卖出逻辑
 			sell_stocks(context)
 			# 标记卖出已完成
@@ -260,20 +279,20 @@ def rebalance(context):
 			log_selection_details(g.selected_stocks, prev_date)
 			
 		else:
-			print('未选到符合条件的股票，本日不调仓')
+			log.warn('未选到符合条件的股票，本日不调仓')
 
 			
 
 	# 判断是否为下午交易时间（买入日）
-	elif current_time == afternoon_buy_time and g.sell_done:
+	elif current_time == afternoon_buy_time and g.sell_done and g.reason_to_sell is not 'takeprofit':
 		# 执行买入逻辑
 		if len(g.stocks_to_buy):
 			current_time = context.current_dt.time()
-			print(f"✅今日({current_time})为买入时间，执行买入操作")
-			print('✅+++++++++++++++++++++++++++++++++++++++++')
-			print(f"✅需要买入股票 {len(g.stocks_to_buy)}只")
+			log.info(f"✅今日({current_time})为买入时间，执行买入操作")
+			log.info('✅+++++++++++++++++++++++++++++++++++++++++')
+			log.info(f"✅需要买入股票 {len(g.stocks_to_buy)}只")
 			for stock in g.stocks_to_buy:
-				print(get_security_info(stock).display_name)
+				log.info(get_security_info(stock).display_name)
 		
 		calc_position(context)
 		buy_stocks(context)
@@ -281,9 +300,46 @@ def rebalance(context):
 		g.sell_done = False
 		info_position(context)
 	else:
-		print(f"今日({current_date})非调仓日，不执行操作")
+		log.info(f"今日({current_date})非调仓日，不执行操作")
 	
 	#print(f"在 {current_date} 符合条件的股票数量: {len(filtered_stocks)}")
+
+def calc_ES_weights(context, stocks):
+	if stocks == []:
+		return {}
+		
+	df = get_price(
+		stocks,
+		end_date=context.previous_date,
+		frequency="daily",
+		fields=["close"],
+		count= 120,
+		panel=False,
+	)
+	#print("calc_ES_weights")
+	#print(stocks)
+	weights = {}
+	for code, group in df.groupby('code'):
+		group = group.sort_values('time')
+		if group.shape[0] < 120:
+			# 基础权重
+			weight = 1 / len(stocks)
+		else:
+			group['daily_return'] = group['close'].pct_change() * 100
+			sorted_group = group.sort_values(by='daily_return')
+			#print(sorted_group['daily_return'])
+			ES = sorted_group['daily_return'].head(6).mean()
+			if ES < 0.00001:
+				weight = 1 / len(stocks)
+			else:
+				weight = -1 / ES
+			
+		weights[code] = weight
+	
+	total_weight = sum([w for w in weights.values()])
+	weights = {key: value/total_weight for key, value in weights.items()}
+	log.info(f'权重:{weights}')
+	return weights
 
 def calc_position(context):
 	total_value = context.portfolio.total_value
@@ -292,34 +348,34 @@ def calc_position(context):
 	'''
 	if holding_num != g.stock_num:
 		fail_sell_stock_num = len(g.stocks_fail_sell) + len(g.yesterday_HL_list)
-		print(f'⭕ ⭕  有{fail_sell_stock_num}只股票没能卖出，调整买入计划')
-		print(f'等权买入股票')
+		log.info(f'⭕ ⭕  有{fail_sell_stock_num}只股票没能卖出，调整买入计划')
+		log.info(f'等权买入股票')
 		available_cash = context.portfolio.available_cash
 		for stock in g.stocks_to_buy:
 			g.excepted_position[stock] = available_cash / len(g.stocks_to_buy) / total_value
-			print(f'期望持仓: {get_security_info(stock).display_name}({stock})，占比{g.excepted_position[stock] * 100:.2f}%')
+			log.info(f'期望持仓: {get_security_info(stock).display_name}({stock})，占比{g.excepted_position[stock] * 100:.2f}%')
 		return
 	'''
 	if  holding_num != len(g.selected_stocks):
-		print(f'⭕ ⭕ 股票数量异常，期望最终持仓{holding_num}只，实际选中{len(g.selected_stocks)}只')
+		log.info(f'⭕ ⭕ 股票数量异常，期望最终持仓{holding_num}只，实际选中{len(g.selected_stocks)}只')
 		
 	positions = context.portfolio.positions
 	fail_pos = 0
 	for stock in g.stocks_fail_sell:
 		fp = positions[stock].value / total_value
 		fail_pos += fp
-		print(f'停牌股 {get_security_info(stock).display_name} 占仓位比重为 {fp*100:.2f}%')
+		log.info(f'停牌股 {get_security_info(stock).display_name} 占仓位比重为 {fp*100:.2f}%')
 	HL_count = 0
 	for stock in g.yesterday_HL_list:
 		if stock in current_holdings:
 			fp = positions[stock].value / total_value
 			fail_pos += fp
 			HL_count += 1
-			print(f'涨停股 {get_security_info(stock).display_name} 占仓位比重为 {fp*100:.2f}%')
+			log.info(f'涨停股 {get_security_info(stock).display_name} 占仓位比重为 {fp*100:.2f}%')
 				
 	g.excepted_position = {}
 	if holding_num - len(g.stocks_fail_sell) - HL_count <= 1:
-		print(f'涨停股数量 {HL_count}, 异常股票数量{len(g.stocks_fail_sell)}, 可调整股票数量: 0。 无需调整')
+		log.info(f'涨停股数量 {HL_count}, 异常股票数量{len(g.stocks_fail_sell)}, 可调整股票数量: 0。 无需调整')
 		return
 	p = (1 - fail_pos) / (holding_num - len(g.stocks_fail_sell) - HL_count)
 	
@@ -341,11 +397,11 @@ def calc_position(context):
 	weights = calc_ES_weights(context, need_stocks)
 	for s, w in weights.items():
 		g.excepted_position[s] = (1 - fail_pos) * w
-	'''	
+	'''    
 		
 	for stock, pos in g.excepted_position.items():
 		stock_name = get_security_info(stock).display_name
-		print(' 期望持仓: %s(%s), 占比 %.2f%%' % (stock_name, stock, pos * 100))
+		log.info(' 期望持仓: %s(%s), 占比 %.2f%%' % (stock_name, stock, pos * 100))
 		
 	current_data = get_current_data()
 	position_dict = {} #记录实际仓位比重
@@ -367,14 +423,15 @@ def calc_position(context):
 			continue
 		amount = int(target_value / current_price / 100) * 100
 		need_cash = amount * current_price
-		print(f'预计买入{stock_name}({stock})  {amount} 股 * {current_price:.2f},总计 {need_cash:.2f}')
+		log.info(f'预计买入{stock_name}({stock})  {amount} 股 * {current_price:.2f},总计 {need_cash:.2f}')
 		position_sum += need_cash
 		position_dict[stock] = [need_cash / total_value, current_price]
 		
 	avai_cash = total_value - position_sum
-	print(f'预计持仓 {position_sum} 剩余金额 {avai_cash:.2f}')
+	log.info(f'预计持仓 {position_sum} 剩余金额 {avai_cash:.2f}')
+		
 	if abs(avai_cash) > 5000 or avai_cash < 0:
-		print(f'❌❌剩余资金过大 {total_value - position_sum}')
+		#log.warn(f'❌❌剩余资金过大 {total_value - position_sum}')
 		cash = 0
 		for stock, exce_pos in g.excepted_position.items():
 			if stock in g.stocks_fail_sell:
@@ -384,7 +441,7 @@ def calc_position(context):
 			#if abs(diff_pos) > 0.04:
 			if abs(diff_pos) * total_value > 5000 or abs(diff_pos) > 0.04:
 				stock_name = get_security_info(stock).display_name
-				print(f'{stock_name} 持仓与期望相差较大，持仓{pos*100:.2f}%,期望{exce_pos*100:.2f}%,金额相差{diff_pos*total_value:.2f}')
+				log.info(f'{stock_name} 持仓与期望相差较大，持仓{pos*100:.2f}%,期望{exce_pos*100:.2f}%,金额相差{diff_pos*total_value:.2f}')
 				if diff_pos > 0:
 					g.stocks_to_buy.append(stock)
 					cash -= diff_pos*total_value
@@ -392,16 +449,16 @@ def calc_position(context):
 					order_info= order_target_value(stock, exce_pos*total_value)
 					if order_info != None and order_info.filled != 0:
 						cash -= diff_pos*total_value
-						print(f'调整{stock_name}市值，卖出{order_info.filled}股 * {order_info.price}')
+						log.info(f'调整{stock_name}市值，卖出{order_info.filled}股 * {order_info.price}')
 						update_stock_price(stock, order_info.price, -order_info.filled)
 						
 		
 		avai_cash += cash
 		if cash != 0:
-			print(f'重新分配之后资金为{avai_cash}')
+			log.info(f'重新分配之后资金为{avai_cash}')
 		
 		if avai_cash > 5000:
-			print(f'重新分配之后资金仍有剩余，追加买入')
+			log.info(f'重新分配之后资金仍有剩余，追加买入')
 			pos_dict = {}
 			for stock, exce_pos in g.excepted_position.items():
 				if stock in g.stocks_fail_sell or stock in g.stocks_to_buy:
@@ -419,7 +476,7 @@ def calc_position(context):
 				avai_cash -= cash
 				if avai_cash > 0:
 					g.stocks_to_buy.append(stock)
-					print(f'{stock_name} 持仓与期望相差{diff_pos*100:.2f}% {diff_pos*total_value:.2f}，补仓')
+					log.info(f'{stock_name} 持仓与期望相差{diff_pos*100:.2f}% {diff_pos*total_value:.2f}，补仓')
 			
 				
 			'''
@@ -432,20 +489,19 @@ def calc_position(context):
 				need_cash = amount * current_price
 				target_value = total_value * g.excepted_position[stock]
 				g.excepted_position[stock] = (target_value + need_cash) / total_value
-				print(f'调整{stock_name}买入数量,增加{amount}股')
+				log.info(f'调整{stock_name}买入数量,增加{amount}股')
 			'''
 		elif avai_cash < 0 and cash == 0 and len(g.stocks_to_buy) > 0:
-			print(f'未重新分配资金，调整买入仓位比重')
+			log.info(f'未重新分配资金，调整买入仓位比重')
 			available_cash = context.portfolio.available_cash
 			for stock in g.stocks_to_buy:
 				g.excepted_position[stock] = available_cash / len(g.stocks_to_buy) / total_value
-				print(f'期望持仓: {get_security_info(stock).display_name}({stock})，占比{g.excepted_position[stock] * 100:.2f}%')
+				log.info(f'期望持仓: {get_security_info(stock).display_name}({stock})，占比{g.excepted_position[stock] * 100:.2f}%')
 			
 			
-	
 	for stock, pos in position_dict.items():
 		stock_name = get_security_info(stock).display_name
-		print(f' 预估持仓: {stock_name}({stock}), 占比 {pos[0] * 100:.2f}% 单价 {pos[1]}')
+		log.info(f' 预估持仓: {stock_name}({stock}), 占比 {pos[0] * 100:.2f}% 单价 {pos[1]}')
 		
 	for stock, exce_pos in g.excepted_position.items():
 		if stock in g.stocks_fail_sell:
@@ -470,11 +526,11 @@ def calc_position(context):
 				current_value = pos * total_value
 				#num = 1
 				num = int((excepted_value - current_value) / current_price / 100)
-				print(f'调整{stock_name}买入数量，期望买入{excepted_value:.2f},当前{current_value},相差{diff_value:.2f}')
+				log.info(f'调整{stock_name}买入数量，期望买入{excepted_value:.2f},当前{current_value},相差{diff_value:.2f}')
 				while True:
 					new_value = current_value + current_price * num * 100
 					diff_v = excepted_value - new_value
-					print(f'单价{current_price}，新市值{new_value:.2f}，差值{diff_v:.2f}')
+					log.info(f'单价{current_price}，新市值{new_value:.2f}，差值{diff_v:.2f}')
 					if abs(round(diff_v,2)) <= abs(round(diff_value,2)):
 						diff_value = diff_v
 						num += 1
@@ -483,14 +539,14 @@ def calc_position(context):
 						break
 				if num > 0:
 					g.excepted_position[stock] = (current_value + current_price * num * 100) / total_value
-					print(f'调整买入数量，追加{num}手,仓位占比调整为{g.excepted_position[stock] * 100:.2f}%')
+					log.info(f'调整买入数量，追加{num}手,仓位占比调整为{g.excepted_position[stock] * 100:.2f}%')
 					
 		'''
 		amount = int(diff_value / current_price / 100) * 100
 		if amount > 0:
 			if stock not in g.stocks_to_buy:
 				g.stocks_to_buy.append(stock)
-			print(f'{stock_name}({stock}) 可以再买入{amount}')
+			log.info(f'{stock_name}({stock}) 可以再买入{amount}')
 		'''
 
 def pop_stock_price(stock):
@@ -519,17 +575,20 @@ def check_limit_up(context):
 			current_data = get_price(stock, end_date=now_time, frequency='1m', fields=['close','high_limit'], skip_paused=False, fq='pre', count=1, panel=False, fill_paused=True)
 			close_price = current_data.iloc[0,1] / 1.1
 			rise_ratio = (current_data.iloc[0,0] - close_price) / close_price * 100
-			print(f'{now_time} {stock} {get_security_info(stock).display_name} 股价{current_data.iloc[0,0]} 涨幅{rise_ratio:.2f}%')
-			if current_data.iloc[0,0] <	current_data.iloc[0,1]:
-				print(f"{stock} {get_security_info(stock).display_name}涨停打开，卖出")
+			#log.warn(f'{now_time} {stock} {get_security_info(stock).display_name} 股价{current_data.iloc[0,0]} 涨幅{rise_ratio:.2f}%')
+			if current_data.iloc[0,0] <    current_data.iloc[0,1]:
+				#log.warn(f"{stock} {get_security_info(stock).display_name}涨停打开，卖出")
 				order_info = order_target_value(stock, 0)
 				if order_info != None and order_info.filled > 0:
 					pop_stock_price(stock)
 				g.reason_to_sell = 'limitup'
 				g.limitup_stocks.append(stock)
+				
+				log.warn(f"{stock} {get_security_info(stock).display_name} {g.limtup_map[stock]} 涨幅{rise_ratio:.2f}%")
+				g.limtup_map.pop(stock)
 			else:
-				print(f"{stock} {get_security_info(stock).display_name}涨停，继续持有")
-
+				log.info(f"{stock} {get_security_info(stock).display_name}涨停，继续持有")
+	
 #如果昨天有股票卖出或者买入失败，剩余的金额今天买入
 def check_remain_amount(context):
 	if g.reason_to_sell is 'limitup': #判断提前售出原因，如果是涨停售出则次日再次交易，如果是止损售出则不交易
@@ -537,14 +596,14 @@ def check_remain_amount(context):
 		now_time = context.current_dt
 		flag = True
 		if len(g.hold_list) < g.stock_num or flag:
-			print(f'现有持仓:')
+			log.info(f'现有持仓:')
 			for stock_code in g.hold_list:
 				stock_name = get_security_info(stock_code).display_name
-				print(f'  {stock_name} {stock_code}')
-			print('涨停卖出')
+				log.info(f'  {stock_name} {stock_code}')
+			log.info('涨停卖出')
 			for stock_code in g.limitup_stocks:
 				stock_name = get_security_info(stock_code).display_name
-				print(f'  {stock_name} {stock_code}')
+				log.info(f'  {stock_name} {stock_code}')
 				
 			# 计算需要买入的股票数量
 			current_date = context.current_dt.date()
@@ -554,29 +613,35 @@ def check_remain_amount(context):
 				if stock_code in g.selected_stocks:
 					g.selected_stocks.remove(stock_code)
 			
+			for stock in g.stoploss_map.keys():
+				if stock in g.selected_stocks:
+					g.selected_stocks.remove(stock)
+					log.error(f"{stock} {get_security_info(stock).display_name} 前{3 - g.stoploss_map[stock]}日止损卖出")
+		
+			
 			current_holdings = list(context.portfolio.positions.keys())
 			if len(current_holdings) > 3:
 				g.selected_stocks = current_holdings
 				
 			collect_sell_buy_stocks(context)
 			if len(g.stocks_to_buy) > 0:
-				print(f"需要买入股票 {len(g.stocks_to_buy)}只")
+				log.info(f"需要买入股票 {len(g.stocks_to_buy)}只")
 				for stock in g.stocks_to_buy:
-					print("待买入 ", get_security_info(stock).display_name)
+					log.info("待买入 ", get_security_info(stock).display_name)
 				
 			#num_stocks_to_buy = min(len(g.limitup_stocks), g.stock_num - len(g.hold_list))
 			#num_stocks_to_buy = g.stock_num - len(g.hold_list)
 			#g.stocks_to_buy = [stock for stock in g.selected_stocks if stock not in g.hold_list and stock not in g.limitup_stocks][:num_stocks_to_buy]
 			#sell_stocks(context)
-			print('有余额可用'+str(round((context.portfolio.cash),2))+'元。买入'+ str(g.stocks_to_buy))
+			log.info('有余额可用'+str(round((context.portfolio.cash),2))+'元。买入'+ str(g.stocks_to_buy))
 			info_position(context)
 			calc_position(context)
 			buy_stocks(context)
 			#info_position(context)
 			g.refresh_hold = True
 		g.reason_to_sell = ''
-	elif g.reason_to_sell is 'stoploss':
-		print('止盈止损后，有余额可用'+str(round((context.portfolio.cash),2))+'元。买入'+ str(g.etf))
+	elif g.reason_to_sell is 'stoploss' or g.reason_to_sell is 'takeprofit':
+		log.info('止盈止损后，有余额可用'+str(round((context.portfolio.cash),2))+'元。买入'+ str(g.etf))
 		g.stocks_to_buy = [g.etf]
 		buy_stocks(context)
 		g.reason_to_sell = ''
@@ -590,19 +655,22 @@ def stop_loss(context):
 
 		if g.stoploss_strategy == 1 or g.stoploss_strategy == 3:
 			for stock in current_positions.keys():
+				#df = get_price(stock, end_date=context.previous_date, frequency='daily', fields=['close'], count=1, panel=False, fill_paused=False)
+				#price = df['close'].iloc[0]
 				price = current_positions[stock].price
 				avg_cost = current_positions[stock].avg_cost
 				# 个股盈利止盈
 				if price >= avg_cost * 2:
 					order_target_value(stock, 0)
 					pop_stock_price(stock)
-					print("⭕ 收益100%止盈,卖出{}".format(stock))
+					log.debug("⭕ 收益100%止盈,卖出{}".format(stock))
 				# 个股止损
 				elif price < avg_cost * (1 - g.stoploss_limit):
 					order_info = order_target_value(stock, 0)
-					print(f"⭕ 收益止损,卖出{stock},跌幅 { (1 - price / avg_cost) * 100:.2f}%")
+					g.stoploss_map[stock] = g.stoploss_map.setdefault(stock, 3)
+					log.debug(f"⭕ 收益止损,卖出{stock},跌幅 { (1 - price / avg_cost) * 100:.2f}%")
 					if order_info != None and order_info.filled > 0:
-						print(f'卖出 {order_info.filled}股 * {order_info.price:.2f}元')
+						log.debug(f'卖出 {order_info.filled}股 * {order_info.price:.2f}元')
 						pop_stock_price(stock)
 						show_info = True
 					g.reason_to_sell = 'stoploss'
@@ -610,34 +678,19 @@ def stop_loss(context):
 						g.selected_stocks.remove(stock)
 
 		if g.stoploss_strategy == 2 or g.stoploss_strategy == 3:
-			stock_df = get_price(security=get_index_stocks('399101.XSHE'), end_date=context.previous_date, frequency='daily', fields=['close','open'], count=1, panel=False)
+			stock_df = get_price(security=get_index_stocks(g.POOL), end_date=context.previous_date, frequency='daily', fields=['close','open'], count=1, panel=False)
 			#print(stock_df)
-			#pre_stock_df = get_price(security='399101.XSHE', end_date=context.previous_date - datetime.timedelta(days=1), frequency='daily', fields=['close'], count=1, panel=False)
+			#pre_stock_df = get_price(security=g.POOL, end_date=context.previous_date - datetime.timedelta(days=1), frequency='daily', fields=['close'], count=1, panel=False)
 			#down_ratio = abs(stock_df.close[0] / pre_stock_df.close[0] - 1)
-			#print("⭕ 大盘降幅{:.2%}".format(stock_df.close[0] / pre_stock_df.close[0] - 1))
+			#log.debug("⭕ 大盘降幅{:.2%}".format(stock_df.close[0] / pre_stock_df.close[0] - 1))
 			down_ratio = (stock_df['close'] / stock_df['open'] - 1).mean()
-			print("大盘降幅{:.2%}".format(down_ratio))
+			log.debug("大盘降幅{:.2%}".format(down_ratio))
 			# 市场大跌止损
 			if abs(down_ratio) >= g.stoploss_market:
-				g.reason_to_sell = 'stoploss'
 				g.refresh_hold = True
 				if down_ratio < 0:
-					print("⭕ 大盘惨跌,平均降幅{:.2%}".format(down_ratio))
-					for stock in current_positions.keys():
-						if stock == g.etf:
-							continue
-						if stock in g.all_weather_list:
-							continue
-						print(f'⭕ 清仓{stock} {get_security_info(stock).display_name}')
-						order_info = order_target_value(stock, 0)
-						if order_info != None and order_info.filled > 0:
-							print(f'卖出 {order_info.filled}股 * {order_info.price:.2f}元')
-							pop_stock_price(stock)
-							show_info = True
-						if stock in g.selected_stocks:
-							g.selected_stocks.remove(stock)
-				else:
-					print("⭕ 大盘大涨,平均涨幅{:.2%}".format(down_ratio))
+					g.reason_to_sell = 'stoploss'
+					log.debug("⭕ 大盘惨跌,平均降幅{:.2%}".format(down_ratio))
 					for stock in current_positions.keys():
 						if stock == g.etf:
 							continue
@@ -645,10 +698,28 @@ def stop_loss(context):
 							continue
 						if stock in g.yesterday_HL_list:
 							continue
-						print(f'⭕ 清仓{stock} {get_security_info(stock).display_name}')
+						log.debug(f'⭕ 清仓{stock} {get_security_info(stock).display_name}')
 						order_info = order_target_value(stock, 0)
 						if order_info != None and order_info.filled > 0:
-							print(f'卖出 {order_info.filled}股 * {order_info.price:.2f}元')
+							log.debug(f'卖出 {order_info.filled}股 * {order_info.price:.2f}元')
+							pop_stock_price(stock)
+							show_info = True
+						if stock in g.selected_stocks:
+							g.selected_stocks.remove(stock)
+				else:
+					g.reason_to_sell = 'takeprofit'
+					log.debug("⭕ 大盘大涨,平均涨幅{:.2%}".format(down_ratio))
+					for stock in current_positions.keys():
+						if stock == g.etf:
+							continue
+						if stock in g.all_weather_list:
+							continue
+						if stock in g.yesterday_HL_list:
+							continue
+						log.debug(f'⭕ 清仓{stock} {get_security_info(stock).display_name}')
+						order_info = order_target_value(stock, 0)
+						if order_info != None and order_info.filled > 0:
+							log.debug(f'卖出 {order_info.filled}股 * {order_info.price:.2f}元')
 							pop_stock_price(stock)
 							show_info = True
 						if stock in g.selected_stocks:
@@ -673,14 +744,14 @@ def balance_position(context):
 			max_ratio = r
 					
 	if max_ratio - min_ratio > 14:
-		print(f'\n===================最大股票仓位比最小仓位高出 {max_ratio - min_ratio} 个点，调整仓位====================')
+		log.info(f'\n===================最大股票仓位比最小仓位高出 {max_ratio - min_ratio} 个点，调整仓位====================')
 		stock_name = get_security_info(min_stock).display_name
-		print('最小占比  持仓: %s(%s),  %.2f%%' % (stock_name, min_stock, min_ratio))
+		log.info('最小占比  持仓: %s(%s),  %.2f%%' % (stock_name, min_stock, min_ratio))
 		stock_name = get_security_info(max_stock).display_name
-		print('最大占比  持仓: %s(%s),  %.2f%%' % (stock_name, max_stock, max_ratio))
+		log.info('最大占比  持仓: %s(%s),  %.2f%%' % (stock_name, max_stock, max_ratio))
 		
 		balance_value = context.portfolio.total_value / 200 * (max_ratio - min_ratio)
-		print(f'卖出 {get_security_info(max_stock).display_name} {balance_value}，买入{get_security_info(min_stock).display_name} {balance_value}')
+		log.info(f'卖出 {get_security_info(max_stock).display_name} {balance_value}，买入{get_security_info(min_stock).display_name} {balance_value}')
 		order_value(max_stock, -balance_value)
 		order_value(min_stock,  balance_value)
 
@@ -709,12 +780,12 @@ def get_small_cap_stocks(stock_list, query_date, n=5):
 				all_data_frames.append(df_batch)
 				
 		except Exception as e:
-			print('查询市值数据时出错（批次 %d）: %s' % (i//batch_size + 1, str(e)))
+			log.error('查询市值数据时出错（批次 %d）: %s' % (i//batch_size + 1, str(e)))
 			continue
 	
 	# 所有批次查询完成后，检查是否获取到数据
 	if not all_data_frames:
-		print("未获取到任何股票的市值数据")
+		log.warn("未获取到任何股票的市值数据")
 		return []
 	
 	# 关键步骤：合并所有批次的数据
@@ -724,7 +795,7 @@ def get_small_cap_stocks(stock_list, query_date, n=5):
 	#df_sorted = df_all.sort_values('circulating_market_cap', ascending=True)
 	df_sorted = df_all.sort_values('market_cap', ascending=True)
 	if n > 30:
-		print(f"get_small_cap_stocks   {query_date}	head {n}")
+		print(f"get_small_cap_stocks   {query_date}    head {n}")
 		rank = 0
 		for idx, row in df_sorted.head(10).iterrows():
 			stock_name = get_security_info(row['code']).display_name
@@ -733,10 +804,10 @@ def get_small_cap_stocks(stock_list, query_date, n=5):
 			cap_in_10k = row['market_cap']
 			rank = rank + 1
 			marker = '  <== 选中' if rank <= n else ''
-			print(f'	第{rank:>2}名: {stock_name}({row["code"]}), 流通市值: {cap_in_10k:.2f} 亿元{marker}')
+			log.info(f'    第{rank:>2}名: {stock_name}({row["code"]}), 流通市值: {cap_in_10k:.2f} 亿元{marker}')
 	
 	# 取全局最小的N只股票
-	selected_stocks = df_sorted['code'].head(n).tolist()
+	selected_stocks = small_cap_get_stock_industry(list(df_sorted.code)[:100], n)
 	
 	flag = False
 	for stock_code in selected_stocks:
@@ -745,32 +816,66 @@ def get_small_cap_stocks(stock_list, query_date, n=5):
 			break
 			
 	if flag:
-		print(f"get_small_cap_stocks   {query_date}	head {n}")
+		print(f"get_small_cap_stocks   {query_date}    head {n}")
 		rank = 0
-		for idx, row in df_sorted.head(10).iterrows():
-			stock_name = get_security_info(row['code']).display_name
+		for idx, row in df_sorted.head(25).iterrows():
+			stock = row['code']
+			stock_name = get_security_info(stock).display_name
 			# 市值通常很大，除以10000显示为“万元”，更易读
 			#cap_in_10k = row['circulating_market_cap']
 			cap_in_10k = row['market_cap']
 			rank = rank + 1
-			marker = '  <== 选中' if rank <= n else ''
-			print(f'	第{rank:>2}名: {stock_name}({row["code"]}), 流通市值: {cap_in_10k:.2f} 亿元{marker}')
+			industrys = get_industry(security=[stock])
+			info = industrys[stock]
+			industry_name = info['sw_l2']['industry_name']
+			marker = '  <== 选中' if stock in selected_stocks else ''
+			log.info(f'    第{rank:>2}名: {stock_name}({row["code"]}), 流通市值: {cap_in_10k:.2f} 亿元 {industry_name} {marker}')
 			
 	
 	return selected_stocks
 	
+def small_cap_get_stock_industry(stock_list, num):
+	#return stock_list[:num]
+	"""行业分散选股"""
+	try:
+		result = get_industry(security=stock_list)
+		selected_stocks = []
+		industry_list = []
+		
+		for stock_code in stock_list:
+			if stock_code in result:
+				info = result[stock_code]
+				if 'sw_l2' in info and info['sw_l2']:
+					industry_name = info['sw_l2']['industry_name']
+					if industry_name not in industry_list:
+						industry_list.append(industry_name)
+						selected_stocks.append(stock_code)
+						if len(industry_list) >= num:
+							break
+		return selected_stocks
+	except Exception as e:
+		log.error(f"行业筛选错误: {e}")
+		return stock_list[:num]
+	
+
 def sell_stocks(context):
 	# 执行卖出
 	g.stocks_fail_sell = []
 	for stock in g.stocks_to_sell:
-		print('✅>>>>>>>>>>>>')
-		print('✅卖出: %s' % get_security_info(stock).display_name)
+		log.info('✅>>>>>>>>>>>>')
+		log.info('✅卖出: %s' % get_security_info(stock).display_name)
 		order_info = order_target_value(stock, 0)
 		if order_info != None and order_info.filled > 0:
-			print(f'卖出 {order_info.filled}股 * {order_info.price:.2f}元')
+			log.info(f'卖出 {order_info.filled}股 * {order_info.price:.2f}元')
 			pop_stock_price(stock)
 		else:
-			g.stocks_fail_sell.append(stock)
+			current_data = get_current_data()
+			last_prices = history(1, unit='1m', field='close', security_list=[stock])
+			is_limit_down = last_prices[stock][-1] <= current_data[stock].low_limit
+			if current_data[stock].paused or is_limit_down:
+				g.stocks_fail_sell.append(stock)
+			else:
+				print(1/0)
 	
 def buy_stocks(context):
 	if len(g.stocks_to_buy) > 0:
@@ -779,8 +884,8 @@ def buy_stocks(context):
 		total_value = context.portfolio.total_value
 		g.each_cash = available_cash / len(g.stocks_to_buy)
 		#if g.stocks_to_buy != [g.etf]:
-		#	g.each_cash = min(g.each_cash, total_value * 1.5 / g.stock_num)
-		print("====调整每股额度====\n当前可用资金 ", available_cash, "\n持仓市值 ", 
+		#    g.each_cash = min(g.each_cash, total_value * 1.5 / g.stock_num)
+		log.info("====调整每股额度====\n当前可用资金 ", available_cash, "\n持仓市值 ", 
 		position_value, "\n总资产: ", total_value, "\n每股额度 ", g.each_cash)
 		# 计算每只股票的目标市值（等权重）
 		# 获取当前总资产
@@ -798,7 +903,7 @@ def buy_stocks(context):
 				raw_amount = target_value_per_stock / current_price
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
 				order(stock, amount)
-				print(f'买入: {get_security_info(stock).display_name}, {stock} \n目标价值:{target_value_per_stock:.2f}'
+				log.info(f'买入: {get_security_info(stock).display_name}, {stock} \n目标价值:{target_value_per_stock:.2f}'
 						 f'\n预计买入{amount}股，每股{current_price}元，合计:{amount * current_price:.2f}')
 				update_stock_price(stock, current_price, amount)
 			else:
@@ -807,15 +912,15 @@ def buy_stocks(context):
 				order_info = order_target_value(stock, target_value_per_stock)
 				raw_amount = target_value_per_stock / current_price
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
-				print(f'委托买入: {get_security_info(stock).display_name}, {stock} \n目标价值:{target_value_per_stock:.2f}'
+				log.info(f'委托买入: {get_security_info(stock).display_name}, {stock} \n目标价值:{target_value_per_stock:.2f}'
 					f'\n预计买入{amount}股，每股{current_price}元，合计:{amount * current_price:.2f}')
 				if order_info != None and order_info.filled > 0:
 					raw_amount = target_value_per_stock / current_price
 					amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
-					print(f'实际买入{order_info.filled}股，每股{order_info.price}元，合计:{order_info.filled * order_info.price:.2f}')
+					log.info(f'实际买入{order_info.filled}股，每股{order_info.price}元，合计:{order_info.filled * order_info.price:.2f}')
 					update_stock_price(stock, order_info.price, order_info.filled)
 				else:
-					print(f'股票 {stock} 买入失败，跳过')
+					log.info(f'股票 {stock} 买入失败，跳过')
 			'''
 			stock_data = current_data[stock]
 			# 获取当前有效价格（优先使用现价）
@@ -830,9 +935,9 @@ def buy_stocks(context):
 			amount = int(raw_amount / 105) * 100  # 向下取整到100股的倍数
 			
 			if amount <= 0:
-				print(f'股票 {stock} 目标市值 {target_value_per_stock:.2f} 对应股数不足1手，跳过')
+				log.info(f'股票 {stock} 目标市值 {target_value_per_stock:.2f} 对应股数不足1手，跳过')
 			else:
-				print(f'买入: {get_security_info(stock).display_name}, {stock} \n股价: {current_price:.2f} \n股数 :{amount}\n合计:{amount * current_price:.2f}')
+				log.info(f'买入: {get_security_info(stock).display_name}, {stock} \n股价: {current_price:.2f} \n股数 :{amount}\n合计:{amount * current_price:.2f}')
 				order(stock, amount)
 			'''
 
@@ -858,7 +963,7 @@ def log_selection_details(selected_stocks, query_date):
 	
 	if df is not None and len(df) > 0:
 		current_data = get_current_data()
-		print('✅=== 本日选中股票详情 ===')
+		log.info('✅=== 本日选中股票详情 ===')
 		for _, row in df.iterrows():
 			stock_code = row['code']
 			current_name = current_data[stock_code].name
@@ -866,7 +971,7 @@ def log_selection_details(selected_stocks, query_date):
 			cmc = row['circulating_market_cap']
 			mc =  row['market_cap']
 			zcl = row['inc_net_profit_to_shareholders_year_on_year']
-			print(f'✅股票: {stock_name}/{current_name}({stock_code}), 流通市值: {cmc:.2f}万元, 总市值: {mc:.2f}万元,净利润增长率: {zcl:.2f}%')
+			log.info(f'✅股票: {stock_name}/{current_name}({stock_code}), 流通市值: {cmc:.2f}万元, 总市值: {mc:.2f}万元,净利润增长率: {zcl:.2f}%')
 			
 	#st_code_list = list(g.st_code)
 	#print(st_code_list)
@@ -876,7 +981,7 @@ def info_position(context):
 	positions = context.portfolio.positions
 	
 	if len(positions) > 0:
-		print(f'******************当日({context.current_dt})持仓市值: %.2f元*******************' % context.portfolio.positions_value)
+		log.info(f'******************当日({context.current_dt})持仓市值: %.2f元*******************' % context.portfolio.positions_value)
 		sorted_pos = dict(sorted(positions.items(), key=lambda x: x[0]))
 		for stock, pos in sorted_pos.items():
 			stock_name = get_security_info(stock).display_name
@@ -885,13 +990,26 @@ def info_position(context):
 			#diff_price = price - g.stock_prices[stock][0]/g.stock_prices[stock][1]
 			ratio = 0
 			diff_price = 0
-			print('✅持仓: %s(%s), 占比 %.2f%%, 涨跌幅: %.2f%% (%.2f), 数量: %d, 市值: %.2f元' % 
+			log.info('✅持仓: %s(%s), 占比 %.2f%%, 涨跌幅: %.2f%% (%.2f), 数量: %d, 市值: %.2f元' % 
 					(stock_name, stock, pos.value / context.portfolio.total_value * 100, ratio, diff_price*pos.total_amount, pos.total_amount, pos.value))
-		print(f'✅*******************总资产 %.2f  剩余可用金额 %.2f元*******************\n\n' % (context.portfolio.total_value, context.portfolio.available_cash))
+		log.info(f'✅*******************总资产 %.2f  剩余可用金额 %.2f元*******************\n\n' % (context.portfolio.total_value, context.portfolio.available_cash))
 
 # 可选：每日盘后记录函数（非必需）
 def after_trading_end(context):
 	current_date = context.current_dt.date()
+	
+	total_value = context.portfolio.total_value
+	if total_value > g.record_max:
+		g.recordlist.clear()
+	if g.record_max > total_value:
+		max_drawdown = (1 - total_value / g.record_max) * 100
+		log.warn(f"max draw down: {max_drawdown:.2f}%")
+		
+	g.recordlist.append(total_value)
+	if len(g.recordlist) > 120:
+		g.recordlist.pop(0)
+	g.record_max = max(g.recordlist)
+	
 	if not g.trade_day and g.refresh_hold == False:
 		return
 	g.refresh_hold = False
@@ -900,7 +1018,7 @@ def after_trading_end(context):
 	positions = context.portfolio.positions
 	
 	if len(positions) > 0:
-		print(f'✅*******************当日(周{current_date.weekday()+1})持仓市值: %.2f元*******************' % context.portfolio.positions_value)
+		log.info(f'✅*******************当日(周{current_date.weekday()+1})持仓市值: %.2f元*******************' % context.portfolio.positions_value)
 		sorted_pos = dict(sorted(positions.items(), key=lambda x: x[0]))
 		for stock, pos in sorted_pos.items():
 			stock_name = get_security_info(stock).display_name
@@ -909,10 +1027,10 @@ def after_trading_end(context):
 			#diff_price = price - g.stock_prices[stock][0]/g.stock_prices[stock][1]
 			ratio = 0
 			diff_price = 0
-			print('✅持仓: %s(%s), 占比 %.2f%%, 涨跌幅: %.2f%% (%.2f), 数量: %d, 市值: %.2f元' % 
+			log.info('✅持仓: %s(%s), 占比 %.2f%%, 涨跌幅: %.2f%% (%.2f), 数量: %d, 市值: %.2f元' % 
 					(stock_name, stock, pos.value / context.portfolio.total_value * 100, ratio, diff_price*pos.total_amount, pos.total_amount, pos.value))
 			#g.stock_prices[stock] = [pos.value, pos.total_amount]
-		print(f'✅*******************总资产 %.2f  剩余可用金额 %.2f元*******************\n\n' % (context.portfolio.total_value, context.portfolio.available_cash))
+		log.info(f'✅*******************总资产 %.2f  剩余可用金额 %.2f元*******************\n\n' % (context.portfolio.total_value, context.portfolio.available_cash))
 
 #"""
 	
@@ -933,7 +1051,7 @@ def filter_chuangye_beijiao_codes(all_stocks):
 			continue
 		
 		#if "002260" in stock or "000835" in stock or "600091" in stock or "600890" in stock or "603157" in stock or "603996" in stock:
-		#	continue
+		#    continue
 			
 		filtered_stocks.append(stock)
 	
@@ -941,7 +1059,7 @@ def filter_chuangye_beijiao_codes(all_stocks):
 '''
 def get_stock_list(context, target_date):
 	final_list = []
-	MKT_index = '399101.XSHE'
+	MKT_index = g.POOL
 	initial_list = filter_stocks(context, get_index_stocks(MKT_index), target_date)
 	q = query(valuation.code,valuation.market_cap).filter(valuation.code.in_(initial_list),valuation.market_cap.between(5,300)).order_by(valuation.market_cap.asc())
 	df_fun = get_fundamentals(q)
@@ -962,39 +1080,39 @@ def get_normal_stocks(context, target_date):
 	
 	# 1. 获取指定日期所有未退市的股票
 	#all_stocks = get_all_securities(types=['stock'], date=target_date).index.tolist()
-	MKT_index = '399101.XSHE'
+	MKT_index = g.POOL
 	#MKT_index = '000852.XSHG'
 	all_stocks = get_index_stocks(MKT_index, target_date)
-	print(f'在 {target_date}，{MKT_index} 共有 {len(all_stocks)} 只股票')
+	log.info(f'在 {target_date}，{MKT_index} 共有 {len(all_stocks)} 只股票')
 	
 	all_stocks = filter_chuangye_beijiao_codes(all_stocks)
 	
-	print(f'去除科创版，北交所等，共有 {len(all_stocks)} 只股票')
+	log.info(f'去除科创版，北交所等，共有 {len(all_stocks)} 只股票')
 	#for stock in all_stocks:
-	#	print(stock)
+	#    print(stock)
 	
 	# 2. 过滤ST/*ST股票
 	non_st_stocks = filter_st_stocks(all_stocks, target_date)
 	
 	#non_st_stocks = all_stocks
-	print(f'过滤ST/*ST股票后，剩余 {len(non_st_stocks)} 只')
+	log.info(f'过滤ST/*ST股票后，剩余 {len(non_st_stocks)} 只')
 	
 	# 3. 过滤停牌股票
 	trading_stocks = filter_paused_stocks(context, non_st_stocks, target_date)
 	
 
-	print(f'过滤停牌，涨跌停股票后，剩余 {len(trading_stocks)} 只')
+	log.info(f'过滤停牌，涨跌停股票后，剩余 {len(trading_stocks)} 只')
 	
 	
 	# 4. 过滤新上市股票（上市不足30天）
 	mature_stocks = filter_new_stock(context, trading_stocks, min_days=180)
-	print(f'过滤上市不足30天股票后，剩余 {len(mature_stocks)} 只')
+	log.info(f'过滤上市不足30天股票后，剩余 {len(mature_stocks)} 只')
 	
 	return mature_stocks
 	
 	# 5. 过滤无交易数据或异常价格的股票
 	final_stocks = filter_abnormal_stocks(mature_stocks, target_date)
-	print(f'过滤异常股票后，最终剩余 {len(final_stocks)} 只正常交易股票')
+	log.info(f'过滤异常股票后，最终剩余 {len(final_stocks)} 只正常交易股票')
 	
 	return final_stocks
 
@@ -1094,10 +1212,10 @@ def filter_new_stocks(stock_list, target_date, min_days=30):
 			if days_listed >= min_days:
 				mature_stocks.append(stock)
 			#else:
-			#	print(f'股票 {stock} 上市仅 {days_listed} 天，小于 {min_days} 天，跳过')
+			#    log.debug(f'股票 {stock} 上市仅 {days_listed} 天，小于 {min_days} 天，跳过')
 				
 		except Exception as e:
-			print(f'获取股票 {stock} 上市日期时出错: {e}')
+			log.error(f'获取股票 {stock} 上市日期时出错: {e}')
 			# 出错时默认通过，保守策略
 			mature_stocks.append(stock)
 	
@@ -1136,7 +1254,7 @@ def filter_abnormal_stocks(stock_list, target_date):
 			stock_data = price_data[price_data['code'] == stock]
 			
 			if len(stock_data) == 0:
-				print(f'股票 {stock} 无价格数据，跳过')
+				log.debug(f'股票 {stock} 无价格数据，跳过')
 				continue
 			
 			# 检查最近5天是否有交易
@@ -1153,10 +1271,10 @@ def filter_abnormal_stocks(stock_list, target_date):
 			if has_trade:
 				normal_stocks.append(stock)
 			else:
-				print(f'股票 {stock} 最近5天无有效交易，跳过')
+				log.debug(f'股票 {stock} 最近5天无有效交易，跳过')
 				
 	except Exception as e:
-		print(f'批量检查价格异常时出错: {e}')
+		log.error(f'批量检查价格异常时出错: {e}')
 		# 出错时返回原始列表
 		return stock_list
 	
