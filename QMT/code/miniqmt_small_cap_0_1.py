@@ -1,4 +1,4 @@
-fro xtquant import xtdata
+from xtquant import xtdata
 from xtquant.xttype import StockAccount
 from xtquant.xttrader import XtQuantTrader, XtQuantTraderCallback
 from xtquant import xtconstant
@@ -182,6 +182,8 @@ def init():
 
 	g.count = 0
 	g.last_pos_value = None
+
+	g.industry_dict = get_sw2_industry()
 	# 每天执行调仓函数
 	# 聚宽会自动将非交易日的触发顺延至下一个交易日
 	#ContextInfo.run_time("sell_func", "1nDay", "2025-01-03 10:00:00","SH")
@@ -189,23 +191,21 @@ def init():
 	#ContextInfo.run_time("myHandlebar","5nSecond","2025-01-03 13:20:00","SH")
 	print(f'策略初始化完成：每月初调仓，持有市值最小的{g.stock_num}只股票, 初始资金{available_cash}')
 
-	g.industry_dict = get_sw2_industry()
-
 def closeQMT():
 	current_date = datetime.now()
-	if current_date.weekday() != 3:
+	if current_date.weekday() != 6:
 		return
 	kill_process_by_name("XtMiniQmt.exe")
 
 def reopenQMT():
 	current_date = datetime.now()
-	if current_date.weekday() != 3:
+	if current_date.weekday() != 7:
 		return
 	open_QMT()
 
 def reconnect():
 	current_date = datetime.now()
-	if current_date.weekday() != 3:
+	if current_date.weekday() != 7:
 		return
 	print("reconnect")
 	# path为mini qmt客户端安装目录下userdata_mini路径
@@ -232,7 +232,7 @@ def kill_process_by_name(name):
 
 def open_QMT():
 	try:
-		subprocess.run(['py', 'login.py'], capture_output=True,text=True,check=True)
+		subprocess.run(['py', 'login.py'], capture_output=False,text=True,check=True)
 		print(f"open QMT success")
 	except subprocess.CalledProcessError as e:
 		print(f"open QMT failed {e.stderr}")
@@ -307,9 +307,9 @@ def run_strategy():
 				[14, 0],  #check_limit_up
 				[14, 2],  #check_remain_amount
 				[15, 1],  #info_position
-				[16, 0],  #closeQMT
-				[16,45],  #reopenQMT
-				[17,15]]  #reconnect
+				[15,30],  #closeQMT
+				[16,30],  #reopenQMT
+				[16,35]]  #reconnect
 	'''
 	task_time = [["*",55],  #judge_date
 				["*",56],  #prepare_stock_list

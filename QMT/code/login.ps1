@@ -40,8 +40,8 @@ foreach ($proc in $qmtProcess) {
         Start-Sleep -Milliseconds 500
     
         # 切换到密码框
-        #[System.Windows.Forms.SendKeys]::SendWait("{TAB}")
-        #Start-Sleep -Milliseconds 500
+        [System.Windows.Forms.SendKeys]::SendWait("{TAB}")
+        Start-Sleep -Milliseconds 500
     
         # 输入密码
         [System.Windows.Forms.SendKeys]::SendWait($password)
