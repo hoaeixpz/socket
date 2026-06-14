@@ -199,13 +199,13 @@ def closeQMT():
 
 def reopenQMT():
 	current_date = datetime.now()
-	if current_date.weekday() != 7:
+	if current_date.weekday() != 6:
 		return
 	open_QMT()
 
 def reconnect():
 	current_date = datetime.now()
-	if current_date.weekday() != 7:
+	if current_date.weekday() != 6:
 		return
 	print("reconnect")
 	# path为mini qmt客户端安装目录下userdata_mini路径
