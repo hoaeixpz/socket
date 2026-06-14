@@ -8,9 +8,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # 3个CSV文件路径
 csv_files = {
-    #'result_zhai': os.path.join(current_dir, 'result_zhai.csv'),
-    'result_small': os.path.join(current_dir, 'result_small.csv'),
-    'result_quantianhou': os.path.join(current_dir, 'result_quantianhou.csv'),
+    'result_zhai': os.path.join(current_dir, 'result_zhai.csv'),
+    #'result_small': os.path.join(current_dir, 'result_small.csv'),
+    #'result_quantianhou': os.path.join(current_dir, 'result_quantianhou.csv'),
 }
 
 def process_strategy(df, name):
@@ -157,6 +157,26 @@ def get_best_weights(merged_df, iter_num = 1000):
     
     return [opts.x.round(3), optv.x.round(3)]
 
+def get_ES_weights(merged_df):
+    weights = {}
+    print("\n=== 各策略最小损失权重===")
+    NUM = 120
+    num = int(NUM * 0.05)
+    for name in csv_files.keys():
+        col = f'{name}_每日收益率'
+        daily_returns = merged_df[col].dropna()  # 去除NaN值
+        daily_returns = daily_returns.tail(NUM)
+        sort_returns = daily_returns.sort_values()
+        ES = sort_returns.head(num).mean()
+        print(f"{name}: {sort_returns.head(num)}  ES  {ES}") 
+        weights[name] = -1 / ES
+    
+    print(weights)
+    total_weight = sum([w for w in weights.values()])
+        
+    fin_weights = {key: value/total_weight for key, value in weights.items()}
+    print(fin_weights)
+
 
 # 读取并处理每个文件
 results = {}
@@ -170,7 +190,10 @@ for name, filepath in csv_files.items():
     print()
 
 # 按日期对齐整合成一个DataFrame
-merged_df = merge_by_date(results, 'result_small')
+merged_df = merge_by_date(results, list(csv_files.keys())[0])
+#del merged_df['result_small_策略收益']
+#del merged_df['result_zhai_策略收益']
+#del merged_df['result_quantianhou_策略收益']
 
 print("=== 整合后的DataFrame ===")
 pd.set_option('display.max_rows', None)
@@ -182,6 +205,9 @@ print(merged_df.tail(20))
 print(f"总行数: {len(merged_df)}")
 print(f"日期范围: {merged_df['日期'].min()} ~ {merged_df['日期'].max()}")
 
+df = merged_df[merged_df['result_zhai_每日收益率'] < -0.01]
+print(df)
+
 # 计算每个策略的总体收益率
 # 公式: R = ∏(1 + r_t) - 1，去除NaN值
 print("\n=== 各策略总体收益率（每日收益率连乘法）===")
@@ -191,8 +217,8 @@ for name in csv_files.keys():
     total_return = (1 + daily_returns).prod() - 1
     print(f"{name}: {total_return:.4f} ({total_return*100:.2f}%)")
 
-get_best_weights(merged_df, 10000)
+#get_best_weights(merged_df, 10000)
 
-analyze_correlation(merged_df)
-
+#analyze_correlation(merged_df)
+#get_ES_weights(merged_df)
 
