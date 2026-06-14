@@ -10,8 +10,8 @@ if (-not $cred) {
 $password = $cred.GetNetworkCredential().Password
 
 # 1. 启动应用
-Start-Process "C:\QMT\bin.x64\XtItClient.exe"
-Start-Sleep -Seconds 8
+#Start-Process "C:\QMT\bin.x64\XtItClient.exe"
+#Start-Sleep -Seconds 8
 
 # 2. 获取窗口
 Add-Type -AssemblyName Microsoft.VisualBasic
@@ -40,8 +40,8 @@ foreach ($proc in $qmtProcess) {
         Start-Sleep -Milliseconds 500
     
         # 切换到密码框
-        [System.Windows.Forms.SendKeys]::SendWait("{TAB}")
-        Start-Sleep -Milliseconds 500
+        #[System.Windows.Forms.SendKeys]::SendWait("{TAB}")
+        #Start-Sleep -Milliseconds 500
     
         # 输入密码
         [System.Windows.Forms.SendKeys]::SendWait($password)

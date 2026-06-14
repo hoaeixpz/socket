@@ -1,4 +1,4 @@
-from xtquant import xtdata
+fro xtquant import xtdata
 from xtquant.xttype import StockAccount
 from xtquant.xttrader import XtQuantTrader, XtQuantTraderCallback
 from xtquant import xtconstant
@@ -191,17 +191,21 @@ def init():
 
 	g.industry_dict = get_sw2_industry()
 
-def reopenQMT():
+def closeQMT():
 	current_date = datetime.now()
-	if current_date.weekday() != 4:
+	if current_date.weekday() != 3:
 		return
 	kill_process_by_name("XtMiniQmt.exe")
-	sleep_sec(10)
+
+def reopenQMT():
+	current_date = datetime.now()
+	if current_date.weekday() != 3:
+		return
 	open_QMT()
 
 def reconnect():
 	current_date = datetime.now()
-	if current_date.weekday() != 4:
+	if current_date.weekday() != 3:
 		return
 	print("reconnect")
 	# path为mini qmt客户端安装目录下userdata_mini路径
@@ -228,7 +232,7 @@ def kill_process_by_name(name):
 
 def open_QMT():
 	try:
-		subprocess.run(['powershell.exe', '-File', 'login.ps1'], capture_output=True,text=True,check=True)
+		subprocess.run(['py', 'login.py'], capture_output=True,text=True,check=True)
 		print(f"open QMT success")
 	except subprocess.CalledProcessError as e:
 		print(f"open QMT failed {e.stderr}")
@@ -302,9 +306,10 @@ def run_strategy():
 				[10,10],  #rebalance_buy
 				[14, 0],  #check_limit_up
 				[14, 2],  #check_remain_amount
-				[15,10],  #info_position
-				[16, 0],  #reopenQMT
-				[16,10]]  #reconnect
+				[15, 1],  #info_position
+				[16, 0],  #closeQMT
+				[16,45],  #reopenQMT
+				[17,15]]  #reconnect
 	'''
 	task_time = [["*",55],  #judge_date
 				["*",56],  #prepare_stock_list
@@ -328,8 +333,9 @@ def run_strategy():
 	scheduler.add_job(check_limit_up,     'cron', hour=task_time[6][0],  minute=task_time[6][1])
 	scheduler.add_job(check_remain_amount,'cron', hour=task_time[7][0],  minute=task_time[7][1])
 	scheduler.add_job(info_position,      'cron', hour=task_time[8][0],  minute=task_time[8][1])
-	scheduler.add_job(reopenQMT,          'cron', hour=task_time[9][0],  minute=task_time[9][1])
-	scheduler.add_job(reconnect,          'cron', hour=task_time[10][0], minute=task_time[10][1])
+	scheduler.add_job(closeQMT,           'cron', hour=task_time[9][0],  minute=task_time[9][1])
+	scheduler.add_job(reopenQMT,          'cron', hour=task_time[10][0], minute=task_time[10][1])
+	scheduler.add_job(reconnect,          'cron', hour=task_time[11][0], minute=task_time[11][1])
 
 	try:
 		print("start")
