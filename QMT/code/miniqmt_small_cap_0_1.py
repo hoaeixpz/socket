@@ -167,6 +167,7 @@ def init():
 	g.weekday = 2  #每周二调仓
 	g.trade_day = False
 	g.each_cash = available_cash / g.stock_num
+	g.last_pos_value = info.total_asset
 	g.sell_done = False
 	g.run_stoploss = True
 	g.stoploss_strategy = 3  # 1为止损线止损，2为市场趋势止损, 3为联合1、2策略
@@ -181,7 +182,6 @@ def init():
 							"512890.SH"]  #红利低波ETF
 
 	g.count = 0
-	g.last_pos_value = None
 
 	g.industry_dict = get_sw2_industry()
 	# 每天执行调仓函数
@@ -189,23 +189,23 @@ def init():
 	#ContextInfo.run_time("sell_func", "1nDay", "2025-01-03 10:00:00","SH")
 	#ContextInfo.run_time("buy_func", "1nDay", "2025-01-03 14:00:00","SH")
 	#ContextInfo.run_time("myHandlebar","5nSecond","2025-01-03 13:20:00","SH")
-	print(f'策略初始化完成：每月初调仓，持有市值最小的{g.stock_num}只股票, 初始资金{available_cash}')
+	print(f'策略初始化完成：每月初调仓，持有市值最小的{g.stock_num}只股票, 初始可用资金{available_cash}, 初始资产{g.last_pos_value}')
 
 def closeQMT():
 	current_date = datetime.now()
-	if current_date.weekday() != 6:
+	if current_date.weekday() != 0:
 		return
 	kill_process_by_name("XtMiniQmt.exe")
 
 def reopenQMT():
 	current_date = datetime.now()
-	if current_date.weekday() != 6:
+	if current_date.weekday() != 0:
 		return
 	open_QMT()
 
 def reconnect():
 	current_date = datetime.now()
-	if current_date.weekday() != 6:
+	if current_date.weekday() != 0:
 		return
 	print("reconnect")
 	# path为mini qmt客户端安装目录下userdata_mini路径
@@ -307,9 +307,9 @@ def run_strategy():
 				[14, 0],  #check_limit_up
 				[14, 2],  #check_remain_amount
 				[15, 1],  #info_position
-				[15,30],  #closeQMT
-				[16,30],  #reopenQMT
-				[16,35]]  #reconnect
+				[15,10],  #closeQMT
+				[18, 0],  #reopenQMT
+				[18, 2]]  #reconnect
 	'''
 	task_time = [["*",55],  #judge_date
 				["*",56],  #prepare_stock_list
@@ -1417,9 +1417,6 @@ def info_position():
 		print(f'{green_c}✅\033[0m*******************总资产 {total_value:.2f} | {info.total_asset:.2f} 剩余可用金额 {available_cash:.2f}元*******************\n\n')
 
 		if current_date.hour == 15:
-			if g.last_pos_value is None:
-				g.last_pos_value = total_value
-
 			daily_return = total_value - g.last_pos_value
 			rate_of_return = daily_return / g.last_pos_value * 100
 			color = red_c if daily_return > 0 else green_c
