@@ -191,7 +191,7 @@ def init():
 	#ContextInfo.run_time("sell_func", "1nDay", "2025-01-03 10:00:00","SH")
 	#ContextInfo.run_time("buy_func", "1nDay", "2025-01-03 14:00:00","SH")
 	#ContextInfo.run_time("myHandlebar","5nSecond","2025-01-03 13:20:00","SH")
-	print(f'策略初始化完成：每月初调仓，持有市值最小的{g.stock_num}只股票, 初始可用资金{available_cash}, 初始资产{g.last_pos_value}')
+	print(f"{red_c}⭕\033[0m策略初始化完成：每月初调仓，持有市值最小的{g.stock_num}只股票, 初始可用资金{available_cash}, 初始资产{g.last_pos_value}")
 
 def closeQMT():
 	current_date = datetime.now()
@@ -409,13 +409,12 @@ def collect_sell_buy_stocks():
 	g.stocks_to_sell = []
 	g.stocks_to_buy = []
 	current_holdings = get_current_holding_stocks()
-	current_holdings.append("002910.SZ")
 	for stock in current_holdings:
 		if (stock not in g.selected_stocks) and (stock not in g.yesterday_HL_list):
 			if not is_limit_up(stock):
 				g.stocks_to_sell.append(stock)
 			else:
-				print(f"{red_c}⚪\033[0m {stock} {get_stock_name(stock)} 转为涨停股，今日不卖出。")
+				print(f"{red_c}⭕\033[0m {stock} {get_stock_name(stock)} 转为涨停股，今日不卖出。")
 				g.today_HL_list.append(stock)
 			
 	for stock in g.selected_stocks:
@@ -670,7 +669,7 @@ def calc_position():
 	avai_cash = total_value - position_sum
 	print(f'预计持仓 {position_sum} 剩余金额 {avai_cash:.2f}')
 	if abs(avai_cash) > CASH_YU or avai_cash < 0:
-		print(f'{red_c}⚪⚪\033[0m剩余资金过大 {total_value - position_sum:.2f}')
+		print(f'{red_c}⭕⭕\033[0m剩余资金过大 {total_value - position_sum:.2f}')
 		cash = 0
 		for stock, exce_pos in g.excepted_position.items():
 			if stock in g.stocks_fail_sell:
@@ -697,7 +696,7 @@ def calc_position():
 						continue
 					if is_limit_down(stock):
 						continue
-					if positions[stock]['canuse_amount'] < 100:
+					if positions[stock].can_use_volume < 100:
 						continue
 
 					sell_target_value(stock, exce_pos*total_value)
@@ -918,7 +917,7 @@ def stop_loss():
 				# 个股盈利止盈
 				if price >= avg_cost * 2:
 					#order_target_value(stock, 0, 'BUY1', ContextInfo, ContextInfo.account)
-					print(f"{red_c}⚪\033[0m 收益100%止盈,卖出{stock}")
+					print(f"{red_c}⭕\033[0m 收益100%止盈,卖出{stock}")
 				# 个股止损
 				elif price < avg_cost * (1 - g.stoploss_limit):
 					sell_target_value(stock, 0)
@@ -971,7 +970,7 @@ def stop_loss():
 							g.selected_stocks.remove(stock)
 				else:
 					g.reason_to_sell = 'takeprofit'
-					print(f"{red_c}⚪\033[0m 大盘大涨,平均涨幅{down_ratio:.2%}")
+					print(f"{red_c}⭕\033[0m 大盘大涨,平均涨幅{down_ratio:.2%}")
 					for stock in current_positions.keys():
 						if stock == g.etf:
 							continue
@@ -979,7 +978,7 @@ def stop_loss():
 							continue
 						if stock in g.yesterday_HL_list or is_limit_up(stock):
 							continue
-						print(f'{red_c}⚪\033[0m 清仓{stock} {get_stock_name(stock)}')
+						print(f'{red_c}⭕\033[0m 清仓{stock} {get_stock_name(stock)}')
 						sell_target_value(stock, 0)
 						#if order_info != None:
 						#	print(f'卖出 {order_info.m_nVolume}股 * {order_info.m_dPrice:.2f}元')
