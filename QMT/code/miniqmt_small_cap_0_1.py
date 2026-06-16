@@ -41,9 +41,10 @@ class Tee:
         self.log.close()
 
 # 重定向 stdout，所有 print 都会经过 Tee 对象
-log_name = datetime.now().strftime('%Y%m%d')
-tee = Tee(f"logfiles/{log_name}.log")
-sys.stdout = tee
+if not DEBUG_DAILY_MODE:
+	log_name = datetime.now().strftime('%Y%m%d')
+	tee = Tee(f"logfiles/{log_name}.log")
+	sys.stdout = tee
 
 red_c = '\033[31m'
 green_c = '\033[32m'
@@ -157,6 +158,7 @@ def init():
 	g.hold_list = []
 	g.limitup_stocks = []
 	g.yesterday_HL_list = []  #昨日涨停股票
+	g.today_HL_list = []      #今日上午涨停股票
 	g.excepted_position = {}
 	g.position_step = 0.00
 	g.reason_to_sell = ''
@@ -407,9 +409,14 @@ def collect_sell_buy_stocks():
 	g.stocks_to_sell = []
 	g.stocks_to_buy = []
 	current_holdings = get_current_holding_stocks()
+	current_holdings.append("002910.SZ")
 	for stock in current_holdings:
 		if (stock not in g.selected_stocks) and (stock not in g.yesterday_HL_list):
-			g.stocks_to_sell.append(stock)
+			if not is_limit_up(stock):
+				g.stocks_to_sell.append(stock)
+			else:
+				print(f"{red_c}⚪\033[0m {stock} {get_stock_name(stock)} 转为涨停股，今日不卖出。")
+				g.today_HL_list.append(stock)
 			
 	for stock in g.selected_stocks:
 		if (stock not in current_holdings) and (stock not in g.yesterday_HL_list):
@@ -607,8 +614,8 @@ def calc_position():
 		fail_pos += fp
 		print(f'停牌股 {get_stock_name(stock)} 占仓位比重为 {fp*100:.2f}%')
 	HL_count = 0
-	for stock in g.yesterday_HL_list:
-		if stock in current_holdings:
+	for stock in current_holdings:
+		if (stock in g.yesterday_HL_list) or (stock in g.today_HL_list):
 			fp = positions[stock].market_value / total_value
 			fail_pos += fp
 			HL_count += 1
@@ -628,9 +635,9 @@ def calc_position():
 	print(g.selected_stocks)
 	for i in range(len(g.selected_stocks)):
 		stock = g.selected_stocks[i]
-		if stock in g.stocks_fail_sell or stock in g.yesterday_HL_list:
+		if stock in g.stocks_fail_sell or stock in g.yesterday_HL_list or stock in g.today_HL_list:
 			continue
-		g.excepted_position[stock] = p + ((holding_num - 1) / 2 - i) * g.position_step
+		g.excepted_position[stock] = p
 		
 	for stock, pos in g.excepted_position.items():
 		stock_name = get_stock_name(stock)
@@ -663,7 +670,7 @@ def calc_position():
 	avai_cash = total_value - position_sum
 	print(f'预计持仓 {position_sum} 剩余金额 {avai_cash:.2f}')
 	if abs(avai_cash) > CASH_YU or avai_cash < 0:
-		print(f'{red_c}❌❌\033[0m剩余资金过大 {total_value - position_sum:.2f}')
+		print(f'{red_c}⚪⚪\033[0m剩余资金过大 {total_value - position_sum:.2f}')
 		cash = 0
 		for stock, exce_pos in g.excepted_position.items():
 			if stock in g.stocks_fail_sell:
@@ -911,7 +918,7 @@ def stop_loss():
 				# 个股盈利止盈
 				if price >= avg_cost * 2:
 					#order_target_value(stock, 0, 'BUY1', ContextInfo, ContextInfo.account)
-					print(f"{red_c}❌\033[0m 收益100%止盈,卖出{stock}")
+					print(f"{red_c}⚪\033[0m 收益100%止盈,卖出{stock}")
 				# 个股止损
 				elif price < avg_cost * (1 - g.stoploss_limit):
 					sell_target_value(stock, 0)
@@ -953,7 +960,7 @@ def stop_loss():
 							continue
 						if stock in g.all_weather_list:
 							continue
-						if stock in g.yesterday_HL_list:
+						if stock in g.yesterday_HL_list or is_limit_up(stock):
 							continue
 						print(f'{red_c}❌\033[0m 清仓{stock} {get_stock_name(stock)}')
 						sell_target_value(stock, 0)
@@ -964,15 +971,15 @@ def stop_loss():
 							g.selected_stocks.remove(stock)
 				else:
 					g.reason_to_sell = 'takeprofit'
-					print(f"{red_c}❌\033[0m 大盘大涨,平均涨幅{down_ratio:.2%}")
+					print(f"{red_c}⚪\033[0m 大盘大涨,平均涨幅{down_ratio:.2%}")
 					for stock in current_positions.keys():
 						if stock == g.etf:
 							continue
 						if stock in g.all_weather_list:
 							continue
-						if stock in g.yesterday_HL_list:
+						if stock in g.yesterday_HL_list or is_limit_up(stock):
 							continue
-						print(f'{red_c}❌\033[0m 清仓{stock} {get_stock_name(stock)}')
+						print(f'{red_c}⚪\033[0m 清仓{stock} {get_stock_name(stock)}')
 						sell_target_value(stock, 0)
 						#if order_info != None:
 						#	print(f'卖出 {order_info.m_nVolume}股 * {order_info.m_dPrice:.2f}元')
@@ -1307,7 +1314,7 @@ def sell_target_value(stock, target_value):
 											 				xtconstant.STOCK_SELL,			#order_type
 															amount,							#order_volume
 															xtconstant.FIX_PRICE,			#price_type: 以固定价格卖出
-															current_price - 0.05,			#price: 当price_type是FIXED时，需要填确切价格
+															current_price - 0.1,			#price: 当price_type是FIXED时，需要填确切价格
 															'',                             #strategy_name
 															f'Sell {stock} {target_value}元 '   #order_remark
 					)
@@ -1336,7 +1343,7 @@ def buy_target_value(stock, target_value):
 			print(f"现有持仓 {current_value:.2f}元，相差 {volume:.2f}元，需要买入股数 {volume / current_price:.2f}不足100股，放弃交易")
 		else:
 			#sell_1_price = get_sell_one_price(stock)
-			buy_price = current_price + 0.05
+			buy_price = current_price + 0.1
 			async_seq = g.xt_trader.order_stock_async(g.account, 
 										 			stock,								#stock_code
 										 			xtconstant.STOCK_BUY,				#order_type
@@ -1359,7 +1366,7 @@ def buy_target_shares(stock, target_share):
 
 	current_price = get_last_price(stock)
 	#sell_1_price = get_sell_one_price(stock)
-	buy_price = current_price + 0.05
+	buy_price = current_price + 0.1
 	async_seq = g.xt_trader.order_stock_async(g.account, 
 											stock,								#stock_code
 											xtconstant.STOCK_BUY,               #order_type
