@@ -195,19 +195,19 @@ def init():
 
 def closeQMT():
 	current_date = datetime.now()
-	if current_date.weekday() != 0:
+	if current_date.weekday() != 4:
 		return
 	kill_process_by_name("XtMiniQmt.exe")
 
 def reopenQMT():
 	current_date = datetime.now()
-	if current_date.weekday() != 0:
+	if current_date.weekday() != 4:
 		return
 	open_QMT()
 
 def reconnect():
 	current_date = datetime.now()
-	if current_date.weekday() != 0:
+	if current_date.weekday() != 4:
 		return
 	print("reconnect")
 	# path为mini qmt客户端安装目录下userdata_mini路径
@@ -360,11 +360,6 @@ def judge_date():
 		if g.trade == True:
 			print(f'{green_c}✅\033[0m========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
-	elif (current_month == 12 or current_month == 3) and current_date.day > 27:
-		if 5 - current_date.weekday() + current_date.day > 31:
-			if g.trade == True:
-				print(f'{green_c}✅\033[0m========== 一月和四月份清仓，日期：%s ==========' % current_date)
-			g.trade = False
 	else:
 		g.trade = True
 	print('judge_date count ',g.count)
