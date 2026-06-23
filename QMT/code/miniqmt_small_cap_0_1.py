@@ -674,7 +674,7 @@ def calc_position():
 			#if abs(diff_pos) > 0.04:
 			if abs(diff_pos) * total_value > CASH_YU or abs(diff_pos) > 0.04:
 				stock_name = get_stock_name(stock)
-				print(f'{stock_name} 持仓与期望相差较大，持仓{pos*100:.2f}%,期望{exce_pos*100:.2f}%,金额相差{diff_pos*total_value:.2f}')
+				print(f'{green_c}✅\033[0m{stock_name} 持仓与期望相差较大，持仓{pos*100:.2f}%,期望{exce_pos*100:.2f}%,金额相差{diff_pos*total_value:.2f}')
 				if diff_pos > 0:
 					g.stocks_to_buy.append(stock)
 					cash -= diff_pos*total_value
@@ -1235,7 +1235,8 @@ def buy_stocks():
 				continue
 
 			info = g.xt_trader.query_stock_asset(g.account)
-			print(f'===可用资金 {info.cash}===')
+			print("")
+			print(f'{green_c}✅\033[0m===可用资金 {info.cash}===')
 
 			if stock == g.etf:
 				target_value_per_stock = min(info.cash, target_value_per_stock)
@@ -1405,9 +1406,10 @@ def info_position():
 			price = pos.market_value / pos.volume
 			ratio = (price / pos.avg_price - 1) * 100
 			color = red_c if ratio > 0 else green_c
+			blank = ' ' if ratio > 0 else ''
 			diff_price = price - pos.avg_price
 			industry = g.industry_dict.get(stock,None)
-			print(f"{green_c}✅\033[0m持仓: {stock_name}({stock}), 占比 {pos.market_value / total_value * 100:.2f}%, 涨跌幅: {color}{ratio:.2f}% ({diff_price * pos.volume:.2f})\033[0m, 数量: {pos.volume}, 市值: {pos.market_value:.1f}元 {industry}")
+			print(f"{green_c}✅\033[0m持仓: {stock_name}({stock}), 占比 {pos.market_value / total_value * 100:.2f}%, 涨跌幅: {color}{blank}{ratio:.2f}% ({diff_price * pos.volume:.2f})\033[0m, 数量: {pos.volume}, 市值: {pos.market_value:.1f}元 {industry}")
 
 		for pos in positions:
 			stock = pos.stock_code
@@ -1509,14 +1511,16 @@ if __name__ == "__main__":
 	#exec_all_weather()
 	#info_position()
 
-	#init()
-	#judge_date()
-	#prepare_stock_list()
+	'''
+	init()
+	judge_date()
+	prepare_stock_list()
 	#trade_etf()
-	#rebalance_sell()
-	#stop_loss()
-	#rebalance_buy()
-	#check_limit_up()
-	#check_remain_amount()
-	#info_position()
+	rebalance_sell()
+	stop_loss()
+	rebalance_buy()
+	check_limit_up()
+	check_remain_amount()
+	info_position()
+	'''
 	#debug()
