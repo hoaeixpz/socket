@@ -259,6 +259,9 @@ def get_trading_dates(stock, dt_str, days = 7):
 	return dates
 
 def is_trading_day():
+	if DEBUG_DAILY_MODE:
+		return True
+
 	current_date = datetime.now()
 	today = current_date.strftime('%Y%m%d')
 	date = get_trading_dates('399101.SZ', today)
@@ -1150,6 +1153,7 @@ def small_cap_get_stock_industry(stock_list, num):
         return stock_list[:num]
 	
 def get_normal_stocks():
+	xtdata.download_sector_data()
 	stocklist = xtdata.get_stock_list_in_sector('399101.SZ')
 	print(f"中小综指成分股数量：{len(stocklist)}")
 	print(stocklist[:10])  # 打印前10只成分股
