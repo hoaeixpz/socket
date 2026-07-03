@@ -307,14 +307,14 @@ def run_strategy():
 				[ 9,31],  #prepare_stock_list
 				[ 9,35],  #trade_etf
 				[10, 0],  #rebalance_sell
-				[10, 2],  #stop_loss
-				[10,10],  #rebalance_buy
+				[10,15],  #stop_loss
+				[10,30],  #rebalance_buy
 				[14, 0],  #check_limit_up
 				[14, 2],  #check_remain_amount
 				[15, 1],  #info_position
 				[15,10],  #closeQMT
 				[18, 0],  #reopenQMT
-				[18, 2]]  #reconnect
+				[18,10]]  #reconnect
 	'''
 	task_time = [["*",55],  #judge_date
 				["*",56],  #prepare_stock_list
@@ -787,7 +787,7 @@ def calc_position():
 					new_value = current_value + current_price * num * 100
 					diff_v = excepted_value - new_value
 					print(f'单价{current_price:.2f}，新市值{new_value:.2f}，差值{diff_v:.2f}')
-					if abs(round(diff_v,2)) <= abs(round(diff_value,2)):
+					if abs(round(diff_v,1)) <= abs(round(diff_value,1)):
 						diff_value = diff_v
 						num += 1
 					else:
@@ -865,6 +865,7 @@ def check_remain_amount():
 			
 			current_holdings = get_current_holding_stocks()
 			if len(current_holdings) > 3:
+				print("已有持仓数量大于3，不再买入其他较小市值股票。")
 				g.selected_stocks = current_holdings
 				
 			collect_sell_buy_stocks()
@@ -1388,6 +1389,19 @@ def get_positions():
 
 	return positions
 
+def get_blank(ratio):
+	blank_num = 2
+	if ratio < 0:
+		blank_num = blank_num - 1
+	if abs(ratio) >= 10:
+		blank_num = blank_num - 1
+	
+	blank = ''
+	for i in range(blank_num):
+		blank = blank + ' '
+
+	return blank
+
 def info_position():
 	current_date = datetime.now()
 	positions = g.xt_trader.query_stock_positions(g.account)
@@ -1410,7 +1424,7 @@ def info_position():
 			price = pos.market_value / pos.volume
 			ratio = (price / pos.avg_price - 1) * 100
 			color = red_c if ratio > 0 else green_c
-			blank = ' ' if ratio > 0 else ''
+			blank = get_blank(ratio)
 			diff_price = price - pos.avg_price
 			industry = g.industry_dict.get(stock,None)
 			print(f"{green_c}✅\033[0m持仓: {stock_name}({stock}), 占比 {pos.market_value / total_value * 100:.2f}%, 涨跌幅: {color}{blank}{ratio:.2f}% ({diff_price * pos.volume:.2f})\033[0m, 数量: {pos.volume}, 市值: {pos.market_value:.1f}元 {industry}")
