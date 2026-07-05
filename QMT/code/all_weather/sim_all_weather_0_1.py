@@ -18,12 +18,12 @@ from datetime import datetime, timedelta
 ACTUAL_POSITIONS = {
     "518880.SH": 3000,      # 黄金ETF — 填你的实际持仓股数
     "159985.SZ": 8100,      # 豆粕ETF
-    "513100.SH": 8000,      # 纳指ETF
-    "601288.SH": 3000,      # 农业银行
-    "600900.SH": 500,      # 长江电力
+    "513100.SH": 8300,      # 纳指ETF
+    "601288.SH": 3100,      # 农业银行
+    "600900.SH": 400,      # 长江电力
 }
 
-AVAILABLE_CASH = 2000   # 账户可用资金（元）
+AVAILABLE_CASH = 104   # 账户可用资金（元）
 
 # ======================== 策略参数（与母版一致） ========================
 
@@ -134,7 +134,8 @@ def calc_ES_weights():
 
     query_date = datetime.now().strftime('%Y%m%d')
     price_data = xtdata.get_market_data_ex(['close'], stocks, period='1d',
-                                           start_time='', end_time=query_date, count=base_days)
+                                           start_time='', end_time=query_date,
+                                           count=base_days, dividend_type='front')
 
     for code in stocks:
         df = price_data.get(code)
@@ -150,6 +151,7 @@ def calc_ES_weights():
             weight = ES * (1 - AR)
             weights[code] = weight
             print(f"{code} {get_stock_name(code)}  ES={ES:.3f}  AR={AR:.3f}  raw={weight:.4f}")
+            #print(srt.tail(num))
 
     # 归一化
     total = sum(weights.values())
@@ -214,10 +216,10 @@ def calc_trades():
 
         action = ""
         if diff > 500 and abs(diff) / target_value > rebalance_tolerance:
-            action = f"<<< 买入 {(diff/price/100):.0f}手"
+            action = f"<<< 买入 {(diff/price/100):.1f}手"
             buys.append((code, target_value, current_value, price))
         elif diff < -500 and abs(diff) / target_value > rebalance_tolerance:
-            action = f">>> 卖出 {(-diff/price/100):.0f}手"
+            action = f">>> 卖出 {(-diff/price/100):.1f}手"
             sells.append((code, target_value, current_value, price))
         else:
             action = "-"
@@ -240,7 +242,7 @@ def calc_trades():
             name = get_stock_name(code)
             diff_value = current - target
             sell_amount = int(diff_value / price / 100) * 100
-            print(f"  卖出 {code} {name}: {sell_amount}股 × {price:.2f}元 = {sell_amount*price:,.0f}元")
+            print(f"  卖出 {code} {name}: \033[31m{sell_amount}\033[0m股 × {price:.2f}元 = {sell_amount*price:,.0f}元")
             print(f"    当前市值 {current:,.0f} → 目标市值 {target:,.0f}")
 
     # 买入清单
@@ -252,7 +254,7 @@ def calc_trades():
             name = get_stock_name(code)
             diff_value = target - current
             buy_amount = int(diff_value / price / 100) * 100
-            print(f"  买入 {code} {name}: {buy_amount}股 × {price:.2f}元 = {buy_amount*price:,.0f}元")
+            print(f"  买入 {code} {name}: \033[31m{buy_amount}\033[0m股 × {price:.2f}元 = {buy_amount*price:,.0f}元")
             print(f"    当前市值 {current:,.0f} → 目标市值 {target:,.0f}")
 
     # 止盈检查
