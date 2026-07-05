@@ -64,14 +64,17 @@ def start_strategy():
     try:
         env = os.environ.copy()
         env['PYTHONIOENCODING'] = 'utf-8'
+        # 用 start 打开独立终端，cmd /k 保证策略结束后终端窗口保留
+        # start "" 是空标题的 workaround（start 把第一个引号参数当标题）
+        # 外层 cmd /c 立即退出，终端独立于调度器进程
         g_process = subprocess.Popen(
-            [sys.executable, script_path],
+            ['cmd', '/c', 'start', '', 'cmd', '/k', sys.executable, script_path],
             cwd=script_dir,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.STDOUT,
             env=env,
         )
-        log(f"策略进程已启动, PID: {g_process.pid}")
+        log(f"策略进程已在新终端中启动")
     except Exception as e:
         log(f"启动策略进程失败: {e}")
 
@@ -104,33 +107,26 @@ def find_strategy_pids():
 
 
 def stop_strategy():
-    """关闭 miniqmt_small_cap_0_1.py 进程并验证是否已杀死"""
+    """关闭 miniqmt_small_cap_0_1.py 进程并验证是否已杀死
+
+    只终止 python.exe 策略进程，保留 cmd 终端窗口以便回看输出日志。
+    """
     global g_process
 
-    # 先处理调度器自己启动的子进程（/t 杀进程树，防止孤儿进程残留）
-    if g_process is not None and g_process.poll() is None:
-        log(f"正在关闭调度器子进程, PID: {g_process.pid}")
-        subprocess.run(
-            ['taskkill', '/f', '/t', '/pid', str(g_process.pid)],
-            capture_output=True, text=True, timeout=10
-        )
-        try:
-            g_process.wait(timeout=5)
-            log(f"子进程已退出, 返回码: {g_process.returncode}")
-        except subprocess.TimeoutExpired:
-            log(f"子进程未退出，但已发送终止信号")
-        g_process = None
-
-    # 同时查找并终止手动启动的策略进程（/t 杀进程树）
+    # 查找并终止所有策略 python 进程（不用 /t，避免波及 cmd 父进程导致终端关闭）
     pids = find_strategy_pids()
     if pids:
         log(f"发现 {len(pids)} 个策略进程: {pids}")
         for pid in pids:
             subprocess.run(
-                ['taskkill', '/f', '/t', '/pid', str(pid)],
+                ['taskkill', '/f', '/pid', str(pid)],
                 capture_output=True, text=True, timeout=10
             )
-            log(f"已发送终止命令 PID {pid}")
+            log(f"已终止 PID {pid}")
+
+    # 即便 g_process（cmd.exe）还活着，策略 python 进程已杀，标记为 None
+    # 终端窗口会因为 cmd /k 保留下来，供用户查看历史输出
+    g_process = None
 
     # 验证：每 5 秒检查一次，最多查 3 次，确认进程已消失
     log("验证关闭结果...")
@@ -195,10 +191,8 @@ def watchdog_job():
     if not (stop_minutes <= now_minutes <= start_minutes):
         return
 
-    if g_process is None or g_process.poll() is not None:
-        if g_process is not None:
-            log(f"看门狗: 策略进程意外退出, 返回码: {g_process.returncode}")
-            g_process = None
+    if not find_strategy_pids():
+        log("看门狗: 策略进程意外退出")
         log("看门狗: 正在重启策略进程...")
         start_strategy()
 
@@ -229,7 +223,7 @@ def main():
         while True:
             time.sleep(3600)  # 每小时打印一次心跳，保持主线程存活
             now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            status = "运行中" if (g_process and g_process.poll() is None) else "未运行"
+            status = "运行中" if find_strategy_pids() else "未运行"
             log(f"心跳 — 策略状态: {status} — {now}")
     except (KeyboardInterrupt, SystemExit):
         log("收到退出信号")
