@@ -545,7 +545,7 @@ def take_profit(context):
                 last_price_30th = group['close'].iloc[-30]
                 pct_30 = (current_price - last_price_30th) / last_price_30th * 100
                 print(f"今日相比于30天前，涨了 {pct_30:.3f} %")
-                if pct_30 > 10:
+                if pct_30 > 10 and pct < 9.8:
                     positions = context.portfolio.positions
                     pos = positions[code]
                     sell_amount = int((pos.total_amount / 2) / 100) * 100

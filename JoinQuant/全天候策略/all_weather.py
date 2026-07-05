@@ -378,7 +378,7 @@ def take_profit(context):
                 last_price_30th = group['close'].iloc[-30]
                 pct_30 = (current_price - last_price_30th) / last_price_30th * 100
                 print(f"今日相比于30天前，涨了 {pct_30:.3f} %")
-                if pct_30 > 10:
+                if pct_30 > 10 and pct < 9.8:
                     positions = context.portfolio.positions
                     pos = positions[code]
                     sell_amount = int((pos.total_amount / 2) / 100) * 100
@@ -393,7 +393,7 @@ def after_code_changed(context):
     run_monthly(before_market_open, 1, time='09:59')
     run_monthly(rebalance_positions_sell, 1, time='10:00')
     run_monthly(rebalance_positions_buy, 1, time='10:02')
-    run_daily(take_profit, time='14:45')
+    run_daily(take_profit, time='14:55')
     
 def info_position(context):
     positions = context.portfolio.positions
