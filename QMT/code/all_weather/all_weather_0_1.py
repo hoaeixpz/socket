@@ -362,7 +362,7 @@ def calc_ES_weights():
     query_date = datetime.now().strftime('%Y%m%d')
     price_data = xtdata.get_market_data_ex(
         ['close'], g.stocks, period='1d',
-        start_time='', end_time=query_date, count=g.base_days
+        start_time='', end_time=query_date, count=g.base_days, dividend_type='front'
     )
 
     weights = {}
@@ -504,7 +504,7 @@ def take_profit():
         df = df.iloc[1:]
         df = df.dropna(subset=['daily_return'])
         sorted_returns = df['daily_return'].sort_values()
-        last_close = df['close'].iloc[-1]
+        last_close = df['close'].iloc[-2]
 
         current_price = get_last_price(code)
         if current_price is None or current_price == 0:

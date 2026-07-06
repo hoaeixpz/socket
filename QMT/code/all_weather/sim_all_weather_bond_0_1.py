@@ -42,6 +42,7 @@ stocks = [
 base_days = 120
 nazhi_weight = 0.03    # 纳指固定加成
 golden_weight = 0.02   # 黄金固定加成
+rebalance_tolerance = 0.06  # 偏离 6% 才交易
 weights = {}
 
 # 回撤管理
@@ -363,14 +364,21 @@ def print_position_table(prices, total_asset, use_weights):
             # 债券组合统一显示
             bond_cur = current_value + (ACTUAL_POSITIONS.get("511220.SH", 0) * (prices.get("511220.SH") or 0))
             diff = total_asset * w - bond_cur
-            action = "<<< 债券增仓" if diff > 500 else (">>> 债券减仓" if diff < -500 else "-")
+            target_val = total_asset * w
+            if diff > 500 and abs(diff) / target_val > rebalance_tolerance:
+                action = "<<< 债券增仓"
+            elif diff < -500 and abs(diff) / target_val > rebalance_tolerance:
+                action = ">>> 债券减仓"
+            else:
+                action = "-"
         elif code == "511220.SH":
             continue  # 城投债不单独显示
         else:
-            diff = total_asset * w - current_value
-            if diff > 500:
+            target_val = total_asset * w
+            diff = target_val - current_value
+            if diff > 500 and abs(diff) / target_val > rebalance_tolerance:
                 action = f"<<< 买入 {diff/price/100:.1f}手"
-            elif diff < -500:
+            elif diff < -500 and abs(diff) / target_val > rebalance_tolerance:
                 action = f">>> 卖出 {-diff/price/100:.1f}手"
             else:
                 action = "-"
@@ -420,12 +428,12 @@ def print_trade_list(prices, total_asset, use_weights):
         target_value = total_asset * w
         diff = target_value - current_value
 
-        if diff > 500:
+        if diff > 500 and abs(diff) / target_value > rebalance_tolerance:
             amount = int(diff / price / 100) * 100
             if amount >= 100:
                 print(f"  [买入] {code} {get_stock_name(code)}: \033[31m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元")
                 has_trades = True
-        elif diff < -500:
+        elif diff < -500 and abs(diff) / target_value > rebalance_tolerance:
             amount = int(-diff / price / 100) * 100
             if amount >= 100:
                 print(f"  [卖出] {code} {get_stock_name(code)}: \033[31m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元")
@@ -443,7 +451,7 @@ def print_trade_list(prices, total_asset, use_weights):
         has_trades = True
 
     if not has_trades:
-        print(f"  无需调仓")
+        print(f"  无需调仓（偏离小于 {rebalance_tolerance*100:.0f}% 或金额不足500元）")
 
 
 # ======================== 止盈检查 ========================

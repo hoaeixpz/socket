@@ -337,7 +337,8 @@ def init():
     g.last_level = -1
     g.drawdown_month = 0
 
-    g.run_day = 1    # 每月第1个交易日调仓
+    g.rebalance_day = 1      # 每月第1个交易日调仓
+    g.rebalance_tolerance = 0.06  # 偏离 6% 才交易
 
     g.last_pos_value = info.total_asset
 
@@ -385,7 +386,7 @@ def calc_ES_weights():
     query_date = datetime.now().strftime('%Y%m%d')
     price_data = xtdata.get_market_data_ex(
         ['close'], g.stocks, period='1d',
-        start_time='', end_time=query_date, count=g.base_days
+        start_time='', end_time=query_date, count=g.base_days, dividend_type='front'
     )
 
     weights = {}
@@ -473,7 +474,7 @@ def rebalance_sell():
             sell_bond(target_value)
             continue
 
-        if pos.market_value > target_value:
+        if pos.market_value > target_value * (1 + g.rebalance_tolerance):
             amount = int((pos.market_value - target_value) / current_price / 100) * 100
             if amount >= 100:
                 print(f'>>>>>>>>>>>>>>>>>卖出>>>>>>>>>>>>>>>>')
@@ -567,10 +568,10 @@ def rebalance_buy():
             continue
 
         current_value = positions[stock].market_value if stock in positions else 0
-        if current_value < target_value:
+        if current_value < target_value * (1 - g.rebalance_tolerance):
             print(f'{stock} {get_stock_name(stock)} 目标股数{target_value / current_price:.2f}')
 
-        if current_value < target_value:
+        if current_value < target_value * (1 - g.rebalance_tolerance):
             amount = int((target_value - current_value) / current_price / 100) * 100
             if amount >= 100:
                 print(f'<<<<<<<<<<<<<<<<<买入<<<<<<<<<<<<<<<<<')
@@ -720,7 +721,7 @@ def rebalance_positions_buy_after_drawdown():
         target_value = total_value * w
         current_value = positions[stock].market_value if stock in positions else 0
 
-        if current_value < target_value:
+        if current_value < target_value * (1 - g.rebalance_tolerance):
             amount = int((target_value - current_value) / current_price / 100) * 100
             if amount >= 100:
                 print(f'<<<<<<<<<<<<<<<<<买入<<<<<<<<<<<<<<<<<')
@@ -758,7 +759,7 @@ def take_profit():
         df = df.iloc[1:]
         df = df.dropna(subset=['daily_return'])
         sorted_returns = df['daily_return'].sort_values()
-        last_close = df['close'].iloc[-1]
+        last_close = df['close'].iloc[-2]
 
         current_price = get_last_price(code)
         if current_price is None or current_price == 0:
