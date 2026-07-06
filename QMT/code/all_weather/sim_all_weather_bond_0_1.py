@@ -64,16 +64,9 @@ def get_last_price(stock):
         tick = xtdata.get_full_tick([stock])
         if stock in tick and tick[stock] and tick[stock]['lastPrice'] > 0:
             return tick[stock]['lastPrice']
-    except Exception:
-        pass
-    try:
-        today = datetime.now().strftime('%Y%m%d')
-        data = xtdata.get_market_data_ex(['close'], [stock], period='1d',
-                                         start_time='', end_time=today, count=2)
-        if stock in data and len(data[stock]) > 0:
-            return float(data[stock]['close'].iloc[-1])
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"get_last_price error: {stock} {e}")
+
     return None
 
 
@@ -89,7 +82,8 @@ def calc_ES_weights():
 
     query_date = datetime.now().strftime('%Y%m%d')
     price_data = xtdata.get_market_data_ex(['close'], stocks, period='1d',
-                                           start_time='', end_time=query_date, count=base_days)
+                                           start_time='', end_time=query_date,
+                                           count=base_days, dividend_type='front')
 
     raw = {}
     for code in stocks:
@@ -207,7 +201,7 @@ def cjk_rjust(s, width):
 # 表格列宽定义
 COL_WIDTHS = {
     'code':   12,   # 代码
-    'name':   22,   # 名称
+    'name':   20,   # 名称
     'price':   8,   # 股价
     'shares':  8,   # 持仓
     'cur_val': 10,  # 当前市值
@@ -375,9 +369,9 @@ def print_position_table(prices, total_asset, use_weights):
         else:
             diff = total_asset * w - current_value
             if diff > 500:
-                action = f"<<< 买入 {diff/price/100:.0f}手"
+                action = f"<<< 买入 {diff/price/100:.1f}手"
             elif diff < -500:
-                action = f">>> 卖出 {-diff/price/100:.0f}手"
+                action = f">>> 卖出 {-diff/price/100:.1f}手"
             else:
                 action = "-"
 
@@ -429,12 +423,12 @@ def print_trade_list(prices, total_asset, use_weights):
         if diff > 500:
             amount = int(diff / price / 100) * 100
             if amount >= 100:
-                print(f"  [买入] {code} {get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元")
+                print(f"  [买入] {code} {get_stock_name(code)}: \033[31m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元")
                 has_trades = True
         elif diff < -500:
             amount = int(-diff / price / 100) * 100
             if amount >= 100:
-                print(f"  [卖出] {code} {get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元")
+                print(f"  [卖出] {code} {get_stock_name(code)}: \033[31m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元")
                 has_trades = True
 
     # 债券交易
@@ -442,10 +436,10 @@ def print_trade_list(prices, total_asset, use_weights):
     bond_sells, bond_buys = calc_bond_trades(bond_target, prices, {})
 
     for code, amount, price, reason in bond_sells:
-        print(f"  [卖出] {code} {get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元 ({reason})")
+        print(f"  [卖出] {code} {get_stock_name(code)}: \033[31m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元 ({reason})")
         has_trades = True
     for code, amount, price, reason in bond_buys:
-        print(f"  [买入] {code} {get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元 ({reason})")
+        print(f"  [买入] {code} {get_stock_name(code)}: \033[31m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元 ({reason})")
         has_trades = True
 
     if not has_trades:
@@ -471,7 +465,7 @@ def take_profit_check(prices):
         df['daily_return'] = df['close'].pct_change() * 100
         df = df.iloc[1:].dropna(subset=['daily_return'])
         srt = df['daily_return'].sort_values()
-        last_close = df['close'].iloc[-1]
+        last_close = df['close'].iloc[-2]
         price = prices.get(code)
         if price is None:
             continue

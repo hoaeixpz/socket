@@ -39,6 +39,26 @@ base_days = 120
 rebalance_tolerance = 0.06  # 偏离 6% 才交易
 weights = {}
 
+# ======================== 数据获取 ========================
+
+def get_stock_name(stock):
+    detail = xtdata.get_instrument_detail(stock)
+    if detail:
+        return detail['InstrumentName']
+    return stock
+
+
+def get_last_price(stock):
+    try:
+        tick = xtdata.get_full_tick([stock])
+        if stock in tick and tick[stock] and tick[stock]['lastPrice'] > 0:
+            return tick[stock]['lastPrice']
+    except Exception as e:
+        print(f"get_last_price error: {stock} {e}")
+
+    return None
+
+
 
 def cjk_len(s):
     """计算字符串在终端中的显示宽度（全角字符算2，半角算1）"""
@@ -91,35 +111,6 @@ def make_row(code, name, price, shares, cur_val, tgt_val, diff, action):
 def make_header():
     """构建表头"""
     return make_row('代码', '名称', '股价', '持仓', '当前市值', '目标市值', '差值', '操作')
-
-
-# ======================== 数据获取 ========================
-
-def get_stock_name(stock):
-    detail = xtdata.get_instrument_detail(stock)
-    if detail:
-        return detail['InstrumentName']
-    return stock
-
-
-def get_last_price(stock):
-    """获取当前价格，优先实时，回退到最近收盘价"""
-    try:
-        tick = xtdata.get_full_tick([stock])
-        if stock in tick and tick[stock] and tick[stock]['lastPrice'] > 0:
-            return tick[stock]['lastPrice']
-    except Exception:
-        pass
-    # 回退：取最近一个交易日收盘价
-    try:
-        today = datetime.now().strftime('%Y%m%d')
-        data = xtdata.get_market_data_ex(['close'], [stock], period='1d',
-                                         start_time='', end_time=today, count=2)
-        if stock in data and len(data[stock]) > 0:
-            return float(data[stock]['close'].iloc[-1])
-    except Exception:
-        pass
-    return None
 
 
 # ======================== 权重计算（与母版完全一致） ========================
@@ -283,7 +274,7 @@ def take_profit_check(prices):
         df['daily_return'] = df['close'].pct_change() * 100
         df = df.iloc[1:].dropna(subset=['daily_return'])
         srt = df['daily_return'].sort_values()
-        last_close = df['close'].iloc[-1]
+        last_close = df['close'].iloc[-2]
         price = prices.get(code)
         if price is None:
             continue
