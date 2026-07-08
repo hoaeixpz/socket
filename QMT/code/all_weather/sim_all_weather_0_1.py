@@ -207,10 +207,10 @@ def calc_trades():
 
         action = ""
         if diff > 500 and abs(diff) / target_value > rebalance_tolerance:
-            action = f"<<< 买入 {(diff/price/100):.1f}手"
+            action = f"<<< 买入 {(diff/price/100):.2f}手"
             buys.append((code, target_value, current_value, price))
         elif diff < -500 and abs(diff) / target_value > rebalance_tolerance:
-            action = f">>> 卖出 {(-diff/price/100):.1f}手"
+            action = f">>> 卖出 {(-diff/price/100):.2f}手"
             sells.append((code, target_value, current_value, price))
         else:
             action = "-"
@@ -281,9 +281,10 @@ def take_profit_check(prices):
 
         pct = (price - last_close) / last_close * 100
         last_3th = srt.iloc[-3]
-        if pct > last_3th:
-            idx_30 = -30 if len(df) >= 30 else 0
-            pct_30 = (price - df['close'].iloc[idx_30]) / df['close'].iloc[idx_30] * 100
+        idx_30 = -30 if len(df) >= 30 else 0
+        pct_30 = (price - df['close'].iloc[idx_30]) / df['close'].iloc[idx_30] * 100
+        
+        if pct > last_3th:    
             if pct_30 > 10 and pct < 9.8:
                 sell_amount = int((shares / 2) / 100) * 100
                 print(f"  {code} {get_stock_name(code)}: 触发止盈!")
@@ -293,7 +294,7 @@ def take_profit_check(prices):
                 print(f"  {code} {get_stock_name(code)}: 涨幅达标但未触发({pct_30:.1f}%/30d) < 10%")
                 print(f"    今日涨幅 {pct:.2f}% > 120天第3高 {last_3th:.2f}%, 30日涨幅 {pct_30:.2f}%")
         else:
-            print(f"  {code} {get_stock_name(code)}: 今日涨幅 {pct:.2f}% <= 阈值 {last_3th:.2f}%")
+            print(f"  {code} {get_stock_name(code)}: 今日涨幅 {pct:.2f}% <= 阈值 {last_3th:.2f}% , 30日涨幅 {pct_30:.2f}%")
 
 
 # ======================== 主流程 ========================

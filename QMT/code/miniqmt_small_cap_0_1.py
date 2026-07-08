@@ -1427,7 +1427,7 @@ def info_position():
 			blank = get_blank(ratio)
 			diff_price = price - pos.avg_price
 			industry = g.industry_dict.get(stock,None)
-			print(f"{green_c}✅\033[0m持仓: {stock_name}({stock}), 占比 {pos.market_value / total_value * 100:.2f}%, 涨跌幅: {color}{blank}{ratio:.2f}% ({diff_price * pos.volume:.2f})\033[0m, 数量: {pos.volume}, 市值: {pos.market_value:.1f}元 {industry}")
+			print(f"{green_c}✅\033[0m{stock_name}({stock}) 占比 {pos.market_value / total_value * 100:.2f}% 涨幅: {color}{blank}{ratio:.2f}% ({diff_price * pos.volume:.2f})\033[0m x {pos.volume} = {pos.market_value:.1f}元 {industry}")
 
 		for pos in positions:
 			stock = pos.stock_code
@@ -1435,7 +1435,7 @@ def info_position():
 			if pos.volume == 0:
 				print(f"{green_c}✅\033[0m持仓: {stock_name}({stock}) 0股")
 
-		print(f'{green_c}✅\033[0m*******************总资产 {total_value:.2f} | {info.total_asset:.2f} 剩余可用金额 {available_cash:.2f}元*******************\n\n')
+		print(f'{green_c}✅\033[0m*******************总资产 {total_value:.2f} 剩余可用金额 {available_cash:.2f}元*******************\n\n')
 
 		if current_date.hour == 15:
 			daily_return = total_value - g.last_pos_value

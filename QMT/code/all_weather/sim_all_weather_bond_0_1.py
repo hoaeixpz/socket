@@ -46,7 +46,7 @@ rebalance_tolerance = 0.06  # 偏离 6% 才交易
 weights = {}
 
 # 回撤管理
-record_max = 201968+2546
+record_max = 204598
 max_down_T = [1.2, 1.8, 2.4, 3.0]
 last_level = 2          # 上次回撤等级（防止同一等级重复触发）
 
@@ -377,9 +377,9 @@ def print_position_table(prices, total_asset, use_weights):
             target_val = total_asset * w
             diff = target_val - current_value
             if diff > 500 and abs(diff) / target_val > rebalance_tolerance:
-                action = f"<<< 买入 {diff/price/100:.1f}手"
+                action = f"<<< 买入 {diff/price/100:.2f}手"
             elif diff < -500 and abs(diff) / target_val > rebalance_tolerance:
-                action = f">>> 卖出 {-diff/price/100:.1f}手"
+                action = f">>> 卖出 {-diff/price/100:.2f}手"
             else:
                 action = "-"
 
@@ -480,9 +480,10 @@ def take_profit_check(prices):
 
         pct = (price - last_close) / last_close * 100
         last_3th = srt.iloc[-3]
-        if pct > last_3th:
-            idx_30 = -30 if len(df) >= 30 else 0
-            pct_30 = (price - df['close'].iloc[idx_30]) / df['close'].iloc[idx_30] * 100
+        idx_30 = -30 if len(df) >= 30 else 0
+        pct_30 = (price - df['close'].iloc[idx_30]) / df['close'].iloc[idx_30] * 100
+        
+        if pct > last_3th:    
             if pct_30 > 10 and pct < 9.8:
                 sell_amount = int((shares / 2) / 100) * 100
                 print(f"  {code} {get_stock_name(code)}: 触发止盈!")
@@ -492,7 +493,7 @@ def take_profit_check(prices):
             else:
                 print(f"  {code} {get_stock_name(code)}: 涨幅达标但未触发({pct_30:.1f}%/30d, {pct:.1f}%/今日)")
         else:
-            print(f"  {code} {get_stock_name(code)}: 涨幅 {pct:.2f}% <= {last_3th:.2f}%")
+            print(f"  {code} {get_stock_name(code)}: 涨幅 {pct:.2f}% <= {last_3th:.2f}% , 30日涨幅 {pct_30:.2f}%")
 
     if not any_triggered:
         print(f"  无触发止盈")
