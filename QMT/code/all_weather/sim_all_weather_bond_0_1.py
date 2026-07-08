@@ -491,7 +491,8 @@ def take_profit_check(prices):
                 print(f"    建议卖出 1/2 = {sell_amount}股")
                 any_triggered = True
             else:
-                print(f"  {code} {get_stock_name(code)}: 涨幅达标但未触发({pct_30:.1f}%/30d, {pct:.1f}%/今日)")
+                print(f"  {code} {get_stock_name(code)}: 涨幅达标但未触发({pct_30:.1f}%/30d) < 10%")
+                print(f"    今日涨幅 {pct:.2f}% > 120天第3高 {last_3th:.2f}%, 30日涨幅 {pct_30:.2f}%")
         else:
             print(f"  {code} {get_stock_name(code)}: 涨幅 {pct:.2f}% <= {last_3th:.2f}% , 30日涨幅 {pct_30:.2f}%")
 
