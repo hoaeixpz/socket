@@ -116,6 +116,44 @@ def show_extreme_windows(returns, top_n=5):
     print()
 
 
+def save_report(stock_code, result, returns, output_dir):
+    """将统计分析结果写入日志文件, 每只股票独立一个文件"""
+    filename = f'{stock_code.replace(".", "_")}_analysis.log'
+    path = os.path.join(output_dir, filename)
+
+    sorted_ret = returns.sort_values('return')
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    lines = []
+    lines.append(f'=== {stock_code} 30交易日滚动涨跌幅分析 ===')
+    lines.append(f'时间: {now}')
+    lines.append(f'数据范围: 过去5年 (约 {len(returns)+30} 个交易日)')
+    lines.append('')
+    lines.append('--- 统计指标 ---')
+    for k, v in result.items():
+        if isinstance(v, float):
+            lines.append(f'{k}: {v:.4f}')
+        else:
+            lines.append(f'{k}: {v}')
+    lines.append('')
+    lines.append('--- 极端涨跌幅窗口 (各5个) ---')
+    lines.append('最大跌幅:')
+    for _, row in sorted_ret.head(5).iterrows():
+        lines.append(f'  {row["start_date"].date()} ~ {row["end_date"].date()}  '
+                     f'{row["start_price"]:.3f} -> {row["end_price"]:.3f}  '
+                     f'{row["return"]*100:+.2f}%')
+    lines.append('最大涨幅:')
+    for _, row in sorted_ret.tail(5).iloc[::-1].iterrows():
+        lines.append(f'  {row["start_date"].date()} ~ {row["end_date"].date()}  '
+                     f'{row["start_price"]:.3f} -> {row["end_price"]:.3f}  '
+                     f'{row["return"]*100:+.2f}%')
+
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines) + '\n')
+
+    return path
+
+
 def plot_distribution(returns, stock_code, output_dir=None):
     """画分布图: 直方图 + KDE + 正态拟合曲线, 保存 PNG"""
     if output_dir is None:
@@ -156,20 +194,23 @@ def plot_distribution(returns, stock_code, output_dir=None):
 
 def main(stock_code):
     """主流程"""
+    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
+    os.makedirs(output_dir, exist_ok=True)
+
     print(f'=== {stock_code} 30交易日滚动涨跌幅分析 ===\n')
 
     # 1. 取数据
-    print('[1/4] 获取历史数据...')
+    print('[1/5] 获取历史数据...')
     df = get_stock_data(stock_code)
     print(f'      共 {len(df)} 条日K线, 时间范围 {df["date"].min().date()} ~ {df["date"].max().date()}\n')
 
     # 2. 算涨跌幅
-    print('[2/4] 计算 30 交易日滚动涨跌幅...')
+    print('[2/5] 计算 30 交易日滚动涨跌幅...')
     returns = calc_window_returns(df, window=30)
     print(f'      共 {len(returns)} 个窗口\n')
 
     # 3. 统计分析
-    print('[3/4] 统计分析...')
+    print('[3/5] 统计分析...')
     result = analyze_returns(returns)
     for k, v in result.items():
         if isinstance(v, float):
@@ -179,14 +220,16 @@ def main(stock_code):
     print()
 
     # 3.5 极端窗口明细
-    print('[3.5/4] 极端涨跌幅窗口...')
+    print('[4/5] 极端涨跌幅窗口...')
     show_extreme_windows(returns)
     print()
 
-    # 4. 画图
-    print('[4/4] 绘制分布图...')
-    img_path = plot_distribution(returns, stock_code)
-    print(f'      图片已保存: {img_path}')
+    # 4. 输出报告和图表
+    print('[5/5] 输出报告和图表...')
+    log_path = save_report(stock_code, result, returns, output_dir)
+    print(f'      日志: {log_path}')
+    img_path = plot_distribution(returns, stock_code, output_dir)
+    print(f'      图表: {img_path}')
     print('\n=== 分析完成 ===')
 
 
