@@ -25,7 +25,7 @@ ACTUAL_POSITIONS = {
     "511220.SH": 2200,      # 城投债ETF（由 buy_bond/sell_bond 管理，不参与权重计算）
 }
 
-AVAILABLE_CASH = 1971.0   # 账户可用资金（元）
+AVAILABLE_CASH = 20000   # 账户可用资金（元）
 
 # ======================== 策略参数 ========================
 
@@ -49,6 +49,8 @@ weights = {}
 record_max = 204598
 max_down_T = [1.2, 1.8, 2.4, 3.0]
 last_level = 2          # 上次回撤等级（防止同一等级重复触发）
+force_level = None
+#force_level = 2         # 不计算，直接设置level为force_level
 
 
 # ======================== 数据获取 ========================
@@ -338,6 +340,23 @@ def calc_drawdown_weights(prices, positions_value, total_asset, level):
 
     return new_weights
 
+def calc_force_drawndown_weights(force_level):
+    bond_weight = weights['511270.SH'] * (4 - force_level) / 4
+    stock_weights = {k: v for k, v in weights.items() if k != "511270.SH"}
+    total_w = sum(stock_weights.values())
+
+    new_weights = {}
+    for code, w in stock_weights.items():
+        new_weights[code] = w / total_w * (1 - bond_weight)
+        print(f"    {code} {get_stock_name(code):12s}  {w*100:5.2f}% → {new_weights[code]*100:6.2f}%")
+
+    # 债券总权重
+    new_weights["511270.SH"] = bond_weight
+    total_check = sum(new_weights.values())
+    print(f"    债券组合（511270+511220 3:1）      {bond_weight*100:6.2f}%")
+    print(f"    权重合计: {total_check*100:.2f}%")
+
+    return new_weights
 
 # ======================== 打印持仓对比 & 交易清单 ========================
 
@@ -348,40 +367,28 @@ def print_position_table(prices, total_asset, use_weights):
     print(f"\n{header}")
     print(f"  {'-'*cjk_len(header)}")
 
-    all_codes = list(use_weights.keys())
-    if "511220.SH" not in all_codes:
-        all_codes.append("511220.SH")
+    bond_weights = use_weights.copy()
+    if '511270.SH' in bond_weights:
+        bond_weights['511270.SH'] = use_weights['511270.SH'] * 3 / 4.0
+        bond_weights['511220.SH'] = use_weights['511270.SH'] * 1 / 4.0
 
+    all_codes = list(bond_weights.keys())
     for code in all_codes:
-        w = use_weights.get(code, 0)
+        w = bond_weights.get(code, 0)
         price = prices.get(code)
         if price is None:
             continue
         current_shares = ACTUAL_POSITIONS.get(code, 0)
         current_value = current_shares * price
 
-        if code == "511270.SH":
-            # 债券组合统一显示
-            bond_cur = current_value + (ACTUAL_POSITIONS.get("511220.SH", 0) * (prices.get("511220.SH") or 0))
-            diff = total_asset * w - bond_cur
-            target_val = total_asset * w
-            if diff > 500 and abs(diff) / target_val > rebalance_tolerance:
-                action = "<<< 债券增仓"
-            elif diff < -500 and abs(diff) / target_val > rebalance_tolerance:
-                action = ">>> 债券减仓"
-            else:
-                action = "-"
-        elif code == "511220.SH":
-            continue  # 城投债不单独显示
+        target_val = total_asset * w
+        diff = target_val - current_value
+        if diff > 500 and abs(diff) / target_val > rebalance_tolerance:
+            action = f"<<< 买入 {diff/price/100:.2f}手"
+        elif diff < -500 and abs(diff) / target_val > rebalance_tolerance:
+            action = f">>> 卖出 {-diff/price/100:.2f}手"
         else:
-            target_val = total_asset * w
-            diff = target_val - current_value
-            if diff > 500 and abs(diff) / target_val > rebalance_tolerance:
-                action = f"<<< 买入 {diff/price/100:.2f}手"
-            elif diff < -500 and abs(diff) / target_val > rebalance_tolerance:
-                action = f">>> 卖出 {-diff/price/100:.2f}手"
-            else:
-                action = "-"
+            action = "-"
 
         name = get_stock_name(code)
         print(make_row(code, name,
@@ -391,24 +398,6 @@ def print_position_table(prices, total_asset, use_weights):
                        f"{total_asset*w:.0f}",
                        f"{total_asset*w - current_value:+.0f}",
                        action))
-
-    # 城投债单独一行
-    p2 = prices.get("511220.SH")
-    if p2:
-        s2 = ACTUAL_POSITIONS.get("511220.SH", 0)
-        v2 = s2 * p2
-        bond_w = use_weights.get("511270.SH", 0)
-        target_2 = total_asset * bond_w * 1 / 4
-        diff_2 = target_2 - v2
-        n2 = get_stock_name("511220.SH")
-        print(make_row("511220.SH", n2,
-                       f"{p2:.2f}",
-                       str(s2),
-                       f"{v2:.0f}",
-                       f"{target_2:.0f}",
-                       f"{diff_2:+.0f}",
-                       "(债券 1/4)"))
-
 
 def print_trade_list(prices, total_asset, use_weights):
     """打印具体买卖股数"""
@@ -534,10 +523,14 @@ if __name__ == "__main__":
         # 回撤触发：按母版逻辑卖债券 + 重新分配非债券权重
         use_weights = calc_drawdown_weights(prices, positions_value, total_asset, level)
     else:
-        # 无回撤触发：使用常规权重
-        use_weights = weights
-        if drawdown_level > 0:
-            print(f"  回撤等级 {drawdown_level}，但未跨级（last_level={last_level}），沿用常规权重")
+        if force_level:
+            print(f"强制设置回撤等级为 {force_level} ， 以该等级设置权重")
+            use_weights = calc_force_drawndown_weights(force_level)
+        else:
+            # 无回撤触发：使用常规权重
+            use_weights = weights
+            if drawdown_level > 0:
+                print(f"  回撤等级 {drawdown_level}，但未跨级（last_level={last_level}），沿用常规权重")
 
     # 5. 打印持仓对比和交易清单
     print(f"\n{'='*60}")

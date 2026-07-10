@@ -118,7 +118,7 @@ def show_extreme_windows(returns, top_n=5):
 
 def save_report(stock_code, result, returns, output_dir):
     """将统计分析结果写入日志文件, 每只股票独立一个文件"""
-    filename = f'{stock_code.replace(".", "_")}_analysis.log'
+    filename = f'{stock_code.replace(".", "_")}_analysis.txt'
     path = os.path.join(output_dir, filename)
 
     sorted_ret = returns.sort_values('return')
