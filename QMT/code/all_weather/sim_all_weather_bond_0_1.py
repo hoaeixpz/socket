@@ -22,10 +22,10 @@ ACTUAL_POSITIONS = {
     "601288.SH": 3300,      # 农业银行
     "600900.SH": 1300,      # 长江电力
     "511270.SH": 400,      # 十年地方债
-    "511220.SH": 2200,      # 城投债ETF（由 buy_bond/sell_bond 管理，不参与权重计算）
+    "511220.SH": 2900,      # 城投债ETF（由 buy_bond/sell_bond 管理，不参与权重计算）
 }
 
-AVAILABLE_CASH = 20000   # 账户可用资金（元）
+AVAILABLE_CASH = 4718   # 账户可用资金（元）
 
 # ======================== 策略参数 ========================
 
@@ -49,8 +49,8 @@ weights = {}
 record_max = 204598
 max_down_T = [1.2, 1.8, 2.4, 3.0]
 last_level = 2          # 上次回撤等级（防止同一等级重复触发）
-force_level = None
-#force_level = 2         # 不计算，直接设置level为force_level
+#force_level = None
+force_level = 2         # 不计算，直接设置level为force_level
 
 
 # ======================== 数据获取 ========================
@@ -449,7 +449,7 @@ def take_profit_check(prices):
     stocks_no_bond = [s for s in stocks if s not in ("511270.SH", "511220.SH")]
     query_date = datetime.now().strftime('%Y%m%d')
     price_data = xtdata.get_market_data_ex(['close'], stocks_no_bond, period='1d',
-                                           start_time='', end_time=query_date, count=base_days)
+                                           start_time='', end_time=query_date, count=base_days, dividend_type='front')
 
     any_triggered = False
     for code in stocks_no_bond:
@@ -472,7 +472,7 @@ def take_profit_check(prices):
         idx_30 = -30 if len(df) >= 30 else 0
         pct_30 = (price - df['close'].iloc[idx_30]) / df['close'].iloc[idx_30] * 100
         
-        if pct > last_3th:    
+        if pct >= last_3th:    
             if pct_30 > 10 and pct < 9.8:
                 sell_amount = int((shares / 2) / 100) * 100
                 print(f"  {code} {get_stock_name(code)}: 触发止盈!")

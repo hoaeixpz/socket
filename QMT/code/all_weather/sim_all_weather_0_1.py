@@ -262,7 +262,7 @@ def take_profit_check(prices):
     """检查是否需要止盈卖出"""
     query_date = datetime.now().strftime('%Y%m%d')
     price_data = xtdata.get_market_data_ex(['close'], stocks, period='1d',
-                                           start_time='', end_time=query_date, count=base_days)
+                                           start_time='', end_time=query_date, count=base_days, dividend_type='front')
 
     for code in stocks:
         shares = ACTUAL_POSITIONS.get(code, 0)
@@ -274,6 +274,7 @@ def take_profit_check(prices):
         df['daily_return'] = df['close'].pct_change() * 100
         df = df.iloc[1:].dropna(subset=['daily_return'])
         srt = df['daily_return'].sort_values()
+        #print(srt[-6:])
         last_close = df['close'].iloc[-2]
         price = prices.get(code)
         if price is None:
@@ -284,7 +285,7 @@ def take_profit_check(prices):
         idx_30 = -30 if len(df) >= 30 else 0
         pct_30 = (price - df['close'].iloc[idx_30]) / df['close'].iloc[idx_30] * 100
         
-        if pct > last_3th:    
+        if pct >= last_3th:    
             if pct_30 > 10 and pct < 9.8:
                 sell_amount = int((shares / 2) / 100) * 100
                 print(f"  {code} {get_stock_name(code)}: 触发止盈!")

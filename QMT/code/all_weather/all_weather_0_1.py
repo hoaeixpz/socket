@@ -513,7 +513,7 @@ def take_profit():
         pct = (current_price - last_close) / last_close * 100
         last_3th = sorted_returns.iloc[-3]
 
-        if pct > last_3th:
+        if pct >= last_3th:
             print("=====================================")
             print(code)
             print(f"今日涨幅 {pct:.3f}% > 过去120天第3名 {last_3th:.3f}%")
