@@ -31,6 +31,7 @@ def initialize(context):
     }
     set_benchmark(custom_benchmark)
     #set_benchmark('511880.XSHG')
+    #set_benchmark("515980.XSHG")
     # 开启动态复权模式(真实价格)
     set_option("avoid_future_data", True)   #防止未来函数
     set_option('use_real_price', True)
@@ -95,6 +96,9 @@ def before_market_open(context):
             "513100.XSHG", #纳指ETF 
             "601288.XSHG", #农业银行
             "600900.XSHG", #长江电力
+            '601225.XSHG', #陕西煤业
+            '000429.XSHE', #粤高速A
+            '601899.XSHG'  #紫金矿业
         ]
     
     if date_str > '2020-06-01': # 豆粕，
@@ -110,6 +114,9 @@ def before_market_open(context):
             #"501018.XSHG", #南方原油
             #"515980.XSHG", #人工智能
             #"511260.XSHG"  #十年国债
+            '601225.XSHG', #陕西煤业
+            '000429.XSHE', #粤高速A
+            '601899.XSHG'  #紫金矿业
         ]
     '''  
     if date_str > '2023-12-01': # 石油，
@@ -372,13 +379,15 @@ def take_profit(context):
             last_3th = sorted_group['daily_return'].iloc[-3]
             if pct >last_3th:
                 print("=====================================")
-                print(code)
+                stock_name = get_security_info(code).display_name
+                print(f"{code} {stock_name}")
                 print(f"今日涨幅 {pct:.3f} % 大于过去120天第3名 {last_3th:.3f} %")
                 print(sorted_group.tail(6))
-                last_price_30th = group['close'].iloc[-30]
-                pct_30 = (current_price - last_price_30th) / last_price_30th * 100
-                print(f"今日相比于30天前，涨了 {pct_30:.3f} %")
-                if pct_30 > 10 and pct < 9.8:
+                N = 30
+                last_price_N_th = group['close'].iloc[-N]
+                pct_N = (current_price - last_price_N_th) / last_price_N_th * 100
+                print(f"今日相比于{N}天前，涨了 {pct_N:.3f} %")
+                if pct_N > 10 and pct < 9.8:
                     positions = context.portfolio.positions
                     pos = positions[code]
                     sell_amount = int((pos.total_amount / 2) / 100) * 100

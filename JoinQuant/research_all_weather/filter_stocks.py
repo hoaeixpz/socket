@@ -10,7 +10,8 @@
   3. 有过 ST 历史
   4. 曾出现长期停牌（单月停牌 > 10 天）
   5. 年化收益 < 3.5%（收益太低的直接淘汰）
-  6. 最大回撤 > 50%（回撤太大的直接淘汰）
+  6. 股票类年化收益 < 7.5%（收益太低的直接淘汰）
+  7. 最大回撤 > 50%（回撤太大的直接淘汰）
 
 多维打分（各维度百分位排名后等权加总）：
   - 年化收益 / ES（Expected Shortfall, α=0.05）
@@ -149,6 +150,13 @@ def get_filtered_securities(start_date=START_DATE):
 
     # --- 杂项 ---
     sec = sec[sec['type'] != 'fjm']
+
+    # 排除"定开"基金（流动性差，见 filter.md 第7条）
+    mask_dingkai = sec['display_name'].str.endswith('定开')
+    if mask_dingkai.any():
+        sec = sec[~mask_dingkai]
+        print(f"  排除'定开'基金: {mask_dingkai.sum()}只")
+
     # 问题标的 + 重复ETF（见 filter.md 第6条，保留每组第一个，排除其余）
     exclude_codes = [
         # 问题标的
@@ -161,6 +169,7 @@ def get_filtered_securities(start_date=START_DATE):
         # 黄金ETF 重复 → 保留 518880
         '159937.XSHE', '518850.XSHG', '518800.XSHG',
         '159934.XSHE', '159812.XSHE', '518660.XSHG',
+        '518890.XSHG', '518680.XSHG', '518600.XSHG',
     ]
     sec = sec[~sec.index.isin(exclude_codes)]
 
@@ -611,8 +620,8 @@ def main():
     _print_section(final, 'etf',   'ETF 基金',   top_n=50)
     _plot_category_heatmap(final, 'etf', 'ETF 基金', top_n=50)
 
-    _print_section(final, 'lof',   'LOF 基金',   top_n=10)
-    _plot_category_heatmap(final, 'lof', 'LOF 基金', top_n=10)
+    _print_section(final, 'lof',   'LOF 基金',   top_n=30)
+    _plot_category_heatmap(final, 'lof', 'LOF 基金', top_n=30)
 
     _print_section(final, 'stock', '个股',       top_n=50)
     _plot_category_heatmap(final, 'stock', '个股', top_n=50)
