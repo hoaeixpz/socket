@@ -284,17 +284,25 @@ def analyze_rolling_correlation(returns_data, etf_pool, window=60):
     print(f"  当前值: {rolling_corr.iloc[-1]:.3f}")
 
 def generate_stock_pool(etf_list):
-    """使用 HUSL 色板在色彩空间均匀分布，确保每只股票颜色辨识度高"""
-    n = len(etf_list)
-    colors = sns.color_palette("husl", 2 * n + 1)  # 多取一个，只取前 n 个，避免首尾色相环闭合导致颜色相近
+    """手选 10 种高辨识度颜色，避开了人眼难分辨的蓝绿相近色"""
+    manual_colors = [
+        "#e6194b",  # 红
+        "#3cb44b",  # 绿
+        "#ffe119",  # 黄
+        "#4363d8",  # 蓝
+        "#f58231",  # 橙
+        "#911eb4",  # 紫
+        "#42d4f4",  # 青
+        "#f032e6",  # 洋红
+        "#9a6324",  # 棕
+        "#800000",  # 深红
+    ]
 
     etf_pool = {}
     for i, etf in enumerate(etf_list):
         stock = etf[0]
         name = etf[1]
-        r, g, b = colors[2 * i]
-        color_code = f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
-        etf_pool[stock] = [name, 100, color_code]
+        etf_pool[stock] = [name, 100, manual_colors[i]]
 
     return etf_pool
     
