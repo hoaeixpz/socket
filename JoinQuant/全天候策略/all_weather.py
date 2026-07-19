@@ -23,15 +23,15 @@ def initialize(context):
     
     # 设定沪深300作为基准
     custom_benchmark = {
-        "518880.XSHG": 0.2, #黄金ETF
-        '159985.XSHE': 0.2, #豆粕ETF 
-        "513100.XSHG": 0.2, #纳指ETF 
-        "601288.XSHG": 0.2, #农业银行
-        "600900.XSHG": 0.2 #长江电力
+        #"518880.XSHG": 0.2, #黄金ETF
+        #'159985.XSHE': 0.2, #豆粕ETF 
+        #"513100.XSHG": 0.2, #纳指ETF 
+        #"601288.XSHG": 0.2, #农业银行
+        #"600900.XSHG": 0.2 #长江电力
     }
-    set_benchmark(custom_benchmark)
+    #set_benchmark(custom_benchmark)
     #set_benchmark('511880.XSHG')
-    #set_benchmark("515980.XSHG")
+    set_benchmark("515980.XSHG")
     # 开启动态复权模式(真实价格)
     set_option("avoid_future_data", True)   #防止未来函数
     set_option('use_real_price', True)
@@ -91,7 +91,7 @@ def before_market_open(context):
     
     if date_str > '2015-12-01': # 城投债ETF，
         g.stocks = [
-            "518880.XSHG", #黄金ETF
+            #"518880.XSHG", #黄金ETF
             #"511220.XSHG", #城投债ETF 
             "513100.XSHG", #纳指ETF 
             "601288.XSHG", #农业银行
@@ -103,7 +103,7 @@ def before_market_open(context):
     
     if date_str > '2020-06-01': # 豆粕，
         g.stocks = [
-            "518880.XSHG", #黄金ETF
+            #"518880.XSHG", #黄金ETF
             #"511220.XSHG", #城投债ETF 
             '159985.XSHE', #豆粕ETF 
             "513100.XSHG", #纳指ETF 
@@ -118,6 +118,8 @@ def before_market_open(context):
             '000429.XSHE', #粤高速A
             '601899.XSHG'  #紫金矿业
         ]
+        
+    #g.stocks = [ "515980.XSHG" ]
     '''  
     if date_str > '2023-12-01': # 石油，
         g.stocks = [
@@ -378,20 +380,23 @@ def take_profit(context):
             pct = (current_price - last_close_price) / last_close_price * 100
             last_3th = sorted_group['daily_return'].iloc[-3]
             if pct >last_3th:
-                print("=====================================")
+                log.error("=====================================")
                 stock_name = get_security_info(code).display_name
-                print(f"{code} {stock_name}")
-                print(f"今日涨幅 {pct:.3f} % 大于过去120天第3名 {last_3th:.3f} %")
-                print(sorted_group.tail(6))
+                log.error(f"{code} {stock_name}")
+                log.error(f"今日涨幅 {pct:.3f} % 大于过去120天第3名 {last_3th:.3f} %")
+                log.error(sorted_group.tail(6))
                 N = 30
+                T = 10
+                if code == '601899.XSHG':
+                    T = 20
                 last_price_N_th = group['close'].iloc[-N]
                 pct_N = (current_price - last_price_N_th) / last_price_N_th * 100
-                print(f"今日相比于{N}天前，涨了 {pct_N:.3f} %")
-                if pct_N > 10 and pct < 9.8:
+                log.error(f"今日相比于{N}天前，涨了 {pct_N:.3f} %")
+                if pct_N > T and pct < 9.8:
                     positions = context.portfolio.positions
                     pos = positions[code]
                     sell_amount = int((pos.total_amount / 2) / 100) * 100
-                    print(f"卖出 1/2 股份，总计{sell_amount}股")
+                    log.error(f"卖出 1/2 股份，总计{sell_amount}股")
                     order(code, -sell_amount)
                     info_position(context)
 
@@ -425,7 +430,7 @@ def after_trading_end(context):
         g.recordlist.clear()
     if g.record_max > total_value:
         max_drawdown = (1 - total_value / g.record_max) * 100
-        log.error(f"max draw down: {max_drawdown:.2f}%")
+        log.warning(f"max draw down: {max_drawdown:.2f}%")
         
     g.recordlist.append(context.portfolio.total_value)
     if len(g.recordlist) > 120:
