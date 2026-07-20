@@ -23,7 +23,7 @@ ACTUAL_POSITIONS = {
     "600900.SH": 400,      # 长江电力
 }
 
-AVAILABLE_CASH = 11690   # 账户可用资金（元）
+AVAILABLE_CASH = 420 + 11586   # 账户可用资金（元）
 
 # ======================== 策略参数（与母版一致） ========================
 
@@ -167,7 +167,7 @@ def calc_ES_weights():
     print(f"目标权重 vs 当前权重")
     print(f"{'='*60}")
     print(f"  {'代码':<14s} {'名称':<12s} {'目标权重':>8s} {'当前权重':>8s}")
-    print(f"  {'-'*14} {'-'*12} {'-'*8} {'-'*8}")
+    print(f"  {'-'*14} {'-'*12}         {'-'*8}     {'-'*8}")
     for code in stocks:
         name = get_stock_name(code)
         target_wt = weights[code] * 100
@@ -175,8 +175,8 @@ def calc_ES_weights():
         cur_price = current_prices.get(code)
         cur_value = cur_shares * cur_price if cur_price else 0
         cur_wt = cur_value / total_asset * 100 if total_asset > 0 else 0
-        print(f"  {code:<14s} {name:<12s} {target_wt:7.2f}% {cur_wt:7.2f}%")
-    print(f"  {'':>28s} {'现金':>8s} {AVAILABLE_CASH/total_asset*100:7.2f}%")
+        print(f"  {code:<14s} {name:<12s}   {target_wt:7.2f}%     {cur_wt:7.2f}%")
+    print(f"  {'':>28s}     {'现金':>8s}    {AVAILABLE_CASH/total_asset*100:7.2f}%")
     print()
 
 
