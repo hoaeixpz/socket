@@ -1,0 +1,25 @@
+init
+建立交易连接，返回0表示连接成功 0
+***** xtdata连接成功 *****
+服务信息: {'tag': 'sp3', 'version': '1.0'}
+服务地址: 127.0.0.1:58610
+数据路径: C:\QMT\bin.x64/../userdata_mini/datadir
+设置xtdata.enable_hello = False可隐藏此消息
+
+⭕策略初始化完成：每月初调仓，持有市值最小的9只股票, 初始可用资金4578.69, 初始资产55309.69
+start
+sleep a day
+
+收到信号 2，正在关闭调度器...
+调度器已安全关闭
+init
+建立交易连接，返回0表示连接成功 0
+***** xtdata连接成功 *****
+服务信息: {'tag': 'sp3', 'version': '1.0'}
+服务地址: 127.0.0.1:58610
+数据路径: C:\QMT\bin.x64/../userdata_mini/datadir
+设置xtdata.enable_hello = False可隐藏此消息
+
+⭕策略初始化完成：每月初调仓，持有市值最小的9只股票, 初始可用资金4578.69, 初始资产55309.69
+start
+sleep a day

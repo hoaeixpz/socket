@@ -306,11 +306,11 @@ def run_strategy():
 	task_time = [[9,30],  #judge_date
 				[ 9,31],  #prepare_stock_list
 				[ 9,35],  #trade_etf
-				[10, 0],  #rebalance_sell
+				[ 9,55],  #rebalance_sell
 				[10,15],  #stop_loss
 				[10,30],  #rebalance_buy
-				[14, 0],  #check_limit_up
-				[14, 2],  #check_remain_amount
+				[14,10],  #check_limit_up
+				[14,12],  #check_remain_amount
 				[15, 1],  #info_position
 				[15,10],  #closeQMT
 				[18, 0],  #reopenQMT
@@ -1263,7 +1263,7 @@ def buy_stocks():
 				print(f'委托买入: {get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'
 					f'\n预计最终持股{amount}股，每股{current_price:.2f}元，合计:{amount * current_price:.2f}')
 				buy_target_value(stock, target_value_per_stock)
-			sleep_sec(1)
+			sleep_sec(10)
 
 def get_sell_one_price(stock):
 	#获取卖一价
