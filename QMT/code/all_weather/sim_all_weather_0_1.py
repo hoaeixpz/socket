@@ -288,14 +288,17 @@ def take_profit_check(prices):
         idx_30 = -30 if len(df) >= 30 else 0
         pct_30 = (price - df['close'].iloc[idx_30]) / df['close'].iloc[idx_30] * 100
         
-        if pct >= last_3th:    
-            if pct_30 > 10 and pct < 9.8:
+        if pct >= last_3th:
+            T = 10
+            if code == '601899.SH':
+                T = 20
+            if pct_30 > T and pct < 9.8:
                 sell_amount = int((shares / 2) / 100) * 100
                 print(f"  {code} {get_stock_name(code)}: 触发止盈!")
                 print(f"    今日涨幅 {pct:.2f}% > 120天第3高 {last_3th:.2f}%, 30日涨幅 {pct_30:.2f}%")
                 print(f"    建议卖出 1/2 = {sell_amount}股")
             else:
-                print(f"  {code} {get_stock_name(code)}: 涨幅达标但未触发({pct_30:.1f}%/30d) < 10%")
+                print(f"  {code} {get_stock_name(code)}: 涨幅达标但未触发({pct_30:.1f}%/30d) < {T}%")
                 print(f"    今日涨幅 {pct:.2f}% > 120天第3高 {last_3th:.2f}%, 30日涨幅 {pct_30:.2f}%")
         else:
             print(f"  {code} {get_stock_name(code)}: 今日涨幅 {pct:.2f}% <= 阈值 {last_3th:.2f}% , 30日涨幅 {pct_30:.2f}%")
