@@ -18,7 +18,7 @@ def initialize(context):
     #set_benchmark('513500.XSHG')
     set_benchmark('511880.XSHG')
     # 开启动态复权模式(真实价格)
-    set_option("avoid_future_data", True)	#防止未来函数
+    set_option("avoid_future_data", True)   #防止未来函数
     set_option('use_real_price', True)
     # 输出内容到日志 log.info()
     log.info('初始函数开始运行且全局只运行一次')
@@ -70,11 +70,11 @@ def initialize(context):
     g.record_max = 0
     g.drawdown_count = 0
     g.drawdown_value = 0
-    g.max_down_T = [1.5, 2.2, 2.8, 3.2]
+    g.max_down_T = [1.1, 1.7, 2.4, 3.2]
     g.drawdown_stop = True
     g.drawdown_count_day = 60
     g.drawdown_level = 0
-    g.last_level = -1
+    g.last_level = 2
     g.drawdown_month = 0
     
     g.run_day = 1
@@ -121,21 +121,28 @@ def before_market_open(context):
 
     g.weights = {}
         
-    calc_ES_weights(context)
+    #calc_ES_weights(context)
     #calc_Sharpe_weights(context)
     #adjust_weights(context)
     M = current_date.month
     if M < g.drawdown_month:
         M = M + 12
-    if M - g.drawdown_month > 1:
-        g.drawdown_level = 0
-        g.last_level = -1
+    if M - g.drawdown_month > 1 and g.last_level > 2:
+        if g.last_level <= 3:
+            g.drawdown_level = 0
+            g.last_level = 2
+        else:
+            g.last_level = g.last_level - (M - g.drawdown_month - 1)
+
+    log.error(f"last {g.last_level} , {g.drawdown_level}")
+    calc_ES_weights(context, g.last_level)
 
     
-def calc_ES_weights(context):
+def calc_ES_weights(context, dd_level):
     alpha = 0.05
     num = int(g.base_days * alpha)
     print("num ", num)
+    log.error(f"dd_level: {dd_level}")
     
     df = get_price(
         g.stocks,
@@ -143,6 +150,7 @@ def calc_ES_weights(context):
         frequency="daily",
         fields=["close"],
         count= g.base_days,
+        fq='pre',
         panel=False
     )
     weights = {}
@@ -176,6 +184,17 @@ def calc_ES_weights(context):
             w += g.golden_weight
         g.weights[key] = w
         
+    if dd_level > 0:
+        bond_weight = g.weights["511270.XSHG"] * (1 - dd_level / 4)
+        g.weights.pop('511270.XSHG')
+        total_weight = sum([w for w in g.weights.values()])
+
+        for key, value in g.weights.items():
+            w = value / total_weight
+            weights[key] = w * (1 - bond_weight)
+        g.weights = weights
+        g.weights['511270.XSHG'] = bond_weight
+
     for stock, w in g.weights.items():
         log.info(f'{stock} {get_security_info(stock).display_name} 权重{100*w:.2f}%')
         
@@ -294,8 +313,8 @@ def adjust_weights(context):
             break
 
 def execute_rebalance_sell(context):
-    if g.drawdown_level > 0:
-        return
+    #if g.drawdown_level > 0:
+    #    return
     print("-  ")
     print("=====================每月调仓 卖出=========================")
     rebalance_positions_sell(context)
@@ -320,7 +339,7 @@ def rebalance_positions_sell(context):
             continue
         
         pos = context.portfolio.positions[stock]
-        if pos.value > target_value:
+        if pos.value > target_value * 1.06:
             amount = (pos.value - target_value) / current_price
             H = int(amount / 100) * 100
             amount = H
@@ -337,7 +356,7 @@ def sell_bond(context, target_value):
     pos_1 = context.portfolio.positions['511270.XSHG']
     pos_2 = context.portfolio.positions['511220.XSHG']
     value = pos_1.value + pos_2.value
-    if value <= target_value:
+    if value <= target_value * 1.06:
         return
     
     diff_value = value - target_value
@@ -370,8 +389,8 @@ def sell_bond(context, target_value):
         order('511220.XSHG', -amount)
 
 def execute_rebalance_buy(context):
-    if g.drawdown_level > 0:
-        return
+    #if g.drawdown_level > 0:
+    #    return
     print("-  ")
     print("=====================每月调仓 买入=========================")
     rebalance_positions_buy(context)
@@ -399,7 +418,7 @@ def rebalance_positions_buy(context):
         if pos.value < target_value:
             log.info(f'{stock} {get_security_info(stock).display_name} 目标股数{target_value / current_price:.2f}')
             
-        if pos.value < target_value:
+        if pos.value < target_value * 0.94:
             amount = (target_value - pos.value) / current_price
             H = int(amount / 100) * 100
             amount = H
@@ -417,7 +436,7 @@ def buy_bond(context, target_value):
     pos_1 = context.portfolio.positions['511270.XSHG']
     pos_2 = context.portfolio.positions['511220.XSHG']
     value = pos_1.value + pos_2.value
-    if value >= target_value:
+    if value >= target_value * 0.94:
         return
     
     diff_value = target_value - value
@@ -469,7 +488,7 @@ def rebalance_drawdown(context):
         else:
             g.drawdown_level = 1
             
-        print(f"{max_drawdown} {g.drawdown_level} -> {g.last_level}")
+        print(f"drawn down: {max_drawdown:.2f} {g.drawdown_level} <-> {g.last_level}")
         if g.drawdown_level <= g.last_level:
             return
         
@@ -478,32 +497,16 @@ def rebalance_drawdown(context):
             
         log.error(f"rebalance_drawdown max draw down: {max_drawdown:.2f}% level {g.drawdown_level}")
         
-        pos_1 = context.portfolio.positions['511270.XSHG']
-        pos_2 = context.portfolio.positions['511220.XSHG']
-        value = pos_1.value + pos_2.value
-        target_value = value * (1 - 1 / (5 - g.drawdown_level))
+        calc_ES_weights(context,  g.drawdown_level)
+        target_value = context.portfolio.total_value * g.weights['511270.XSHG']
+        log.info(f'bond target_value {target_value}')
         sell_bond(context, target_value)
         
         pos_1 = context.portfolio.positions['511270.XSHG']
         pos_2 = context.portfolio.positions['511220.XSHG']
         bond_weight = (pos_1.value + pos_2.value) / context.portfolio.total_value
         print(f"债券比重 {bond_weight*100:.2f} %")
-                
-        calc_ES_weights(context)
-        weights = {}
-        g.weights.pop('511270.XSHG')
-        total_weight = sum([w for w in g.weights.values()])
 
-        for key, value in g.weights.items():
-            w = value / total_weight
-            weights[key] = w * (1 - bond_weight)
-        g.weights = weights
-        
-        print(">>>>>>>>>重新计算权重>>>>>>>>>>>>>>>>>>>")
-        print(g.weights)
-        for stock, w in g.weights.items():
-            log.info(f'{stock} {get_security_info(stock).display_name} 权重{100*w:.2f}%')
-        print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
         rebalance_positions_buy(context)
         g.drawdown_stop = False
 
@@ -518,6 +521,7 @@ def take_profit(context):
         frequency="daily",
         fields=["close"],
         count= g.base_days,
+        fq='pre',
         panel=False
     )
     
@@ -544,7 +548,7 @@ def take_profit(context):
                 print(sorted_group.tail(6))
                 last_price_30th = group['close'].iloc[-30]
                 pct_30 = (current_price - last_price_30th) / last_price_30th * 100
-                print(f"今日相比于30天前，涨了 {pct_30:.3f} %")
+                print(f"今日相比于30天前 {last_price_30th}，涨了 {pct_30:.3f} %")
                 if pct_30 > 10 and pct < 9.8:
                     positions = context.portfolio.positions
                     pos = positions[code]
@@ -561,10 +565,10 @@ def after_code_changed(context):
     run_monthly(execute_rebalance_buy, g.run_day, time='10:02')
     run_daily(rebalance_drawdown, time='14:50')
     run_daily(take_profit, time='14:55')
-    g.max_down_T = [1.2, 1.8, 2.4, 3.0]
+    g.max_down_T = [1.1, 1.7, 2.4, 3.2]
     
 def after_trading_end(context):
-    print(g.max_down_T)
+    #print(g.max_down_T)
     current_date = context.current_dt.date()
     total_value = context.portfolio.total_value
     if total_value > g.record_max:
