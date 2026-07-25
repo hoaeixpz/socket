@@ -1,0 +1,3760 @@
+
+=== 第1页 ===
+API 文 档
+感 谢 您 使 用 JoinQuant （ 聚 宽 ） 量 化 交 易 平 台 ， 以 下 内 容 主 要 介 绍 聚 宽 量 化 交 易 平 台 的 API 使 用 方 法 ， 目 录 中
+带 有”♠” 标 识 的 API 是  "回测环境 /模拟 " 的 专 用 API ， 不 能 在 研 究 模 块 中 调 用 。
+内 容 较 多 ， 可 使 用Ctrl+F 进 行 搜 索 。
+如 果 以 下 内 容 仍 没 有 解 决 您 的 问 题 ， 请 您 通 过 社 区 提 问 的 方 式 告 诉 我 们 ， 谢 谢 。
+开 始 写 策 略
+简 单 但 是 完 整 的 策 略
+先 来 看 一 个 简 单 但 是 完 整 的 策 略 :
+def initialize(context): 
+    # 定义一个全局变量 , 保存要操作的股票 
+    g.security = '000001.XSHE' 
+    # 运行函数 
+    run_daily(market_open, time='every_bar') 
+ 
+def market_open(context): 
+    if g.security not in context.portfolio.positions: 
+        order(g.security, 1000) 
+    else: 
+        order(g.security, -800) 
+一 个 完 整 策 略 只 需 要 两 步 :
+设 置 初 始 化 函 数 : initialize, 上 面 的 例 子 中 , 只 操 作 一 支 股 票 : ‘000001.XSHE’, 平 安 银 行
+实 现 一 个 函 数 , 来 根 据 历 史 数 据 调 整 仓 位 .
+这 个 策 略 里 , 每 当 我 们 没 有 股 票 时 就 买 入 1000 股 , 每 当 我 们 有 股 票 时 又 卖 出 800 股 , 具 体 的 下 单 API 请 看order 函
+数.
+这 个 策 略 里 , 我 们 有 了 交 易 , 但 是 只 是 无 意 义 的 交 易 , 没 有 依 据 当 前 的 数 据 做 出 合 理 的 分 析
+下 面 我 们 来 看 一 个 真 正 实 用 的 策 略
+实 用 的 策 略
+在 这 个 策 略 里 , 我 们 会 根 据 历 史 价 格 做 出 判 断 :
+如 果 上 一 时 间 点 价 格 高 出 五 天 平 均 价 1%, 则 全 仓 买 入
+如 果 上 一 时 间 点 价 格 低 于 五 天 平 均 价 , 则 空 仓 卖 出
+
+=== 第2页 ===
+# 导入聚宽函数库 
+import jqdata 
+ 
+# 初始化函数，设定要操作的股票、基准等等 
+def initialize(context): 
+    # 定义一个全局变量 , 保存要操作的股票 
+    # 000001(股票 : 平安银行 ) 
+    g.security = '000001.XSHE' 
+    # 设定沪深 300作为基准 
+    set_benchmark('000300.XSHG') 
+    # 开启动态复权模式 ( 真实价格 ) 
+    set_option('use_real_price', True) 
+    # 运行函数 
+    run_daily(market_open, time='every_bar') 
+ 
+# 每个单位时间 ( 如果按天回测 , 则每天调用一次 , 如果按分钟 , 则每分钟调用一次 ) 调用一次 
+def market_open(context): 
+    security = g.security 
+    # 获取股票的收盘价 
+    close_data = attribute_history(security, 5, '1d', ['close']) 
+    # 取得过去五天的平均价格 
+    MA5 = close_data['close'].mean() 
+    # 取得上一时间点价格 
+    current_price = close_data['close'][-1] 
+    # 取得当前的现金 
+    cash = context.portfolio.cash 
+ 
+    # 如果上一时间点价格高出五天平均价 1%, 则全仓买入 
+    if current_price > 1.01*MA5: 
+        # 用所有  cash 买入股票 
+        order_value(security, cash) 
+        # 记录这次买入 
+        log.info("Buying %s" % (security)) 
+    # 如果上一时间点价格低于五天平均价 , 则空仓卖出 
+    elif current_price < MA5 and context.portfolio.positions[security].closea
+ble_amount > 0: 
+        # 卖出所有股票 , 使这只股票的最终持有量为 0 
+        order_target(security, 0) 
+        # 记录这次卖出 
+        log.info("Selling %s" % (security)) 
+    # 画出上一时间点价格 
+    record(stock_price=current_price) 
+ 
+用 户 需 要 实 现 的 函 数
+initialize
+initialize(context) 
+
+=== 第3页 ===
+初 始 化 方 法 ， 在 整 个 回 测 、 模 拟 实 盘 中 最 开 始 执 行 一 次 ， 用 于 初 始 一 些 全 局 变 量
+参 数 
+context: Context 对 象, 存 放 有 当 前 的 账 户 / 股 票 持 仓 信 息
+返 回 
+None
+示 例
+def initialize(context): 
+    # g为全局变量 
+    g.security = "000001.XSHE" 
+定 时 运 行 函 数 , 可 选
+run_monthly
+run_weekly
+run_daily
+def initialize(context): 
+    # 按月运行 
+    run_monthly(func, monthday, time='open', reference_security) 
+    # 按周运行 
+    run_weekly(func, weekday, time='open', reference_security) 
+    # 每天内何时运行 
+    run_daily(func, time='open', reference_security) 
+具 体 参 见 定 时 运 行
+参 数
+参 数 解 释
+func 一 个 函 数 , 此 函 数 必 须 接 受 context 参 数
+monthday 每 月 的 第 几 个 交 易 日 , 可 以 是 负 数 , 表 示 倒 数 第 几 个 交 易 日 。 如 果 超 出 每 月 总 交 易 日 个
+数 ， 则 取 临 近 的 交 易 日 执 行 。 （ 具 体 见 下 方 注 意 中 的 示 例 ）
+weekday 每 周 的 第 几 个 交 易 日 , 可 以 是 负 数 , 表 示 倒 数 第 几 个 交 易 日 。 如 果 超 出 每 周 总 交 易 日 个
+数 ， 则 取 临 近 的 交 易 日 执 行 。 （ 具 体 见 下 方 注 意 中 的 示 例 ）
+time 一 个 字 符 串 , 可 以 是 具 体 执 行 时 间 , 支 持  time 表 达 式 。 比 如  “10:00”, “01:00”, 或 者
+“every_bar”, “open”, “before_open”, “after_close”, “morning” 和  “night” 。 ( 具 体 执 行
+时 间 如 见 下 方 )
+time 表 达 式 具 有  ‘base +/-offset’ 的 形 式 ， 如 ： ’open-30m’ 表 示 开 盘 前 30 分
+钟 ，’close+1h30m’ 表 示 收 盘 后 一 小 时 三 十 分 钟 。 当 使 用  ‘base +/-offset’ 形 式 的 表 达
+式 时 ，  base 只 能 使 用  open 或  close 二 者 之 一 。
+
+=== 第4页 ===
+参 数 解 释
+reference_security 时 间 的 参 照 标 的 。
+如 参 照  ‘000001.XSHG’ ， 交 易 时 间 为  9:30-15:00 。
+如 参 照 ’IF1512.CCFX’ ， 2016-01-01 之 后 的 交 易 时 间 为  9:30-15:00 ， 在 此 之 前 为
+9:15-15:15 。
+如 参 照 ’A9999.XDCE’ ， 因 为 有 夜 盘 ， 因 此 开 始 时 间 为 21:00 ， 结 束 时 间 为 15:00 。
+time 具 体 执 行 时 间
+具 体 时 间 24 小 时 内 的 任 意 时 间 ， 如 ”10:00”, “01:00”
+every_bar 只 能 在  run_daily 中 调 用 ；  按 天 会 在 每 天 的 开 盘 时 调 用 一 次 ， 按 分 钟 会 在 每 天 的 每 分 钟 运
+行
+open 开 盘 时 运 行 ( 等 同 于 ”9:30”)
+before_open 早 上 9:00 运 行
+after_close 下 午 15:30 运 行
+morning 早 上 8:00 运 行
+night 晚 上 20:00 运 行
+返 回 
+None
+示 例
+
+=== 第5页 ===
+def weekly(context): 
+    print 'weekly %s %s' % (context.current_dt, context.current_dt.isoweekday
+()) 
+ 
+ 
+def monthly(context): 
+    print 'monthly %s %s' % (context.current_dt, context.current_dt.month) 
+ 
+ 
+def daily(context): 
+    print 'daily %s' % context.current_dt 
+ 
+ 
+def initialize(context): 
+ 
+    # 指定每月第一个交易日 , 在开盘后一小时 10 分钟执行 
+    run_monthly(monthly, 1, 'open + 1h10m') 
+ 
+    # 指定每天收盘前 10 分钟运行 
+    run_weekly(daily, 'close - 10m') 
+ 
+    # 指定每天收盘后执行 
+    run_daily(daily, 'after_close') 
+ 
+    # 指定在每天的 10:00 运行 
+    run_daily(daily, '10:00') 
+ 
+    # 参照股指期货的时间每分钟运行一次 , 必须选择分钟回测 , 否则每天执行 
+    run_daily(daily, 'every_bar', reference_security='IF1512.CCFX') 
+handle_data, 可 选
+handle_data(context, data) 
+该 函 数 每 个 单 位 时 间 会 调 用 一 次 , 如 果 按 天 回 测 , 则 每 天 调 用 一 次 , 如 果 按 分 钟 , 则 每 分 钟 调 用 一 次 。
+该 函 数 依 据 的 时 间 是 股 票 的 交 易 时 间 ， 即  9:30 - 15:00. 期 货 请 使 用 定 时 运 行 函 数 。
+该 函 数 在 回 测 中 的 非 交 易 日 是 不 会 触 发 的 （ 如 回 测 结 束 日 期 为 2016 年 1 月 5 日 ， 则 程 序 在 2016 年 1 月 1 日 -3 日
+时 ，handle_data 不 会 运 行 ， 4 日 继 续 运 行 ） 。
+对 于 使 用 当 日 开 盘 价 撮 合 的 日 级 模 拟 盘 ， 在 9:25 集 合 竞 价 完 成 时 就 可 以 获 取 到 开 盘 价 ， 出 于 减 少 并 发 运 行 模
+拟 盘 数 量 的 目 的 ， 我 们 会 提 前 到 9:27~9:30 之 间 运 行 , 策 略 类 获 取 到 逻 辑 时 间 (context.current_dt) 仍 然 是
+9:30 。
+参 数 
+context: Context 对 象, 存 放 有 当 前 的 账 户 / 标 的 持 仓 信 息  
+data: 一 个 字 典 (dict), key 是 股 票 代 码 , value 是 当 时 的SecurityUnitData 对 象 . 存 放 前 一 个 单 位 时 间 ( 按 天 回 测 ,
+是 前 一 天 , 按 分 钟 回 测 , 则 是 前 一 分 钟 ) 的 数 据 . 注 意:
+
+=== 第6页 ===
+为 了 加 速 , data 里 面 的 数 据 是 按 需 获 取 的 , 每 次  handle_data 被 调 用 时 , data 是 空 的  dict, 当 你 使 用
+data[security] 时 该  security 的 数 据 才 会 被 获 取 .
+data 只 在 这 一 个 时 间 点 有 效 , 请 不 要 存 起 来 到 下 一 个  handle_data 再 用
+注 意, 要 获 取 回 测 当 天 的 开 盘 价 / 是 否 停 牌 / 涨 跌 停 价 , 请 使 用  get_current_data
+返 回 
+None
+示 例
+def handle_data(context, data): 
+    order("000001.XSHE",100) 
+before_trading_start, 可 选
+before_trading_start(context) 
+该 函 数 会 在 每 天 开 始 交 易 前 被 调 用 一 次 , 您 可 以 在 这 里 添 加 一 些 每 天 都 要 初 始 化 的 东 西 .
+该 函 数 依 据 的 时 间 是 股 票 的 交 易 时 间 ， 即 该 函 数 启 动 时 间 为  9:20. 期 货 请 使 用 定 时 运 行 函 数 ， time 参 数 设 定
+为’before_open’ 。
+参 数 
+context: Context 对 象, 存 放 有 当 前 的 账 户 / 股 票 持 仓 信 息
+返 回 
+None
+示 例
+def before_trading_start(context): 
+    log.info(str(context.current_dt)) 
+after_trading_end, 可 选
+after_trading_end(context) 
+该 函 数 会 在 每 天 结 束 交 易 后 被 调 用 一 次 , 您 可 以 在 这 里 添 加 一 些 每 天 收 盘 后 要 执 行 的 内 容 . 这 个 时 候 所 有 未 完
+成 的 订 单 已 经 取 消 .
+该 函 数 依 据 的 时 间 是 股 票 的 交 易 时 间 ， 即 该 函 数 启 动 时 间 为  15:10. 期 货 请 使 用 定 时 运 行 函 数 ， time 参 数 设
+定 为’after_close’ 。
+参 数 
+context: Context 对 象, 存 放 有 当 前 的 账 户 / 股 票 持 仓 信 息
+
+=== 第7页 ===
+返 回 
+None
+示 例
+def after_trading_end(context): 
+    log.info(str(context.current_dt)) 
+process_initialize, 可 选
+process_initialize(context) 
+该 函 数 会 在 每 次 模 拟 盘 / 回 测 进 程 重 启 时 执 行 , 一 般 用 来 初 始 化 一 些 不 能 持 久 化 保 存 的 内 容 . 在  initialize 后 执 行 .
+因 为 模 拟 盘 会 每 天 重 启 , 所 以 这 个 函 数 会 每 天 都 执 行 .
+参 数 
+context: Context 对 象, 存 放 有 当 前 的 账 户 / 股 票 持 仓 信 息
+返 回 
+None
+示 例
+def process_initialize(context): 
+    # query 对象不能被  pickle 序列化 , 所以不能持久保存 , 所以每次进程重启时都给它初始
+化 
+    # 以两个下划线开始 , 系统序列化  [g] 时就会自动忽略这个变量 , 更多信息 , 请看  [g] 和
+ [模拟盘注意事项 ] 
+    g.__q = query(valuation) 
+ 
+def handle_data(context, data): 
+    get_fundamentals(g.__q) 
+on_strategy_end, 可 选
+def on_strategy_end(context) 
+在 回 测 、 模 拟 交 易 正 常 结 束 时 被 调 用 ，  失 败 时 不 会 被 调 用 。
+在 模 拟 交 易 到 期 结 束 时 也 会 被 调 用 ，  手 动 在 到 期 前 关 闭 不 会 被 调 用 。
+参 数 
+context: Context 对 象, 存 放 有 当 前 的 账 户 / 股 票 持 仓 信 息
+返 回 
+None
+
+=== 第8页 ===
+示 例
+def on_strategy_end(context): 
+    print '回测结束 ' 
+after_code_changed, 可 选
+after_code_changed(context) 
+模 拟 盘 在 每 天 的 交 易 时 间 结 束 后 会 休 眠 ， 第 二 天 开 盘 时 会 恢 复 ， 如 果 在 恢 复 时 发 现 代 码 已 经 发 生 了 修 改 ， 则
+会 在 恢 复 时 执 行 这 个 函 数 。  
+具 体 的 使 用 场 景 ： 可 以 利 用 这 个 函 数 修 改 一 些 模 拟 盘 的 数 据 。
+注 意: 因 为 一 些 原 因 , 执 行 回 测 时 这 个 函 数 也 会 被 执 行 一 次 , 在  process_initialize 执 行 完 之 后 执 行 .
+参 数 
+context: Context 对 象, 存 放 有 当 前 的 账 户 / 股 票 持 仓 信 息
+返 回 
+None
+示 例
+def after_code_changed(context): 
+    g.stock = '000001.XSHE' 
+回 测 引 擎 介 绍
+回 测 环 境
+1. 回 测 引 擎 运 行 在 Python2.7 之 上 , 请 您 的 策 略 也 兼 容 Python2.7
+2. 我 们 支 持 所 有 的 Python 标 准 库 和 部 分 常 用 第 三 方 库 , 具 体 请 看 : python 库. 另 外 您 可 以 把 .py 文 件 放 在 研
+究 根 目 录 , 回 测 中 可 以 直 接 import, 具 体 请 看 : 自 定 义 python 库
+3. 安 全 是 平 台 的 重 中 之 重 , 您 的 策 略 的 运 行 也 会 受 到 一 些 限 制 , 具 体 请 看 : 安 全
+回 测 过 程
+1. 准 备 好 您 的 策 略 , 选 择 要 操 作 的 股 票 池 , 实 现 handle_data 函 数
+2. 选 定 一 个 回 测 开 始 和 结 束 日 期 , 选 择 初 始 资 金 、 调 仓 间 隔 ( 每 天 还 是 每 分 钟 ), 开 始 回 测
+3. 引 擎 根 据 您 选 择 的 股 票 池 和 日 期 , 取 得 股 票 数 据 , 然 后 每 一 天 或 者 每 一 分 钟 调 用 一 次 您 的 handle_data 函
+数, 同 时 告 诉 您 现 金 、 持 仓 情 况 和 股 票 在 上 一 天 或 者 分 钟 的 数 据 . 在 此 函 数 中 , 您 还 可 以 调 用 函 数 获 取 任
+何 多 天 的 历 史 数 据 , 然 后 做 出 调 仓 决 定 .
+4. 当 您 下 单 后 , 我 们 会 根 据 接 下 来 时 间 的 实 际 交 易 情 况 , 处 理 您 的 订 单 . 具 体 细 节 参 见 订 单 处 理
+
+=== 第9页 ===
+5. 下 单 后 您 可 以 调 用 get_open_orders 取 得 所 有 未 完 成 的 订 单 , 调 用 cancel_order 取 消 订 单
+6. 您 可 以 在 handle_data 里 面 调 用 record() 函 数 记 录 某 些 数 据 , 我 们 会 以 图 表 的 方 式 显 示 在 回 测 结 果 页 面
+7. 您 可 以 在 任 何 时 候 调 用 log.info/debug/warn/error 函 数 来 打 印 一 些 日 志
+8. 回 测 结 束 后 我 们 会 画 出 您 的 收 益 和 基 准 ( 参 见set_benchmark) 收 益 的 曲 线 , 列 出 每 日 持 仓 , 每 日 交 易 和 一
+系 列 风 险 数 据 。
+数 据
+1. 股 票 数 据 ： 我 们 拥 有 所 有 A 股 上 市 公 司 2005 年 以 来 的 股 票 行 情 数 据 、 市 值 数 据 、 财 务 数 据 、 上 市 公 司 基
+本 信 息 、 融 资 融 券 信 息 等 。 为 了 避 免 幸 存 者 偏 差 ， 我 们 包 括 了 已 经 退 市 的 股 票 数 据 。
+2. 基 金 数 据 ： 我 们 目 前 提 供 了 600 多 种 在 交 易 所 上 市 的 基 金 的 行 情 、 净 值 等 数 据 ， 包 含ETF 、LOF 、 分 级
+A/B 基 金 以 及 货 币 基 金 的 完 整 的 行 情 、 净 值 数 据 等 ， 请 点 击 基 金 数 据 查 看 。
+3. 金 融 期 货 数 据 ： 我 们 提 供 中 金 所 推 出 的 所 有 金 融 期 货 产 品 的 行 情 数 据 ， 并 包 含 历 史 产 品 的 数 据 。
+4. 股 票 指 数 ： 我 们 支 持 近 600 种 股 票 指 数 数 据 ， 包 括 指 数 的 行 情 数 据 以 及 成 分 股 数 据 。 为 了 避 免 未 来 函
+数 ， 我 们 支 持 获 取 历 史 任 意 时 刻 的 指 数 成 分 股 信 息 ， 具 体 见get_index_stocks 。 注 意 ： 指 数 不 能 买 卖
+5. 行 业 板 块 ： 我 们 支 持 按 行 业 、 按 板 块 选 股 ， 具 体 见get_industry_stocks
+6. 概 念 板 块 ： 我 们 支 持 按 概 念 板 块 选 股 ， 具 体 见get_concept_stocks
+7. 宏 观 数 据 ： 我 们 提 供 全 方 位 的 宏 观 数 据 ， 为 投 资 者 决 策 提 供 有 力 数 据 支 持 。
+8. 所 有 的 行 情 数 据 我 们 均 已 处 理 好 前 复 权 信 息 。
+9. 我 们 当 日 的 回 测 数 据 会 在 收 盘 后 通 过 多 数 据 源 进 行 校 验 ， 并 在 T+1 （ 第 二 天 ） 的 00:01 更 新 。
+安 全
+1. 保 证 您 的 策 略 安 全 是 我 们 的 第 一 要 务
+2. 在 您 使 用 我 们 网 站 的 过 程 中 , 我 们 全 程 使 用 https 传 输
+3. 策 略 会 加 密 存 储 在 数 据 库
+4. 回 测 时 您 的 策 略 会 在 一 个 安 全 的 进 程 中 执 行 , 我 们 使 用 了 进 程 隔 离 的 方 案 来 确 保 系 统 不 会 被 任 何 用 户 的
+代 码 攻 击 , 每 个 用 户 的 代 码 都 运 行 在 一 个 有 很 强 限 制 的 进 程 中 : 
+只 能 读 指 定 的 一 些 python 库 文 件
+不 能 写 和 执 行 任 何 文 件 , 如 果 您 需 要 保 存 和 读 取 私 有 文 件 , 请 看 [write_file]/[read_file]
+不 能 创 建 进 程 或 者 线 程
+限 制 了 cpu 和 内 存 , 堆 栈 的 使 用
+可 以 访 问 网 络 , 但 是 对 带 宽 做 了 限 制 , 下 载 最 大 带 宽 为 500KB/s, 上 传 带 宽 为 10KB/s
+有 严 格 的 超 时 机 制 , 如 果 handle_data 超 过 30 分 钟 则 立 即 停 止 运 行  
+对 于 读 取 回 测 所 需 要 的 数 据 , 和 输 出 回 测 结 果 , 我 们 使 用 一 个 辅 助 进 程 来 帮 它 完 成 , 两 者 之 间 通 过
+管 道 连 接 .
+我们使用了 linux 内核级别的 apparmer 技术来实现这一点 . 
+有了这些限制我们确保了任何用户不能侵入我们的系统 , 更别提盗取他人的策略了 . 
+运 行 频 率
+1. Bar 的 概 念
+在 一 定 时 间 段 内 的 时 间 序 列 就 构 成 了 一 根  K 线 （ 日 本 蜡 烛 图 ） ， 单 根  K 线 被 称 为  Bar 。
+
+=== 第10页 ===
+如 果 是 一 分 钟 内 的  Tick 序 列 ， 即 构 成 一 根 分 钟  K 线 ， 又 称 分 钟  Bar;  
+如 果 是 一 天 内 的 分 钟 序 列 ， 即 构 成 一 根 日 线  K 线 ， 又 称 日 线  Bar;
+Bar 的 示 意 图 如 下 所 示 ：
+Bar 就 是 时 间 维 度 上 ， 价 格 在 空 间 维 度 上 变 化 构 成 的 数 据 单 元 。 如 下 图 所 示 ， 多 个 数 据 单 元  Bar 构 成 的 一 个
+时 间 序 列 。
+2. 频 率 详 解
+下 列 图 片 中 齿 轮 为  handle_data(context, data) 的 运 行 时 间 ， before_trading_start(context) 等 其 他 函 数 运 行
+时 间 详 见 相 关API 。
+频 率 ： 天
+当 选 择 天 频 率 时 ，  算 法 在 每 根 日 线  Bar 都 会 运 行 一 次 ， 即 每 天 运 行 一 次 。
+在 算 法 中 ， 可 以 获 取 任 何 粒 度 的 数 据 。
+
+=== 第11页 ===
+频 率 ： 分 钟
+当 选 择 分 钟 频 率 时 ，  算 法 在 每 根 分 钟  Bar 都 会 运 行 一 次 ， 即 每 分 钟 运 行 一 次 。
+在 算 法 中 ， 可 以 获 取 任 何 粒 度 的 数 据 。
+频 率 ： Tick
+当 选 择  Tick 频 率 时 ， 每 当 新 来 一 个  Tick ， 算 法 都 会 被 执 行 一 次 。
+注 意 ： 现 阶 段 ， Tick 频 率 只 有 在 模 拟 交 易 时 可 以 选 择 。
+执 行 示 意 图 如 下 图 所 示 ：
+
+=== 第12页 ===
+订 单 处 理
+对 于 您 在 某 个 单 位 时 间 下 的 单 , 我 们 会 做 如 下 处 理 :
+回 测
+使 用Bar 撮 合
+市 价 单 : 
+按 天 回 测  
+当 “ 最 新 价 + 滑 点 ” 在 涨 跌 停 范 围 内 ， 则 进 行 撮 合 ， 反 之 撤 销
+交 易 价 格 : 开 盘 价  + 滑 点
+最 大 成 交 量 : 每 次 下 单 成 交 量 不 会 超 过 该 股 票 当 天 的 总 成 交 量 . 可 通 过 选 项
+order_volume_ratio 设 置 每 天 最 大 的 成 交 量 , 例 如 : 0.25 表 示 下 单 成 交 量 不 会 超 过 当 天 成
+交 量 的  25%
+注 意: 
+context.portfolio 中 的 持 仓 价 格 会 使 用 当 天 开 盘 价 更 新
+data 是 昨 天 的 按 天 数 据 , 要 想 拿 到 当 天 开 盘 价 , 请 使 用  get_current_data 拿 取
+day_open 字 段
+- 分钟回测 
+    - 当 “最新价 +滑点 ” 在涨跌停范围内，则进行撮合，反之撤销 
+    - 交易价格 : 因为我们是在每分钟的第一秒钟执行代码 , 所以价格是上一分钟的最后一个价格
+ + [滑点 ] 
+    - 同按天回测规则 , 每次下单成交量不会超过该股票当天的总成交量 , [order_volume_rati
+o] 同样有效 .注意 : 这是限制了每个订单的成交量 , 当然 , 你可以通过一天多次下单来超过一天成
+交量, 但是 , 为了对你的回测负责 , 请不要这么做 . 
+ 
+ 
+ 
+ 
+所有市价单下单之后同步完成 ( 也即  order_XXX 系列函数返回时完成 ), context.portfolio 会同
+步变化
+
+=== 第13页 ===
+限 价 单
+回 测( 天 、 分 钟 ): 
+当 委 托 价  > 最 新 价 + 滑 点 ， 按 市 价 单 模 式 撮 合
+当 委 托 价  <= 最 新 价 + 滑 点 ， 则 挂 单 ， 在 Bar 结 束 时 按 照 Bar 信 息 进 行 撮 合 ：  
+当 委 托 价  > bar 的 最 低 价 ， 则 成 交 价 为 委 托 价 ， 成 交 量 不 超 过  Bar 成 交 量  *
+order_volume_ratio
+天 、 分 钟 相 同
+不 是 立 即 完 成 , 下 单 之 后  context.portfolio.cash 和  context.portfolio.positions 不 会 同 步 变 化 .
+按 天 模 拟 交 易 暂 时 不 支 持 限 价 单
+上 述 过 程 中 , 如 果 实 际 价 格 已 经 涨 停 或 者 跌 停 , 则 相 对 应 的 买 单 或 卖 单 不 成 交 , 市 价 单 直 接 取 消 (log 中 有 警 告 信
+息), 限 价 单 会 挂 单 直 到 可 以 成 交 .
+一 天 结 束 后 , 所 有 未 完 成 的 订 单 会 被 取 消
+每 次 订 单 完 成 ( 完 全 成 交 ) 或 者 取 消 后 , 我 们 会 根 据 成 交 量 计 算 手 续 费 ( 参 见set_order_cost), 减 少 您 的 现 金
+更 多 细 节 , 请 看order 函 数
+模 拟 交 易
+模 拟 交 易 默 认 开 启 盘 口 撮 合 模 式 。 可 通 过 [ 设 置 是 否 开 启 盘 口 撮 合 模 式 ] 进 行 设 定 ， 决 定 您 定 的 模 拟 交 易 使 用 盘
+口 还 是  Bar 进 行 撮 合 。
+1. 使 用 盘 口 撮 合
+市 价 单
+买 单 ：  
+根 据 卖 单 盘 口 进 行 撮 合
+优 先 从 卖 一 档 开 始 撮 合 ， 根 据 成 交 量 算 出  加 权 均 价
+成 交 价 ：  加 权 均 价
+5 档 成 交 剩 余 撤 销 ： 买 入 时 从 “ 卖 一 ” 到 “ 卖 五 ” 价 格 依 次 成 交 ， 卖 出 时 从 “ 买 一 ” 到 “ 买 五 ” 价 格
+依 次 成 交 。 若 无 法 全 部 成 交 ， 则 剩 余 未 匹 配 量 自 动 撤 销
+当 前 没 有 盘 口 时 ， 按 照  使 用  Bar 处 理  处 理 ：  
+当 成 交 量 不 为 零 为 ， 使 用 最 新 价 + 滑 点 成 交
+当 成 交 量 为 零 ， 则 取 消 该 订 单
+卖 单 ：  
+根 据 买 单 盘 口 进 行 撮 合
+优 先 从 买 一 档 开 始 撮 合 ， 根 据 成 交 量 算 出  加 权 均 价
+成 交 价  ：  加 权 均 价
+5 档 成 交 剩 余 撤 销 ： 买 入 时 从 “ 卖 一 ” 到 “ 卖 五 ” 价 格 依 次 成 交 ， 卖 出 时 从 “ 买 一 ” 到 “ 买 五 ” 价 格
+依 次 成 交 。 若 无 法 全 部 成 交 ， 则 剩 余 未 匹 配 量 自 动 撤 销
+当 前 没 有 盘 口 时 ， 按 照  使 用  Bar 处 理  处 理 ：  
+当 成 交 量 不 为 零 为 ， 使 用 最 新 价 + 滑 点 成 交
+当 成 交 量 为 零 ， 则 取 消 该 订 单
+限 价 单
+买 单 ：  
+根 据 卖 单 盘 口 进 行 撮 合
+优 先 从 卖 一 档 开 始 撮 合 ， 直 至 盘 口 价 格 > 委 托 价 的 档 位 ， 根 据 成 交 量 算 出  加 权 均 价
+
+=== 第14页 ===
+成 交 价  ：  加 权 均 价
+当 限 价 单 根 据 盘 口 撮 合 完 ， 为 部 分 成 交 时 ， 剩 余 委 托 数 量 会 在  Bar 结 束 时 根 据  Bar 信 息
+进 行 撮 合 ， 详 情 见 Bar 撮 合 方 式 。
+- 卖单： 
+    - 根据买单盘口进行撮合 
+    - 优先从买一档开始撮合，直至盘口价格 < 委托价的档位，根据成交量算出  加权均价 
+    - 成交价 ：  加权均价 
+    - 当限价单根据盘口撮合完，为部分成交时，剩余委托数量会在  Bar 结束时根据  Bar 信息
+进行撮合，详情见  Bar 撮合方式。 
+ 
+ 
+ 
+注意：如模拟盘下限价委托单，并且根据盘口撮合后，订单为部分成交，则该订单完整信息在收盘时
+更新。
+2. 使 用 Bar 撮 合
+市 价 单 : 
+模 拟 交 易  
+当 “ 最 新 价 + 滑 点 ” 在 涨 跌 停 范 围 内 ， 则 进 行 撮 合 ， 反 之 撤 销
+交 易 价 格 : 最 新 价  + 滑 点
+最 大 交 易 量 : 不 管 是 按 天 , 按 分 钟 , 还 是 按 tick, 由 于 市 价 单 都 是 同 步 完 成 , 下 单 那 一 刻 无 法
+知 道 当 天 成 交 量 , 所 以 市 价 单 都 不 考 虑 成 交 量 , 全 量 成 交 .
+- 所有市价单下单之后同步完成 ( 也即  order_XXX 系列函数返回时完成 ), context.portfolio
+ 会同步变化 
+限 价 单  
+模 拟 交 易 ( 天 、 分 钟 、 Tick):  
+当 委 托 价  > 最 新 价 + 滑 点 ， 按 市 价 单 模 式 撮 合
+当 委 托 价  <= 最 新 价 + 滑 点 ， 则 挂 单 ， 在 Bar 结 束 时 按 照 Bar 信 息 进 行 撮 合 ：  
+当 委 托 价  > bar 的 最 低 价 ， 则 成 交 价 为 委 托 价 ， 成 交 量 不 超 过  Bar 成 交 量  *
+order_volume_ratio
+天 、 分 钟 、 tick 相 同
+按tick, 不 是 立 即 完 成 , 而 是 下 单 之 后 每 个 tick 根 据 这 个 tick 的 分 价 表 撮 合 一 次 , 直 到 完
+全 成 交 或 者 当 天 收 盘 为 止 . 同 样 考 虑  order_volume_ratio 选 项 .
+注 意 ： 如 模 拟 盘 下 限 价 委 托 单 ， 订 单 信 息 会 在 收 盘 后 更 新 。
+- 不是立即完成 , 下单之后  context.portfolio.cash 和 context.portfolio.positions 
+不会同步变化 . 
+ 
+ 
+ 
+ 
+按天模拟交易暂时不支持限价单
+
+=== 第15页 ===
+上 述 过 程 中 , 如 果 实 际 价 格 已 经 涨 停 或 者 跌 停 , 则 相 对 应 的 买 单 或 卖 单 不 成 交 , 市 价 单 直 接 取 消 (log 中 有 警 告 信
+息), 限 价 单 会 挂 单 直 到 可 以 成 交 .
+一 天 结 束 后 , 所 有 未 完 成 的 订 单 会 被 取 消
+每 次 订 单 完 成 ( 完 全 成 交 ) 或 者 取 消 后 , 我 们 会 根 据 成 交 量 计 算 手 续 费 ( 参 见set_order_cost), 减 少 您 的 现 金
+更 多 细 节 , 请 看order 函 数
+拆 分 合 并 和 分 红
+传 统 前 复 权 回 测 模 式 ： 当 股 票 发 生 拆 分 ， 合 并 或 者 分 红 时 ， 股 票 价 格 会 受 到 影 响 ， 为 了 保 证 价 格 的 连
+续 性, 我 们 使 用 前 复 权 来 处 理 之 前 的 股 票 价 格 ， 给 您 的 所 有 股 票 价 格 已 经 是 前 复 权 的 价 格 。
+真 实 价 格 （ 动 态 复 权 ） 回 测 模 式 ： 当 股 票 发 生 拆 分 ， 合 并 或 者 分 红 时 ， 会 按 照 历 史 情 况 ， 对 账 户 进 行
+处 理 ， 会 在 账 户 账 户 中 增 加 现 金 或 持 股 数 量 发 生 变 化 ， 并 会 有 日 志 提 示 。
+**注：**传统前复权回测模式  与  真实价格（动态复权）回测模式  区别 [见这里](/post/1629) 
+股 息 红 利 税 的 计 算
+真 实 的 税 率 计 算 方 式 如 下 ：
+分 红 派 息 的 时 候 ， 不 扣 税 ；
+等 你 卖 出 该 只 股 票 时 ， 会 根 据 你 的 股 票 持 有 时 间 （ 自 你 买 进 之 日 ， 算 到 你 卖 出 之 日 的 前 一 天 ， 下 同 ）
+超 过 一 年 的 免 税 。 2015 年 9 月 之 前 的 政 策 是 ， 满 一 年 的 收 5% 。 现 在 执 行 的 是 ,2015 年 9 月 份 的 新 优 惠 政
+策 ： 满 一 年 的 免 税 ；
+等 你 卖 出 股 票 时 ， 你 的 持 有 时 间 在 1 个 月 以 内 （ 含 1 个 月 ） 的 ， 补 交 红 利 的 20% 税 款 ， 券 商 会 在 你 卖 出
+股 票 当 日 清 算 时 直 接 扣 收 ；
+等 你 卖 出 股 票 时 ， 你 的 持 有 时 间 在 1 个 月 至 1 年 间 （ 含 1 年 ） 的 ， 补 交 红 利 的 10% 税 款 ， 券 商 直 接 扣 ；
+分 次 买 入 的 股 票 ， 一 律 按 照 “ 先 进 先 出 ” 原 则 ， 对 应 计 算 持 股 时 间 ；
+当 日 有 买 进 卖 出 的 （ 即 所 谓 做 盘 中 T+0 ） ， 收 盘 后 系 统 计 算 你 当 日 净 额 ， 净 额 为 买 入 ， 则 记 录 为 今 日 新
+买 入 。 净 额 为 卖 出 ， 则 按 照 先 进 先 出 原 则 ， 算 成 你 卖 出 了 你 最 早 买 入 的 对 应 数 量 持 股 ， 并 考 虑 是 否 扣
+税 和 税 率 问 题 。
+在 回 测 及 模 拟 交 易 中 ， 由 于 需 要 在 分 红 当 天 将 扣 税 后 的 分 红 现 金 发 放 到 账 户 ， 因 此 无 法 准 确 计 算 用 户 的 持 仓
+时 间 （ 不 知 道 股 票 卖 出 时 间 ） ， 我 们 的 计 算 方 式 是 ， 统 一 按 照  20% 的 税 率 计 算 的 。
+滑 点
+在 实 战 交 易 中 ， 往 往 最 终 成 交 价 和 预 期 价 格 有 一 定 偏 差 ， 因 此 我 们 加 入 了 滑 点 模 式 来 帮 助 您 更 好 地 模 拟 真 实
+市 场 的 表 现 。
+您 可 以 通 过set_slippage 来 设 置 回 测 具 体 的 滑 点 参 数 。
+交 易 税 费
+交 易 税 费 包 含 券 商 手 续 费 和 印 花 税 。 您 可 以 通 过set_order_cost 来 设 置 具 体 的 交 易 税 费 的 参 数 。
+券 商 手 续 费
+
+=== 第16页 ===
+中 国A 股 市 场 目 前 为 双 边 收 费 ， 券 商 手 续 费 系 默 认 值 为 万 分 之 三 ， 即 0.03% ， 最 少 5 元 。
+印 花 税
+印 花 税 对 卖 方 单 边 征 收 ， 对 买 方 不 再 征 收 ， 系 统 默 认 为 千 分 之 一 ， 即 0.1% 。
+风 险 指 标
+风 险 指 标 数 据 有 利 于 您 对 策 略 进 行 一 个 客 观 的 评 价 。
+注 意: 无 论 是 回 测 还 是 模 拟 , 所 有 风 险 指 标 ( 年 化 收 益 /alpha/beta/sharpe/max_drawdown 等 指 标 ) 都 只 会 每 天 更
+新 一 次 , 也 只 根 据 每 天 收 盘 后 的 收 益 计 算 , 并 不 考 虑 每 天 盘 中 的 收 益 情 况. 例 外 :
+分 钟 和 TICK 模 拟 盘 每 分 钟 会 更 新 策 略 收 益 和 基 准 收 益
+按 天 模 拟 盘 每 天 开 盘 后 和 收 盘 后 会 更 新 策 略 收 益 和 基 准 收 益
+那 么 可 能 会 造 成 这 种 现 象 : 模 拟 时 收 益 曲 线 中 有 回 撤 , 但 是  max_drawdown 可 能 为 0.
+Total Returns （ 策 略 收 益 ）
+Total Annualized Returns （ 策 略 年 化 收 益 ）
+Benchmark Returns （ 基 准 收 益 ）
+Benchmark Annualized Returns （ 基 准 年 化 收 益 ）
+Alpha （ 阿 尔 法 ）
+投 资 中 面 临 着 系 统 性 风 险 （ 即 Beta ） 和 非 系 统 性 风 险 （ 即 Alpha ） ， Alpha 是 投 资 者 获 得 与 市 场 波 动 无 关 的 回
+报 。 比 如 投 资 者 获 得 了 15% 的 回 报 ， 其 基 准 获 得 了 10% 的 回 报 ， 那 么 Alpha 或 者 价 值 增 值 的 部 分 就 是 5% 。策略最终股票和现金的总价值
+策略开始股票和现金的总价值
+策略收益
+策略执行天数
+基准最终价值
+基准开始价值
+基准收益
+策略执行天数
+
+=== 第17页 ===
+Alpha 值 解 释
+α>0 策 略 相 对 于 风 险 ， 获 得 了 超 额 收 益
+α=0 策 略 相 对 于 风 险 ， 获 得 了 适 当 收 益
+α<0 策 略 相 对 于 风 险 ， 获 得 了 较 少 收 益
+Beta （ 贝 塔 ）
+表 示 投 资 的 系 统 性 风 险 ， 反 映 了 策 略 对 大 盘 变 化 的 敏 感 性 。 例 如 一 个 策 略 的 Beta 为 1.5 ， 则 大 盘 涨 1% 的 时
+候 ， 策 略 可 能 涨 1.5% ， 反 之 亦 然 ； 如 果 一 个 策 略 的 Beta 为 -1.5 ， 说 明 大 盘 涨 1% 的 时 候 ， 策 略 可 能 跌 1.5% ，
+反 之 亦 然 。  
+Beta 值 解 释
+β<0 投 资 组 合 和 基 准 的 走 向 通 常 反 方 向 ， 如 空 头 头 寸 类
+β=0 投 资 组 合 和 基 准 的 走 向 没 有 相 关 性 ， 如 固 定 收 益 类
+0<β<1 投 资 组 合 和 基 准 的 走 向 相 同 ， 但 是 比 基 准 的 移 动 幅 度 更 小
+β=1 投 资 组 合 和 基 准 的 走 向 相 同 ， 并 且 和 基 准 的 移 动 幅 度 贴 近
+β>1 投 资 组 合 和 基 准 的 走 向 相 同 ， 但 是 比 基 准 的 移 动 幅 度 更 大
+Sharpe （ 夏 普 比 率 ）
+表 示 每 承 受 一 单 位 总 风 险 ， 会 产 生 多 少 的 超 额 报 酬 ， 可 以 同 时 对 策 略 的 收 益 与 风 险 进 行 综 合 考 虑 。  策略年化收益率
+基准年化收益率
+无风险利率（默认）
+策略值
+策略每日收益
+基准每日收益
+策略每日收益与基准每日收益的协方差
+基准每日收益的方差
+策略年化收益率
+
+=== 第18页 ===
+Sortino （ 索 提 诺 比 率 ）
+表 示 每 承 担 一 单 位 的 下 行 风 险 ， 将 会 获 得 多 少 超 额 回 报 。  
+Information Ratio （ 信 息 比 率 ）
+衡 量 单 位 超 额 风 险 带 来 的 超 额 收 益 。 信 息 比 率 越 大 ， 说 明 该 策 略 单 位 跟 踪 误 差 所 获 得 的 超 额 收 益 越 高 ， 因
+此 ， 信 息 比 率 较 大 的 策 略 的 表 现 要 优 于 信 息 比 率 较 低 的 基 准 。 合 理 的 投 资 目 标 应 该 是 在 承 担 适 度 风 险 下 ， 尽
+可 能 追 求 高 信 息 比 率 。  
+Algorithm Volatility （ 策 略 波 动 率 ）
+用 来 测 量 策 略 的 风 险 性 ， 波 动 越 大 代 表 策 略 风 险 越 高 。  
+Benchmark Volatility （ 基 准 波 动 率 ）
+用 来 测 量 基 准 的 风 险 性 ， 波 动 越 大 代 表 基 准 风 险 越 高 。  无风险利率（默认）
+策略收益波动率
+策略年化收益率
+无风险利率（默认）
+策略下行波动率
+策略年化收益率
+基准年化收益率
+策略与基准每日收益差值的年化标准差
+策略每日收益率
+策略每日收益率的平均值
+策略执行天数
+基准每日收益率
+
+=== 第19页 ===
+Max Drawdown （ 最 大 回 撤 ）
+描 述 策 略 可 能 出 现 的 最 糟 糕 的 情 况 ， 最 极 端 可 能 的 亏 损 情 况 。  
+Downside Risk （ 下 行 波 动 率 ）
+策 略 收 益 下 行 波 动 率 。 和 普 通 收 益 波 动 率 相 比 ， 下 行 标 准 差 区 分 了 好 的 和 坏 的 波 动 。  
+胜 率(%)
+盈 利 次 数 在 总 交 易 次 数 中 的 占 比 。  
+日 胜 率 (%)
+策 略 盈 利 超 过 基 准 盈 利 的 天 数 在 总 交 易 数 中 的 占 比 。  
+盈 亏 比
+周 期 盈 利 亏 损 的 比 例 。  基准每日收益率的平均值
+基准执行天数
+策略某日股票和现金的总价值，
+策略每日收益率
+策略至第日平均收益率
+策略执行天数
+胜率盈利交易次数
+总交易次数
+日胜率当日策略收益跑赢当日基准收益的天数
+总交易日数
+盈亏比总盈利额
+总亏损额
+
+=== 第20页 ===
+运 行 时 间
+开 盘 前 (9:20) 运 行 :
+run_monthly/run_weekly/run_daily 中 指 定 time=’before_open’ 运 行 的 函 数
+before_trading_start
+盘 中 运 行 :
+run_monthly/run_weekly/run_daily 中 在 指 定 交 易 时 间 执 行 的 函 数 , 执 行 时 间 为 这 分 钟 的 第 一 秒 .
+例 如: run_daily(func, '14:50') 会 在 每 天 的 14:50:00( 精 确 到 秒 ) 执 行
+handle_data 
+按 日 回 测 / 模 拟 , 在 9:30:00( 精 确 到 秒 ) 运 行 , data 为 昨 天 的 天 数 据
+按 分 钟 回 测 / 模 拟 , 在 每 分 钟 的 第 一 秒 运 行 , 每 天 执 行 240 次 , 不 包 括 11:30 和 15:00 这 两 分 钟 ,
+data 是 上 一 分 钟 的 分 钟 数 据 . 例 如 : 当 天 第 一 次 执 行 是 在 9:30:00, data 是 昨 天 14:59 这 一 分
+钟 的 分 钟 数 据 , 当 天 最 后 一 次 执 行 是 在 14:59:00, data 是14:58 这 一 分 钟 的 分 钟 数 据 .
+按tick 模 拟 , 上 午 从 9:30:00 到 11:29:55, 下 午 从 13:00:00 到 14:59:55, 每 5 秒 钟 执 行 一 次 , 一
+天 执 行 240*12 次 . 例 如 : 当 天 第 一 次 执 行 时 在 9:30:00, data 为 昨 天 最 后 5 秒 (14:59:55-
+15:00:00) 的 数 据 ( 统 计 高 开 低 收 + 成 交 量 + 成 交 额 )
+收 盘 后 (15:00 后 半 小 时 内 ) 运 行 :
+run_monthly/run_weekly/run_daily 中 指 定 time=’after_close’ 运 行 的 函 数
+after_trading_end
+同 一 个 时 间 点 , 总 是 先 运 行  run_XXX 指 定 的 函 数 , 然 后 是  before_trading_start, handle_data 和
+after_trading_end
+注 意:
+run_XXX 指 定 的 函 数 只 能 有 一 个 参 数  context, data 不 再 提 供 , 请 使 用  history/attribute_history
+获 取
+initialize / before_trading_start / after_trading_end / handle_data 都 是 可 选 的 , 如 果 不 是 必 须
+的, 不 要 实 现 这 些 函 数 , 一 个 空 函 数 会 降 低 运 行 速 度 .
+模 拟 盘 注 意 事 项
+模 拟 盘 在 每 天 运 行 结 束 后 会 保 存 状 态 , 结 束 进 程 ( 相 当 于 休 眠 ). 然 后 在 第 二 天 恢 复 .
+进 程 结 束 时 会 保 存 这 些 状 态 :
+用 户 账 户 , 持 仓
+使 用 pickle 保 存  g 对 象 . 注 意  
+g 中 以  ‘__’ 开 头 的 变 量 将 被 忽 略 , 不 会 被 保 存
+g 中 不 能 序 列 化 的 变 量 不 会 被 保 存 , 重 启 后 会 不 存 在 . 如 果 你 写 了 如 下 的 代 码 : 
+python 
+def initialize(context): 
+g.query = query(valuation) 
+g 将 不 能 被 保 存 , 因 为  query() 返 回 的 对 象 并 不 能 被 持 久 化 . 重 启 后 也 不 会 再 执 行  initialize,
+使 用 g.query 将 会 抛 出  AttributeError 异 常  
+正 确 的 做 法 是 , 在  process_initialize 中 初 始 化 它 , 并 且 名 字 以  ‘__’ 开 头 . 
+python 
+
+=== 第21页 ===
+def process_initialize(context): 
+g.__query = query(valuation) 
+    - 注意: 涉及到 IO( 打开的文件 , 网络连接 , 数据库连接 ) 的对象是不能被序列化的 : 
+        - `query(valuation)` : 数据库连接 
+        - `open("some/path")` : 打开的文件 
+        - `requests.get('')` : 网络连接 
+ 
+ 
+ 
+ 
+使用 [pickle] 保存  [context] 对象 , 处理方式跟  [g] 一样
+为了防止恶意攻击 , 序列化之后的状态大小不能超过  30M, 如果超出将在保存状态时运行失败 . 当超
+过 20M 时日志中会有警告提示 , 请注意日志 .
+恢 复 过 程 是 这 样 的 :
+1. 加 载 策 略 代 码 , 因 为 python 是 动 态 语 言 , 编 译 即 运 行 , 所 以 全 局 的 ( 在 函 数 外 写 的 ) 代 码 会 被 执 行 一 遍 .
+2. 使 用 保 存 的 状 态 恢 复  g, context, 和 函 数 外 定 义 的 全 局 变 量 .
+3. 执 行 process_initialize, 每 次 启 动 时 都 会 执 行 这 个 函 数 .
+4. 如 果 策 略 代 码 和 上 一 次 运 行 时 发 生 了 修 改 ， 而 且 代 码 中 定 义 了  after_code_changed 函 数 ， 则 会 运 行
+after_code_changed 函 数 。
+重 启 后 不 再 执 行  initialize 函 数 , initialize 函 数 在 整 个 模 拟 盘 的 生 命 周 期 中 只 执 行 一 次 . 即 使 是 更 改 回 测 后 ,
+initialize 也 不 会 执 行 .
+模 拟 盘 更 改 回 测 之 后 上 述 的 全 局 变 量 ( 包 括  g 和  context 中 保 存 的 ) 不 会 丢 失 . 新 代 码 中  initialize 不 会 执 行 . 
+如 果 需 要 修 改 原 来 的 值 , 可 以 在  after_code_changed 函 数 里 面 修 改 , 比 如 , 原 来 代 码 是 :
+a = 1 
+def initialize(context): 
+    g.stock = '000001.XSHE' 
+代 码 改 成 :
+a = 2 
+def initialize(context): 
+    g.stock = '000002.XSHE' 
+执 行 时 , a 仍 然 是  1, g.stock 仍 然 是  ‘000001.XSHE’, 要 修 改 他 们 的 值 , 必 须 定 义  after_code_changed:
+def after_code_changed(context): 
+    global a 
+    a = 2 
+    g.stock = '000002.XSHE' 
+
+=== 第22页 ===
+创 建 模 拟 交 易 时 , 如 果 选 择 的 日 期 是 今 天 , 则 从 今 天 当 前 时 间 点 开 始 运 行 , 应 该 在 当 前 时 间 点 之 前 运 行 的 函 数 不
+再 运 行 . 比 如 : 今 天 10:00 创 建 了 按 天 的 模 拟 交 易 , 选 择 日 期 是 今 天 , 代 码 中 实 现 了  handle_data 和
+after_trading_end, 则  handle_data 今 天 不 运 行 , 而  after_trading_end 会 在  15:10 运 行
+当 模 拟 交 易 在 A 时 间 点 失 败 后 , 然 后 在 B 时 间 点 ” 重 跑 ”, 那 么  A-B 之 间 的 时 间 点 应 该 运 行 的 函 数 不 再 运 行
+因 为 模 拟 盘 资 源 有 限 , 为 了 防 止 用 户 创 建 之 后 长 期 搁 置 浪 费 资 源 , 我 们 做 出 如 下 限 制 : 如 果 一 个 模 拟 盘 同 时 满 足
+下 面 条 件 , 则 暂 缓 运 行 :
+该 用 户 连 续 30 天 没 有 使 用 JoinQuant 网 站
+没 有 开 启 微 信 通 知
+当 用 户 重 新 使 用 网 站 后 , 第 二 天 会 继 续 运 行 ( 会 把 之 前 的 交 易 日 执 行 一 遍 , 并 不 会 跳 过 日 期 )
+强 烈 建 议 模 拟 盘 使 用 真 实 价 格 成 交 , 即 调 用  set_option('use_real_price', True). 更 多 细 节 请 看
+set_option
+模 拟 交 易 和 回 测 的 差 别
+因 为 一 些 原 因 , 模 拟 交 易 现 在 和 回 测 还 是 有 些 微 小 的 差 别 , 具 体 如 下 :
+市 价 单 的 处 理 : 
+回 测: 成 交 量 不 会 超 过 当 天 成 交 量 ( 或 当 天 成 交 量 的 一 部 分 , 见order_volume_ratio 选 项 )
+模 拟: 默 认 使 用 盘 口 撮 合 ， 五 档 之 后 转 撤 销 处 理 ； 关 闭 盘 口 撮 合 后 ， 如 果 成 交 量 不 为 0 ， 则 全 部
+成 交 。
+这会导致同样的日期同样的程序回测结果可能会和模拟交易结果不一样 , 请注意 
+按 天 模 拟 交 易 暂 时 不 支 持 限 价 单 , 所 有 限 价 单 会 自 动 转 成 市 价 单
+理 论 上 对 运 行 结 果 不 会 有 影 响 : 模 拟 交 易 进 程 每 天 会 重 启 ( 请 看 [ 模 拟 交 易 注 意 事 项 ]). 回 测 进 程 一 般 不 会
+重 启, 如 果 需 要 重 启 ( 比 如 机 器 宕 机 了 ) 也 会 做 和 模 拟 交 易 同 样 的 处 理 .
+期 货 交 割 日
+期 货 持 仓 到 交 割 日 ， 没 有 手 动 交 割 ， 系 统 会 以 当 天 结 算 价 平 仓 , 没 有 手 续 费 , 不 会 有 交 易 记 录 .
+还 券 细 则
+T+1, 当 日 融 的 券 当 日 不 能 还
+还 券 时 要 扣 除 利 息
+直 接 还 券 时 , 可 以 使 用 当 日 买 入 的 券 还 ( 不 受 T+1 限 制 ), 且 优 先 使 用 当 日 买 入 的 券 还
+API 介 绍
+
+=== 第23页 ===
+注 意 事 项
+【 取 数 据 函 数 】 【 其 它 函 数 】 目 录 中 带 有 ”♠” 标 识 的 API 是  "回测环境 /模拟 " 专 用 的 API ， 不 能 在 研 究
+模 块 中 调 用 。 整 个  【 jqdata 模 块 】 在 研 究 环 境 与 回 测 环 境 下 都 可 以 使 用 .
+所 有 价 格 单 位 是 元
+时 间 表 示 : 
+所 有 时 间 都 是 北 京 时 间 , 时 区 :UTC+8
+所 有 时 间 都 是datetime.datetime 对 象
+每 日 结 束 时 自 动 撤 销 所 有 未 完 成 订 单
+下 文 中 提 到  Context, SecurityUnitData, Portfolio, Position, Order 对 象 都 是 只 读 的 , 尝 试 修 改 他 们 会 报
+错 或 者 无 效 .
+没 有python 基 础 的 同 学 请 注 意 , 有 的 函 数 的 定 义 中 , 某 些 参 数 是 有 值 的 , 这 个 值 是 参 数 的 默 认 值 , 这 个 参
+数 是 可 选 的 , 可 以 不 传 .
+回 测 和 模 拟 中 ， 每 日 下 单 的 最 大 数 量 为 10000 笔
+如 需 使 用 分 仓 操 作 ， 请 看 账 户 分 仓 操 作.
+策 略 设 置 函 数
+set_benchmark - 设 置 基 准
+set_benchmark(security) 
+默 认 我 们 选 定 了 沪 深 300 指 数 的 每 日 价 格 作 为 判 断 您 策 略 好 坏 和 一 系 列 风 险 值 计 算 的 基 准 . 您 也 可 以 使
+用set_benchmark 指 定 其 他 股 票 / 指 数 /ETF 的 价 格 作 为 基 准 。 注 意 ： 这 个 函 数 只 能 在 initialize 中 调 用 。
+参 数
+security: 股 票 / 指 数 /ETF 代 码
+返 回 
+None
+示 例
+set_benchmark('600000.XSHG') 
+set_order_cost - 设 置 佣 金 / 印 花 税
+set_order_cost(cost, type, ref=None) 
+指 定 每 笔 交 易 要 收 取 的 手 续 费 , 系 统 会 根 据 用 户 指 定 的 费 率 计 算 每 笔 交 易 的 手 续 费
+参 数
+cost: OrderCost 对 象
+
+=== 第24页 ===
+open_tax ， 买 入 时 印 花 税  ( 只 股 票 类 标 的 收 取 ， 基 金 与 期 货 不 收 )
+close_tax ， 卖 出 时 印 花 税  ( 只 股 票 类 标 的 收 取 ， 基 金 与 期 货 不 收 )
+open_commission ， 买 入 时 佣 金
+close_commission, 卖 出 时 佣 金
+close_today_commission, 平 今 仓 佣 金
+min_commission, 最 低 佣 金 ， 不 包 含 印 花 税
+type: 股 票 、 基 金 、 金 融 期 货 ， ’stock’/ ‘fund’ / ‘index_futures’ / ‘futures’
+ref: 参 考 代 码 ， 支 持 股 票 代 码 / 基 金 代 码 / 期 货 合 约 代 码 ， 以 及 期 货 的 品 种 ， 如
+‘000001.XSHE’/’510180.XSHG’/’IF1709’/’IF’
+默 认 与 示 例
+# 股票类每笔交易时的手续费是：买入时佣金万分之三，卖出时佣金万分之三加千分之一印花税 ,
+ 每笔交易佣金最低扣 5 块钱 
+set_order_cost(OrderCost(open_tax=0, close_tax=0.001, open_commission=0.0003,
+ close_commission=0.0003, close_today_commission=0, min_commission=5), 
+type='stock') 
+ 
+# 期货类每笔交易时的手续费是：买入时万分之 0.23, 卖出时万分之 0.23, 平今仓为万分之 23 
+set_order_cost(OrderCost(open_tax=0, close_tax=0, open_commission=0.000023, c
+lose_commission=0.000023, close_today_commission=0.0023, min_commission=0), t
+ype='index_futures') 
+ 
+# 单独设置  000300.XSHG 的费用 
+set_order_cost(OrderCost(open_tax=0, close_tax=0.001, open_commission=0.0003,
+ close_commission=0.0003, close_today_commission=0, min_commission=5), 
+type='stock', ref='000300.XSHG') 
+ 
+# 设置所有期货（包括金融指数期货）的费用 
+set_order_cost(OrderCost(open_tax=0, close_tax=0.001, open_commission=0.0003,
+ close_commission=0.0003, close_today_commission=0, min_commission=5), 
+type='futures') 
+ 
+# 对 IF/IH/IC 三个品种有效 
+set_order_cost(OrderCost(open_tax=0, close_tax=0.001, open_commission=0.0003,
+ close_commission=0.0003, close_today_commission=0, min_commission=5), 
+type='index_futures') 
+ 
+# 单独设置 AU期货品种的费用 
+set_order_cost(OrderCost(open_tax=0, close_tax=0.001, open_commission=0.0003,
+ close_commission=0.0003, close_today_commission=0, min_commission=5), 
+type='futures', ref='AU') 
+ 
+# 单独设置 AU1709 合约的费用 
+set_order_cost(OrderCost(open_tax=0, close_tax=0.001, open_commission=0.0003,
+ close_commission=0.0003, close_today_commission=0, min_commission=5), 
+type='futures', ref='AU1709') 
+注 ： 期 货 持 仓 到 交 割 日 会 以 当 天 结 算 价 平 仓 , 没 有 手 续 费 , 不 会 有 交 易 记 录 .
+set_slippage - 设 置 滑 点
+
+=== 第25页 ===
+set_slippage(object) 
+设 定 滑 点 ， 回 测 / 模 拟 时 有 效 .
+当 您 下 单 后 , 真 实 的 成 交 价 格 与 下 单 时 预 期 的 价 格 总 会 有 一 定 偏 差 , 因 此 我 们 加 入 了 滑 点 模 式 来 帮 您 更 好 的 模
+拟 真 实 市 场 的 表 现 . 我 们 暂 时 只 支 持 固 定 滑 点
+固 定 滑 点 
+当 您 使 用 固 定 滑 点 的 时 候 , 我 们 认 为 您 的 落 单 的 多 少 并 不 会 影 响 您 最 后 的 成 交 价 格 . 您 只 需 要 指 定 一 个 价 差 , 
+当 您 下 达 一 个 买 单 指 令 的 时 候 , 成 交 的 价 格 等 于 当 时 ( 您 执 行 order 函 数 所 在 的 单 位 时 间 ) 的 平 均 价 格 加 上 价 差 的
+一 半 ； 当 您 下 达 一 个 卖 出 指 令 的 时 候 ， 卖 出 的 价 格 等 于 当 时 的 平 均 价 格 减 去 价 差 的 一 半 . 
+价 差 可 以 设 定 为 一 个 固 定 值 或 者 按 照 百 分 比 设 定 。
+固 定 值 ：  
+这 个 价 差 可 以 是 一 个 固 定 的 值 ( 比 如 0.02 元 , 交 易 时 加 减 0.01 元 ), 设 定 方 式 为 ： FixedSlippage(0.02)
+百 分 比 ：  
+这 个 价 差 可 以 是 是 当 时 价 格 的 一 个 百 分 比 ( 比 如 0.2%, 交 易 时 加 减 当 时 价 格 的 0.1%), 设 定 方 式 为 ：
+PriceRelatedSlippage(0.002)
+# 设定滑点为固定值 
+set_slippage(FixedSlippage(0.02)) 
+ 
+# 设定滑点为百分比 
+set_slippage(PriceRelatedSlippage(0.002)) 
+注 ： 如 果 您 没 有 调 用  set_slippage 函 数 , 系 统 默 认 的 滑 点 是  PriceRelatedSlippage(0.00246)
+设 置 动 态 复 权 ( 真 实 价 格 ) 模 式
+set_option('use_real_price', value) 
+该 设 定 必 须 在initialize 中 调 用 
+设 置 是 否 开 启 动 态 复 权 （ 真 实 价 格 ） 模 式 ， 原 理 讲 解 图 示 见 帖 子 。 默 认 是 False( 主 要 是 为 了 让 旧 的 策 略 不 会
+出 错). 
+是 否 开 启 动 态 复 权 模 式 对 模 拟 交 易 是 有 影 响 的 ， 详 情 参 见 这 里 。
+参 数
+value: True / False
+示 例
+# 开启动态复权模式 
+set_option('use_real_price', True) 
+是 否 开 启 动 态 复 权 对 于 回 测 及 模 拟 交 易 的 影 响 ：
+1. 动 态 复 权 原 理
+2. 是 否 开 启 动 态 复 权 模 式 对 模 拟 交 易 的 影 响
+
+=== 第26页 ===
+开 启 ，value 值 为  True: 回 测 过 程 中 :
+每 天 看 到 的 当 天 的 价 格 都 是 真 实 的 ( 不 复 权 的 )
+使 用 真 实 的 价 格 下 单 , 交 易 详 情 和 持 仓 详 情 里 看 到 的 都 是 真 实 价 格
+为 了 让 编 写 代 码 简 单 , 通 过history/attribute_history/get_price/SecurityUnitData.mavg/vwap 等
+API 拿 到 的 都 是 基 于 当 天 日 期 的 前 复 权 价 格. 比 如 : 回 测 运 行 到 了 2015-01-01 这 一 天 , 那
+么history(3, '1d', 'close') 取 得 的 就 是 你 穿 越 到 2015-01-01 这 一 天 所 看 到 的 前 复 权 价
+格. 另 一 方 面 , 你 在 不 同 日 期 调 用
+history/attribute_history/get_price/SecurityUnitData.mavg/vwap 返 回 的 价 格 可 能 是 不 一 样 的 , 因
+为 我 们 在 不 同 日 期 看 到 的 前 复 权 价 格 是 不 一 样 的 . 所 以 不 要 跨 日 期 缓 存 这 些 API 返 回 的 结 果 .
+每 到 新 的 一 天 , 如 果 持 仓 中 有 股 票 发 生 了 拆 合 或 者 分 红 或 者 其 他 可 能 影 响 复 权 因 子 的 情 形 , 我 们
+会 根 据 复 权 因 子 自 动 调 整 股 票 的 数 量 , 如 果 调 整 后 的 数 量 是 小 数 , 则 向 下 取 整 到 整 数 , 最 后 为 了 保
+证context.portfolio.portfolio_value 不 变 , context.portfolio.cash 可 能 有 略 微 调 整 .
+注 意 事 项 : 
+如 上 所 说 , 不 要 跨 日 期 缓 存history/attribute_history/get_price 这 些API 返 回 的 结 果
+开 启 真 实 价 格 回 测 之 后 , 回 测 结 果 可 能 会 之 前 不 一 样 , 因 为 交 易 时 买 入 数 量 必 须 是 100 的 倍
+数, 使 用 前 复 权 价 格 和 实 际 价 格 能 买 入 的 数 量 是 不 一 样 的 .
+如 果 想 通 过  history 拿 到 昨 天 的 真 实 价 格 , 还 是 需 要 用 取 得 价 格 除 以 factor, 因 为 可 能 今 天
+发 生 了 拆 合 分 红 , 导 致 拿 到 的 昨 天 的 价 格 是 相 对 于 今 天 的 前 复 权 价 格 .
+        ```python 
+        s = '000001.XSHE' 
+        df = attribute_history(s, 1, '1d', fields=['close', 'factor']) 
+        real_close = df['close'][-1] / df['factor'][-1] 
+        ``` 
+关 闭 ，value 值 为  False: 此 选 项 的 核 心 是 选 定 一 个 日 期 作 为 基 准 , 保 证 这 个 日 期 的 价 格 是 真 实 价 格 , 然
+后 调 整 其 他 日 期 的 价 格 . 最 终 保 证 所 有 价 格 是 连 续 的 , 在 回 测 或 者 模 拟 交 易 过 程 中 不 同 日 期 看 到 的 价 格
+是 一 致 的 . 下 面 分 回 测 和 模 拟 交 易 单 独 做 介 绍 : 
+回 测: 基 准 日 期 是 建 立 回 测 的 日 期 , 回 测 过 程 中 所 看 到 的 所 有 价 格 都 是 基 于 此 日 期 的 前 复 权 价 格 .
+比 如 说 , 我 昨 天 跑 了 一 个 回 测 , 那 么 回 测 过 程 所 有 价 格 都 是 在 昨 天 所 看 到 的 前 复 权 价 格 . 这 会 导 致
+两 个 问 题 : 
+回 测 过 程 中 使 用 了 前 复 权 价 格 下 单 , 这 是 违 背 真 实 场 景 的 , 不 能 对 接 实 盘 的 .
+不 同 的 日 期 建 立 的 回 测 跑 出 来 的 结 果 可 能 会 有 差 异 , 因 为 如 果 这 两 次 回 测 之 间 回 测 的 股 票
+发 生 了 拆 合 或 者 分 红 , 会 导 致 回 测 中 看 到 前 复 权 价 格 会 不 一 致 .
+模 拟 交 易 : 基 准 日 期 是 建 立 模 拟 交 易 的 日 期 , 模 拟 交 易 过 程 所 看 到 的 所 有 价 格 都 是 基 于 此 日 期 调
+整 过 的 . 为 了 方 便 计 算 , 我 举 一 个 虚 拟 的 例 子 : 某 只 股 票 在 如 下 三 个 日 期 的 实 际 价 格 和 后 复 权 因 子
+分 别 是 :
+    |日期 |价格 | 后复权因子 | 
+    |--|--|--| 
+    |2015-09-01|1|1| 
+    |2015-10-01|2|2| 
+    |2015-11-01|4|4| 
+    - 如果你在  09-01 建立了一个模拟交易 , 你在不同日期看到的所有价格都是  1 
+    - 如果你在  10-01 建立了一个模拟交易 , 你在不同日期看到的所有价格都是  2 
+    - 如果你在  11-01 建立了一个模拟交易 , 你在不同日期看到的所有价格都是  4 
+为 了 更 好 的 模 拟 , 建 议 大 家 都 设 成  True. 将 来 对 接 实 盘 交 易 时 , 此 选 项 会 强 制 设 成  True
+注 意 ： 设 置  use_real_price 为  True 之 后 , 如 下 的 按 天 回 测 的 代 码 是 不 对 的 ：
+
+=== 第27页 ===
+def initialize(context): 
+    g.cached_data = [] 
+    g.s = '000001.XSHE' 
+ 
+def handle_data(content, data): 
+    g.cached_data.append(data) 
+    if len(g.cached_data) > 1: 
+        # 如果昨天收盘价比前天涨了 5%, 则买入 . 这是不对的 , 如果昨天早上发生了拆合 , 则
+昨天和前天的股价不具可比性 . 
+        if g.cached_data[-1][g.s].close > g.cached_data[-2][g.s].close * 
+1.05: 
+            order(g.s, 1000) 
+设 置 成 交 量 比 例
+set_option('order_volume_ratio', value) 
+设 定 成 交 量 比 例 ， 根 据 实 际 行 情 限 制 每 个 订 单 的 成 交 量 .
+参 数
+value: value 是 一 个  float 值 , 根 据 实 际 行 情 限 制 每 个 订 单 的 成 交 量 . 
+对 于 每 一 笔 订 单 ：  
+如 果 是 市 价 单 , 成 交 量 不 超 过 : 每 日 成 交 量  * value
+如 果 是 限 价 单 , 限 价 单 撮 合 时 设 定 分 价 表 中 每 一 个 价 格 的 成 交 量 的 比 率 , 假 设 某 一 分 钟 分 价
+表 如 下 :
+        价格 | 成交量 
+        ---|--- 
+        10.0 | 10 
+        10.1 | 11 
+        10.2 | 12 
+    撮合时 , 按价格  10.0 成交 10 * value 股 , 按价格  10.1 成交 11 * value 股 , 按价
+格 10.2 成交 12 * value 股 
+示 例
+# 设定成交量比例 
+set_option('order_volume_ratio', 0.25) # 成交量不超过总成交量的四分之一 
+设 置 是 否 开 启 盘 口 撮 合 模 式
+set_option('match_with_order_book', value) 
+设 定 是 否 使 用 盘 口 撮 合 模 式 . 此 选 项 只 对 模 拟 盘 生 效 ， 默 认 开 启
+参 数
+
+=== 第28页 ===
+value: 默 认 开 启  
+True ， 开 启 ， 使 用 盘 口 进 行 撮 合 ， 撮 合 方 式 详 见 订 单 处 理
+False ， 关 闭 ， 使 用  Bar 进 行 撮 合 ， 撮 合 方 式 详 见 订 单 处 理
+set_universe(history 专 用 )
+set_universe(security_list) 
+设 置 或 者 更 新 此 策 略 要 操 作 的 股 票 池  context.universe. 请 注 意 :
+该 函 数 现 在 只 用 于 设 定 history 函 数 的 默 认 security_list, 除 此 之 外 并 无 其 他 用 处 。
+参 数
+security_list: 股 票 列 表
+返 回 
+None
+示 例
+set_universe(['000001.XSHE', '600000.XSHG']) 
+set_commission( 已 废 弃 )
+set_commission(object) 
+指 定 每 笔 交 易 要 收 取 的 手 续 费 , 系 统 会 根 据 用 户 指 定 的 费 率 计 算 每 笔 交 易 的 手 续 费
+次 函 数 已 废 弃 ， 请 使 用  set_order_cost - 设 置 佣 金 / 印 花 税
+参 数 
+object: 一 个 PerTrade 对 象
+PerTrade.buy_cost ， 买 入 时 手 续 费
+PerTrade.sell_cost ， 卖 出 时 手 续 费
+PerTrade.min_cost ， 最 少 的 手 续 费
+默 认 ： PerTrade(buy_cost=0.0003, sell_cost=0.0013, min_cost=5)  
+每 笔 交 易 时 的 手 续 费 是 , 买 入 时 万 分 之 三 ， 卖 出 时 万 分 之 三 加 千 分 之 一 印 花 税 , 每 笔 交 易 最 低 扣 5 块 钱
+获 取 数 据 函 数
+get_price - 获 取 历 史 数 据
+get_price(security, start_date=None, end_date=None, frequency='daily', fields
+=None, skip_paused=False, fq='pre', count=None) 
+
+=== 第29页 ===
+获 取 一 支 或 者 多 只 股 票 的 行 情 数 据 , 按 天 或 者 按 分 钟 ， 这 里 在 使 用 时 注 意  end_date 的 设 置 ，  不 要 引 入 未 来 的
+数 据 。
+关 于 停 牌: 因 为 此 API 可 以 获 取 多 只 股 票 的 数 据 , 可 能 有 的 股 票 停 牌 有 的 没 有 , 为 了 保 持 时 间 轴 的 一 致 ,
+我 们 默 认 没 有 跳 过 停 牌 的 日 期 , 停 牌 时 使 用 停 牌 前 的 数 据 填 充 ( 请 看  SecurityUnitData 的 paused 属 性 ). 如 想
+跳 过, 请 使 用  skip_paused=True 参 数 , 同 时 只 取 一 只 股 票 的 信 息
+参 数
+security: 一 支 股 票 代 码 或 者 一 个 股 票 代 码 的 list
+count: 与 start_date 二 选 一 ， 不 可 同 时 使 用. 数 量 , 返 回 的 结 果 集 的 行 数 , 即 表 示 获 取  end_date 之 前
+几 个 frequency 的 数 据
+start_date: 与 count 二 选 一 ， 不 可 同 时 使 用. 字 符 串 或 者  datetime.datetime/datetime.date 对 象 , 开 始
+时 间. 
+如 果 count 和  start_date 参 数 都 没 有 , 则  start_date 生 效 , 值 是  ‘2015-01-01’. 注 意 :
+当 取 分 钟 数 据 时 , 时 间 可 以 精 确 到 分 钟 , 比 如 : 传 入  datetime.datetime(2015, 1, 1, 10,
+0, 0) 或 者  '2015-01-01 10:00:00'.
+当 取 分 钟 数 据 时 , 如 果 只 传 入 日 期 , 则 日 内 时 间 是 当 日 的  00:00:00.
+当 取 天 数 据 时 , 传 入 的 日 内 时 间 会 被 忽 略
+end_date: 格 式 同 上 , 结 束 时 间 , 默 认 是 ’2015-12-31’, 包 含 此 日 期 . 注 意: 当 取 分 钟 数 据 时 , 如 果
+end_date 只 有 日 期 , 则 日 内 时 间 等 同 于  00:00:00, 所 以 返 回 的 数 据 是 不 包 括  end_date 这 一 天 的.
+frequency: 单 位 时 间 长 度 , 几 天 或 者 几 分 钟 , 现 在 支 持 ’Xd’,’Xm’, ‘daily’( 等 同 于 ’1d’), ‘minute’( 等 同
+于’1m’), X 是 一 个 正 整 数 , 分 别 表 示 X 天 和 X 分 钟 ( 不 论 是 按 天 还 是 按 分 钟 回 测 都 能 拿 到 这 两 种 单 位 的 数
+据), 注 意 , 当 X > 1 时 , fields 只 支 持 [‘open’, ‘close’, ‘high’, ‘low’, ‘volume’, ‘money’] 这 几 个 标 准 字 段 . 默 认
+值 是daily
+fields: 字 符 串 list, 选 择 要 获 取 的 行 情 数 据 字 段 , 默 认 是 None( 表 示 [‘open’, ‘close’, ‘high’, ‘low’, ‘volume’,
+‘money’] 这 几 个 标 准 字 段 ), 支 持SecurityUnitData 里 面 的 所 有 基 本 属 性 , ， 包 含 ： [‘open’, ’ close’, ‘low’,
+‘high’, ‘volume’, ‘money’, ‘factor’, ‘high_limit’,’ low_limit’, ‘avg’, ’ pre_close’, ‘paused’]
+skip_paused: 是 否 跳 过 不 交 易 日 期 ( 包 括 停 牌 , 未 上 市 或 者 退 市 后 的 日 期 ). 如 果 不 跳 过 , 停 牌 时 会 使 用 停
+牌 前 的 数 据 填 充 ( 具 体 请 看 SecurityUnitData 的 paused 属 性 ), 上 市 前 或 者 退 市 后 数 据 都 为  nan, 但 要 注
+意:
+默 认 为  False
+当 skip_paused 是  True 时 , 只 能 取 一 只 股 票 的 信 息
+fq: 复 权 选 项 :
+'pre': 前 复 权 ( 根 据 ’use_real_price’ 选 项 不 同 含 义 会 有 所 不 同 , 参 见set_option), 默 认 是 前 复 权
+None: 不 复 权 , 返 回 实 际 价 格
+'post': 后 复 权
+返 回
+请 注 意 , 为 了 方 便 比 较 一 只 股 票 的 多 个 属 性 , 同 时 也 满 足 对 比 多 只 股 票 的 一 个 属 性 的 需 求 , 我 们 在
+security 参 数 是 一 只 股 票 和 多 只 股 票 时 返 回 的 结 构 完 全 不 一 样
+如 果 是 一 支 股 票 , 则 返 回pandas.DataFrame 对 象, 行 索 引 是datetime.datetime 对 象, 列 索 引 是 行 情 字 段
+名 字, 比 如 ’open’/’close’. 比 如 : get_price('000300.XSHG')[:2] 返 回 :
+open close high low volume money
+
+=== 第30页 ===
+2015-01-05
+00:00:003566.093641.543669.043551.51451198098.0519849817448.0
+2015-01-06
+00:00:003608.433641.063683.233587.23420962185.0498529588258.0
+如 果 是 多 支 股 票 , 则 返 回pandas.Panel 对 象, 里 面 是 很 多pandas.DataFrame 对 象, 索 引 是 行 情 字 段
+(open/close/…), 每 个pandas.DataFrame 的 行 索 引 是datetime.datetime 对 象, 列 索 引 是 股 票 代 号 . 比 如
+get_price(['000300.XSHG', '000001.XSHE'])['open'][:2] 返 回:
+000300.XSHG000001.XSHE
+2015-01-05 00:00:003566.09 13.21
+2015-01-06 00:00:003608.43 13.09
+示 例
+# 获取一支股票 
+df = get_price('000001.XSHE') # 获取000001.XSHE 的 2015 年的按天数据 
+df = get_price('000001.XSHE', start_date='2015-01-01', end_date='2015-01-31 2
+3:00:00', frequency='minute', fields=['open', 'close']) # 获得000001.XSHG 的 20
+15年01月的分钟数据 , 只获取 open+close 字段 
+df = get_price('000001.XSHE', count = 2, end_date='2015-01-31', frequency='da
+ily', fields=['open', 'close']) # 获取获得 000001.XSHG 在 2015 年 01 月 31 日前 2 个交易日
+的数据 
+df = get_price('000001.XSHE', start_date='2015-12-01 14:00:00', end_date='201
+5-12-02 12:00:00', frequency='1m') # 获得000001.XSHG 的 2015 年 12 月 1 号 14:00-2015
+年12月2日 12:00 的分钟数据 
+ 
+# 获取多只股票 
+panel =  get_price(get_index_stocks('000903.XSHG')) # 获取中证 100的所有成分股的
+2015年的天数据 , 返回一个 [pandas.Panel] 
+df_open = panel['open']  # 获取开盘价的 [pandas.DataFrame],  行索引是 [datetime.d
+atetime]对象 , 列索引是股票代号 
+df_volume = panel['volume']  # 获取交易量的 [pandas.DataFrame] 
+ 
+df_open['000001.XSHE'] # 获取平安银行的 2015 年每天的开盘价数据 
+history ♠ - 获 取 历 史 数 据
+history(count, unit='1d', field='avg', security_list=None, df=True, skip_paus
+ed=False, fq='pre') 
+回 测 环 境 / 模 拟 专 用 API
+查 看 历 史 的 行 情 数 据 。
+关 于 停 牌: 因 为 获 取 了 多 只 股 票 的 数 据 , 可 能 有 的 股 票 停 牌 有 的 没 有 , 为 了 保 持 时 间 轴 的 一 致 , 我 们 默 认 没 有 跳
+过 停 牌 的 日 期 , 停 牌 时 使 用 停 牌 前 的 数 据 填 充 ( 请 看SecurityUnitData 的paused 属 性 ). 如 想 跳 过 , 请 使 用
+skip_paused=True 参 数
+
+=== 第31页 ===
+当 取 天 数 据 时 , 不 包 括 当 天 的 , 即 使 是 在 收 盘 后
+参 数
+count: 数 量 , 返 回 的 结 果 集 的 行 数
+unit: 单 位 时 间 长 度 , 几 天 或 者 几 分 钟 , 现 在 支 持 ’Xd’,’Xm’, X 是 一 个 正 整 数 , 分 别 表 示 X 天 和 X 分 钟 ( 不 论 是
+按 天 还 是 按 分 钟 回 测 都 能 拿 到 这 两 种 单 位 的 数 据 ), 注 意 , 当 X > 1 时 , field 只 支 持 [‘open’, ‘close’, ‘high’,
+‘low’, ‘volume’, ‘money’] 这 几 个 标 准 字 段 .
+field: 要 获 取 的 数 据 类 型 , 支 持SecurityUnitData 里 面 的 所 有 基 本 属 性 , ， 包 含 ： [‘open’, ’ close’, ‘low’,
+‘high’, ‘volume’, ‘money’, ‘factor’, ‘high_limit’,’ low_limit’, ‘avg’, ’ pre_close’, ‘paused’]
+security_list: 
+要 获 取 数 据 的 股 票 列 表
+None 表 示 查 询  context.universe 中 所 有 股 票 的 数 据 ， context.universe 需 要 使 用set_universe 进
+行 设 定 ， 形 如 ： set_universe([‘000001.XSHE’, ‘600000.XSHG’]) 。
+df: 若 是 True, 返 回pandas.DataFrame, 否 则 返 回 一 个 dict, 具 体 请 看 下 面 的 返 回 值 介 绍 . 默 认 是 True.  
+我 们 之 所 以 增 加 df 参 数 , 是 因 为pandas.DataFrame 创 建 和 操 作 速 度 太 慢 , 很 多 情 况 并 不 需 要 使 用 它 . 为
+了 保 持 向 上 兼 容 , df 默 认 是 True, 但 是 如 果 你 的 回 测 速 度 很 慢 , 请 考 虑 把 df 设 成 False.
+skip_paused: 是 否 跳 过 不 交 易 日 期 ( 包 括 停 牌 , 未 上 市 或 者 退 市 后 的 日 期 ). 如 果 不 跳 过 , 停 牌 时 会 使 用 停
+牌 前 的 数 据 填 充 ( 具 体 请 看 SecurityUnitData 的 paused 属 性 ), 上 市 前 或 者 退 市 后 数 据 都 为  nan, 但 要 注
+意:
+默 认 为  False
+如 果 跳 过 , 则 行 索 引 不 再 是 日 期 , 因 为 不 同 股 票 的 实 际 交 易 日 期 可 能 不 一 样
+fq: 复 权 选 项 :
+'pre': 前 复 权 ( 根 据 ’use_real_price’ 选 项 不 同 含 义 会 有 所 不 同 , 参 见set_option), 默 认 是 前 复 权
+None: 不 复 权 , 返 回 实 际 价 格
+'post': 后 复 权
+返 回
+df=True:  
+pandas.DataFrame 对 象, 行 索 引 是datetime.datetime 对 象, 列 索 引 是 股 票 代 号 . 比 如 : 如 果 当 前 时 间 是
+2015-01-07, universe 是 [‘000300.XSHG’, ‘000001.XSHE’], history(2, '1d', 'open') 将 返 回 : 
+|—|000300.XSHG|000001.XSHE| 
+|—|—|—| 
+|2015-01-05 00:00:00|3566.09|13.21| 
+|2015-01-06 00:00:00|3608.43|13.09|
+关于numpy和 pandas, 请看下面的第三方库介绍 
+df=False: 
+dict, key 是 股 票 代 码 , 值 是 一 个 numpy 数 组numpy.ndarray, 对 应 上 面 的 DataFrame 的 每 一 列 , 例 如
+history(2, '1d', 'open', df=False) 将 返 回 : 
+python 
+{ 
+'000300.XSHG': array([ 3566.09, 3608.43]), 
+'000001.XSHE': array([ 13.21, 13.09]) 
+} 
+
+=== 第32页 ===
+示 例
+h = history(5, security_list=['000001.XSHE', '000002.XSHE']) 
+h['000001.XSHE'] #000001(平安银行 ) 过去 5 天的每天的平均价 , 一个 pd.Series 对象 , index
+是datatime 
+h['000001.XSHE'][-1] #000001(平安银行 ) 昨天 ( 数组最后一项 ) 的平均价 
+h.iloc[-1] #所有股票在昨天的平均价 , 一个 pd.Series 对象 , index 是股票代号 
+h.iloc[-1]['000001.XSHE'] #000001(平安银行 ) 昨天 ( 数组最后一项 ) 的平均价 
+h.mean() # 取得每一列的平均值 
+## set_universe 之后可以，调用  history 可以不用指定  security_list 
+set_universe(['000001.XSHE']) # 设定universe 
+history(5) # 获取universe 中股票的过去 5 天 ( 不包含今天 ) 的每天的平均价 
+history(5, '1m') # 获取universe 中股票的过去 5 分钟 ( 不包含当前分钟 ) 的每分钟的平均价 
+history(5, '1m', 'price') # 获取universe 中股票的过去 5 分钟 ( 不包含当前分钟 ) 的每分钟
+的平均价 
+history(5, '1m', 'volume') # 获取universe 中股票的过去 5 分钟 ( 不包含当前分钟 ) 的每分钟
+的交易额 
+history(5, '1m', 'price', ['000001.XSHE']) # 获取平安银行的过去 5 分钟 ( 不包含当前分
+钟)的每分钟的平均价 
+h = history(5, security_list=['000001.XSHE', '000002.XSHE'], df=False) 
+h['000001.XSHE'] #h 是一个  dict ，获取  h 中  000001.XSHE 对应的值。 
+h['000001.XSHE'][0] #返回000001.XSHE 最新一日的数据 
+h['000001.XSHE'][-1] #返回000001.XSHE 第五天的数据 
+h['000001.XSHE'].sum() #对返回的五日数据求和 
+h['000001.XSHE'].mean() # 对返回的五日数据求平均 
+# 因为h本身是一个 dict, 下列 panda.DataFrame 的特性将不可用 : 
+# h.illoc[-1] 
+# h.sum() 
+attribute_history ♠ - 获 取 历 史 数 据
+attribute_history(security, count, unit='1d', 
+            fields=['open', 'close', 'high', 'low', 'volume', 'money'], 
+            skip_paused=True, df=True, fq='pre') 
+回 测 环 境 / 模 拟 专 用 API
+查 看 某 一 支 股 票 的 历 史 数 据 , 可 以 选 这 只 股 票 的 多 个 属 性 , 默 认 跳 过 停 牌 日 期.
+当 取 天 数 据 时 , 不 包 括 当 天 的 , 即 使 是 在 收 盘 后
+参 数
+security: 股 票 代 码
+count: 数 量 , 返 回 的 结 果 集 的 行 数
+unit: 单 位 时 间 长 度 , 几 天 或 者 几 分 钟 , 现 在 支 持  ‘Xd’, ‘Xm’, X 是 一 个 正 整 数 , 分 别 表 示 X 天 和 X 分 钟 ( 不 论 是
+按 天 还 是 按 分 钟 回 测 都 能 拿 到 这 两 种 单 位 的 数 据 ), 注 意 , 当  X > 1 时 , field 只 支 持  [‘open’, ‘close’, ‘high’,
+‘low’, ‘volume’, ‘money’] 这 几 个 标 准 字 段 .
+
+=== 第33页 ===
+fields: 股 票 属 性 的 list, 支 持SecurityUnitData 里 面 的 所 有 基 本 属 性 ， 包 含 ： [‘open’, ’ close’, ‘low’, ‘high’,
+‘volume’, ‘money’, ‘factor’, ‘high_limit’,’ low_limit’, ‘avg’, ’ pre_close’, ‘paused’]
+skip_paused: 是 否 跳 过 不 交 易 日 期 ( 包 括 停 牌 , 未 上 市 或 者 退 市 后 的 日 期 ). 如 果 不 跳 过 , 停 牌 时 会 使 用 停
+牌 前 的 数 据 填 充 ( 具 体 请 看SecurityUnitData 的paused 属 性 ), 上 市 前 或 者 退 市 后 数 据 都 为  nan, 默 认 是
+True
+df: 若 是 True, 返 回pandas.DataFrame, 否 则 返 回 一 个 dict, 具 体 请 看 下 面 的 返 回 值 介 绍 . 默 认 是 True. 我
+们 之 所 以 增 加 df 参 数 , 是 因 为pandas.DataFrame 创 建 和 操 作 速 度 太 慢 , 很 多 情 况 并 不 需 要 使 用 它 . 为 了
+保 持 向 上 兼 容 , df 默 认 是 True, 但 是 如 果 你 的 回 测 速 度 很 慢 , 请 考 虑 把 df 设 成 False.
+fq: 复 权 选 项 :
+'pre': 前 复 权 ( 根 据 ’use_real_price’ 选 项 不 同 含 义 会 有 所 不 同 , 参 见set_option), 默 认 是 前 复 权
+None: 不 复 权 , 返 回 实 际 价 格
+'post': 后 复 权
+返 回
+df=True  
+pandas.DataFrame 对 象, 行 索 引 是datetime.datetime 对 象, 列 索 引 是 属 性 名 字 . 比 如 : 如 果 当 前 时 间 是
+2015-01-07, attribute_history('000300.XSHG', 2) 将 返 回 :
+open close high low volume money
+2015-01-05
+00:00:003566.093641.543669.043551.51451198098.0519849817448.0
+2015-01-06
+00:00:003608.433641.063683.233587.23420962185.0498529588258.0
+df=False: 
+dict, key 是 股 票 代 码 , 值 是 一 个 numpy 数 组numpy.ndarray, 对 应 上 面 的 DataFrame 的 每 一 列 , 例 如
+attribute_history('000300.XSHG', 2, df=False) 将 返 回 :
+{ 
+    'volume': array([  4.51198098e+08,   4.20962185e+08]), 
+    'money': array([  5.19849817e+11,   4.98529588e+11]), 
+    'high': array([ 3669.04,  3683.23]), 
+    'low': array([ 3551.51,  3587.23]), 
+    'close': array([ 3641.54,  3641.06]), 
+    'open': array([ 3566.09,  3608.43]) 
+} 
+示 例
+
+=== 第34页 ===
+stock = '000001.XSHE' 
+h = attribute_history(stock, 5, '1d', ('open','close', 'volume', 'factor')) #
+ 取得000001(平安银行 ) 过去 5 天的每天的开盘价 , 收盘价 , 交易量 , 复权因子 
+# 不管df等于 True 还是 False, 下列用法都是可以的 
+h['open'] #过去5天的每天的开盘价 , 一个 pd.Series 对象 , index 是 datatime 
+h['close'][-1] #昨天的收盘价 
+h['open'].mean() 
+ 
+# 下面的 pandas.DataFrame 的特性 , df=False 时将不可用 
+# 行的索引可以是整数 , 也可以是日期的各种形式 : 
+h['open']['2015-01-05'] 
+h['open'][datetime.date(2015, 1, 5)] 
+h['open'][datetime.datetime(2015, 1, 5)] 
+ 
+# 按行取数据 
+h.iloc[-1] #昨天的开盘价和收盘价 , 一个 pd.Series 对象 , index 是字符串 :'open'/'close' 
+h.iloc[-1]['open'] #昨天的开盘价 
+h.loc['2015-01-05']['open'] 
+ 
+# 高级运算 
+h = h[h['volume'] > 1000000] # 只保留交易量 >1000000 股的行 
+h['open'] = h['open']/h['factor'] #让open列都跟 factor 列相除 , 把价格都转化成原始价
+格 
+h['close'] = h['close']/h['factor'] 
+get_current_data ♠ - 获 取 当 前 时 间 数 据
+get_current_data() 
+回 测 环 境 / 模 拟 专 用 API
+获 取 当 前 单 位 时 间 （ 当 天 / 当 前 分 钟 ） 的 涨 跌 停 价 , 是 否 停 牌 ， 当 天 的 开 盘 价 等 。
+回 测 时 , 通 过  API 获 取 到 的 是 前 一 个 单 位 时 间 ( 天 / 分 钟 ) 的 数 据 , 而 有 些 数 据 , 我 们 在 这 个 单 位 时 间 是 知 道 的 , 比
+如 涨 跌 停 价 , 是 否 停 牌 , 当 天 的 开 盘 价 . 我 们 添 加 了 这 个 API 用 来 获 取 这 些 数 据 .
+参 数
+现 在 不 需 要 传 入 , 即 使 传 入 了 , 返 回 的  dict 也 是 空 的 , dict 的  value 会 按 需 获 取 .
+返 回 值 
+一 个dict, 其 中  key 是 股 票 代 码 , value 是 拥 有 如 下 属 性 的 对 象
+last_price : 最 新 价
+high_limit: 涨 停 价
+low_limit: 跌 停 价
+paused: 是 否 停 止 或 者 暂 停 了 交 易 , 当 停 牌 、 未 上 市 或 者 退 市 后 返 回  True
+is_st: 是 否 是  ST( 包 括 ST, *ST) ， 是 则 返 回  True ， 否 则 返 回  False
+day_open: 当 天 开 盘 价
+name: 股 票 现 在 的 名 称 , 可 以 用 这 个 来 判 断 股 票 当 天 是 否 是  ST, *ST, 是 否 快 要 退 市
+industry_code: 股 票 现 在 所 属 行 业 代 码 , 参 见  行 业 概 念 数 据
+
+=== 第35页 ===
+注 意
+为 了 加 速 , 返 回 的  dict 里 面 的 数 据 是 按 需 获 取 的 , dict 初 始 是 空 的 , 当 你 使 用
+current_data[security] 时( 假 设  current_data 是 返 回 的  dict), 该  security 的 数 据 才 会 被 获 取 .
+返 回 的 结 果 只 在 当 天 有 效 , 请 不 要 存 起 来 到 隔 天 再 用
+示 例
+def handle_data(context, data): 
+    current_data = get_current_data() 
+    print current_data 
+    print current_data['000001.XSHE'] 
+    print current_data['000001.XSHE'].paused 
+    print current_data['000001.XSHE'].day_open 
+get_bars ♠ - 获 取 历 史 数 据
+get_bars(security, count, unit='1d', 
+                 fields=['date', 'open','high','low','close'], 
+                 include_now=False) 
+回 测 环 境 / 模 拟 专 用 API
+获 取 各 种 时 间 周 期 的  bar 数 据 ，  bar 的 分 割 方 式 与 主 流 股 票 软 件 相 同 ，  而 且 支 持 返 回 当 前 时 刻 所 在  bar 的 数
+据 。
+参 数
+security: 股 票 代 码
+count: 大 于 0 的 整 数 ， 表 示 获 取 bar 的 个 数 。 如 果 行 情 数 据 的 bar 不 足 count 个 ， 返 回 的 长 度 则 小 于 count
+个 数 。
+unit: bar 的 时 间 单 位 , 支 持 如 下 周 期 ： ’1m’, ‘5m’, ‘15m’, ‘30m’, ‘60m’, ‘120m’, ‘1d’, ‘1w’, ‘1M’ 。 ’1w’ 表 示
+一 周 ， ‘1M’ 表 示 一 月 。
+fields: 获 取 数 据 的 字 段 ，  支 持 如 下 值 ： ’date’, ‘open’, ‘close’, ‘high’, ‘low’, ‘volume’, ‘money’
+include_now: 取 值True 或 者 False 。  表 示 是 否 包 含 当 前 bar, 比 如 策 略 时 间 是 9:33 ， unit 参 数 为 5m ，  如
+果 include_now=True, 则 返 回 9:30-9:33 这 个 分 钟  bar 。
+返 回 值
+一 个 numpy.ndarry 对 象 。 可 以 通 过  array[‘close’] 的 方 式 直 接 访 问 列 数 据 。
+示 例
+array = get_bars('000001.XSHG', 5, unit='1d',fields=['open','close'],include_
+now=False) 
+array['close'] 
+get_extras - 获 取 基 金 净 值 / 期 货 结 算 价 等
+
+=== 第36页 ===
+get_extras(info, security_list, start_date='2015-01-01', end_date='2015-12-3
+1', df=True, count=None) 
+得 到 多 只 标 的 在 一 段 时 间 的 如 下 额 外 的 数 据 :
+is_st: 是 否 是 ST ， 是 则 返 回  True ， 否 则 返 回  False
+acc_net_value: 基 金 累 计 净 值
+unit_net_value: 基 金 单 位 净 值
+futures_sett_price: 期 货 结 算 价
+futures_positions: 期 货 持 仓 量
+参 数
+info: [‘is_st’, ‘acc_net_value’, ‘unit_net_value’, ‘futures_sett_price’, ‘futures_positions’] 中 的 一 个
+security_list: 股 票 列 表
+start_date/end_date: 开 始 结 束 日 期 , 同  get_price
+df: 返 回pandas.DataFrame 对 象 还 是 一 个 dict, 同  history
+count: 数 量 , 与 start_date 二 选 一 , 不 可 同 时 使 用, 必 须 大 于  0. 表 示 取  end_date 往 前 的  count 个 交 易
+日 的 数 据
+返 回 值
+df=True:  
+pandas.DataFrame 对 象, 列 索 引 是 股 票 代 号 , 行 索 引 是datetime.datetime, 比 如
+get_extras('acc_net_value', ['510300.XSHG', '510050.XSHG'], start_date='2015-
+12-01', end_date='2015-12-03') 返 回:
+|---|510300.XSHG|510050.XSHG| 
+|---|---|---| 
+|2015-12-01 00:00:00|1.395|3.119| 
+|2015-12-02 00:00:00|1.4432|3.251| 
+|2015-12-03 00:00:00|1.4535|3.254| 
+ 
+`get_extras('is_st', ['000001.XSHE', '000018.XSHE'], start_date='2013-12-01',
+ end_date='2013-12-03')` 返回 : 
+|---|000001.XSHE|000018.XSHE| 
+|---|---|---| 
+|2013-12-02 00:00:00|False|True| 
+|2013-12-03 00:00:00|False|True| 
+df=False 
+一 个dict, key 是 基 金 代 号 , value 是numpy.ndarray, 比 如get_extras('acc_net_value',
+['510300.XSHG', '510050.XSHG'], start_date='2015-12-01', end_date='2015-12-
+03', df=False) 返 回 : 
+python 
+{ 
+u'510050.XSHG': array([ 3.119, 3.251, 3.254]), 
+u'510300.XSHG': array([ 1.395 , 1.4432, 1.4535]) 
+} 
+get_fundamentals - 查 询 财 务 数 据
+
+=== 第37页 ===
+get_fundamentals(query_object, date=None, statDate=None) 
+查 询 财 务 数 据 ， 详 细 的 数 据 字 段 描 述 请 点 击 财 务 数 据 文 档 查 看
+date 和 statDate 参 数 只 能 传 入 一 个 :
+传 入date 时 , 查 询 指 定 日 期 date 收 盘 后 所 能 看 到 的 最 近 ( 对 市 值 表 来 说 , 最 近 一 天 , 对 其 他 表 来 说 , 最 近 一
+个 季 度 ) 的 数 据, 我 们 会 查 找 上 市 公 司 在 这 个 日 期 之 前 ( 包 括 此 日 期 ) 发 布 的 数 据 , 不 会 有 未 来 函 数 .
+传 入statDate 时 , 查 询  statDate 指 定 的 季 度 或 者 年 份 的 财 务 数 据. 注 意 : 
+1. 由 于 公 司 发 布 财 报 不 及 时 , 一 般 是 看 不 到 当 季 度 或 年 份 的 财 务 报 表 的 , 回 测 中 使 用 这 个 数 据 可 能
+会 有 未 来 函 数 , 请 注 意 规 避 .
+2. 由 于 估 值 表 每 天 更 新 , 当 按 季 度 或 者 年 份 查 询 时 , 返 回 季 度 或 者 年 份 最 后 一 天 的 数 据
+3. 由 于“ 资 产 负 债 数 据 ” 这 个 表 是 存 量 性 质 的 ，  查 询 年 度 数 据 是 返 回 第 四 季 度 的 数 据 。
+4. 银 行 业 、 券 商 、 保 险 专 项 数 据 只 有 年 报 数 据 ， 需 传 入 statDate 参 数 ， 当 传 入  date 参 数  或
+statDate 传 入 季 度 时 返 回 空 ， 请 自 行 避 免 未 来 函 数 。
+当 date 和  statDate 都 不 传 入 时 , 相 当 于 使 用  date 参 数 , date 的 默 认 值 下 面 会 描 述 .
+参 数
+query_object: 一 个sqlalchemy.orm.query.Query 对 象, 可 以 通 过 全 局 的  query 函 数 获 取  Query 对 象
+date: 查 询 日 期 , 一 个 字 符 串 ( 格 式 类 似 ’2015-10-15’) 或 者datetime.date/datetime.datetime 对 象, 可 以 是
+None, 使 用 默 认 日 期 . 这 个 默 认 日 期 在 回 测 和 研 究 模 块 上 有 点 差 别 :
+1. 回 测 模 块 : 默 认 值 会 随 着 回 测 日 期 变 化 而 变 化 , 等 于  context.current_dt 的 前 一 天 ( 实 际 生 活 中 我
+们 只 能 看 到 前 一 天 的 财 报 和 市 值 数 据 , 所 以 要 用 前 一 天 )
+2. 研 究 模 块 : 使 用 平 台 财 务 数 据 的 最 新 日 期 , 一 般 是 昨 天 . 
+如 果 传 入 的  date 不 是 交 易 日 , 则 使 用 这 个 日 期 之 前 的 最 近 的 一 个 交 易 日
+statDate: 财 报 统 计 的 季 度 或 者 年 份 , 一 个 字 符 串 , 有 两 种 格 式 :
+1. 季 度: 格 式 是 : 年 + ‘q’ + 季 度 序 号, 例 如 : ‘2015q1’, ‘2013q4’.
+2. 年 份: 格 式 就 是 年 份 的 数 字 , 例 如 : ‘2015’, ‘2016’.
+返 回 
+返 回 一 个  pandas.DataFrame, 每 一 行 对 应 数 据 库 返 回 的 每 一 行 ( 可 能 是 几 个 表 的 联 合 查 询 结 果 的 一 行 ), 列 索
+引 是 你 查 询 的 所 有 字 段  
+注 意 ：
+1. 为 了 防 止 返 回 数 据 量 过 大 , 我 们 每 次 最 多 返 回 10000 行
+2. 当 相 关 股 票 上 市 前 、 退 市 后 ， 财 务 数 据 返 回 各 字 段 为 空
+示 例
+
+=== 第38页 ===
+# 查询'000001.XSHE' 的所有市值数据 , 时间是 2015-10-15 
+q = query( 
+    valuation 
+).filter( 
+    valuation.code == '000001.XSHE' 
+) 
+df = get_fundamentals(q, '2015-10-15') 
+# 打印出总市值 
+log.info(df['market_cap'][0]) 
+# 获取多只股票在某一日期的市值 , 利润 
+df = get_fundamentals(query( 
+        valuation, income 
+    ).filter( 
+        # 这里不能使用  in 操作 , 要使用 in_() 函数 
+        valuation.code.in_(['000001.XSHE', '600000.XSHG']) 
+    ), date='2015-10-15') 
+# 选出所有的总市值大于 1000 亿元 , 市盈率小于 10, 营业总收入大于 200 亿元的股票 
+df = get_fundamentals(query( 
+        valuation.code, valuation.market_cap, valuation.pe_ratio, income.tota
+l_operating_revenue 
+    ).filter( 
+        valuation.market_cap > 1000, 
+        valuation.pe_ratio < 10, 
+        income.total_operating_revenue > 2e10 
+    ).order_by( 
+        # 按市值降序排列 
+        valuation.market_cap.desc() 
+    ).limit( 
+        # 最多返回 100个 
+        100 
+    ), date='2015-10-15') 
+# 使用 or_ 函数 : 查询总市值大于 1000 亿元  ** 或者 ** 市盈率小于 10 的股票 
+from sqlalchemy.sql.expression import or_ 
+get_fundamentals(query( 
+        valuation.code 
+    ).filter( 
+        or_( 
+            valuation.market_cap > 1000, 
+            valuation.pe_ratio < 10 
+        ) 
+    )) 
+
+=== 第39页 ===
+# 查询平安银行 2014 年四个季度的季报 , 放到数组中 
+q = query( 
+        income.statDate, 
+        income.code, 
+        income.basic_eps, 
+        balance.cash_equivalents, 
+        cash_flow.goods_sale_and_service_render_cash 
+    ).filter( 
+        income.code == '000001.XSHE', 
+    ) 
+ 
+rets = [get_fundamentals(q, statDate='2014q'+str(i)) for i in range(1, 5)] 
+# 查询平安银行 2014 年的年报 
+q = query( 
+        income.statDate, 
+        income.code, 
+        income.basic_eps, 
+        cash_flow.goods_sale_and_service_render_cash 
+    ).filter( 
+        income.code == '000001.XSHE', 
+    ) 
+ 
+ret = get_fundamentals(q, statDate='2014') 
+get_fundamentals_continuously - 查 询 多 日 的 财 务 数 据
+get_fundamentals_continuously(query_object, end_date=None,count=None) 
+查 询 财 务 数 据 ， 详 细 的 数 据 字 段 描 述 请 点 击 财 务 数 据 文 档 查 看
+参 数
+query_object: 一 个sqlalchemy.orm.query.Query 对 象, 可 以 通 过 全 局 的  query 函 数 获 取  Query 对 象
+date: 查 询 日 期 , 一 个 字 符 串 ( 格 式 类 似 ’2015-10-15’) 或 者datetime.date/datetime.datetime 对 象, 可 以 是
+None, 使 用 默 认 日 期 . 这 个 默 认 日 期 在 回 测 和 研 究 模 块 上 有 点 差 别 : 
+1. 回 测 模 块 : 默 认 值 会 随 着 回 测 日 期 变 化 而 变 化 , 等 于  context.current_dt 的 前 一 天 ( 实 际 生 活 中 我
+们 只 能 看 到 前 一 天 的 财 报 和 市 值 数 据 , 所 以 要 用 前 一 天 )
+2. 研 究 模 块 : 使 用 平 台 财 务 数 据 的 最 新 日 期 , 一 般 是 昨 天 . 
+如 果 传 入 的  date 不 是 交 易 日 , 则 使 用 这 个 日 期 之 前 的 最 近 的 一 个 交 易 日
+count: 获 取  end_date 前  count 个 日 期 的 数 据
+返 回 
+返 回 一 个  pandas.Panel
+示 例
+
+=== 第40页 ===
+>>> q = query(valuation.turnover_ratio, 
+              valuation.market_cap, 
+              indicator.eps 
+            ).filter(valuation.code.in_(['000001.XSHE', '600000.XSHG'])) 
+ 
+>>> panel = get_fundamentals_continuously(q, enddate='2018-01-01', count=5) 
+ 
+>>> panel  
+ 
+<class 'pandas.core.panel. P a n e l'> 
+Dimensions: 3 (items) x 5 (major_axis) x 2 (minor_axis) 
+Items axis: turnover_ratio to eps 
+Major_axis axis: 2017-12-25 to 2017-12-29 
+Minor_axis axis: 000001.XSHE to 600000.XSHG 
+ 
+>>> panel.minor_xs('600000.XSHG') 
+ 
+turnover_ratio  market_cap  eps 
+day          
+2017-12-25  0.0687  3695.4270   0.48 
+2017-12-26  0.0542  3710.1030   0.48 
+2017-12-27  0.1165  3704.2324   0.48 
+2017-12-28  0.0849  3680.7510   0.48 
+2017-12-29  0.0582  3695.4270   0.48 
+ 
+ 
+>>> panel.major_xs('2017-12-25') 
+ 
+turnover_ratio  market_cap  eps 
+code             
+000001.XSHE 0.9372  2275.0796   0.38 
+600000.XSHG 0.0687  3695.4270   0.48 
+ 
+>>> panel.xs('turnover_ratio',axis=0) 
+# axis=0 表示  items axis; axis=1 表示  major axis; axis=2 表示  minor axis 
+ 
+code    000001.XSHE 600000.XSHG 
+day      
+2017-12-25  0.9372  0.0687 
+2017-12-26  0.6642  0.0542 
+2017-12-27  0.8078  0.1165 
+2017-12-28  0.9180  0.0849 
+2017-12-29  0.5810  0.0582 
+ 
+jy.run_query - 更 多 财 务 及 宏 观 数 据
+from jqdata import jy 
+jy.run_query(query_object) 
+查 询 聚 源 数 据 ， 详 细 的 数 据 字 段 描 述 请 点 击 聚 源 数 据 查 看
+
+=== 第41页 ===
+参 数
+query_object: 一 个sqlalchemy.orm.query.Query 对 象, 可 以 通 过 全 局 的 query 函 数 获 取 Query 对 象
+返 回
+返 回 一 个 pandas.DataFrame, 每 一 行 对 应 数 据 库 返 回 的 每 一 行 , 列 索 引 是 你 查 询 的 所 有 字 段
+注 意
+1. 为 了 防 止 返 回 数 据 量 过 大 , 我 们 每 次 最 多 返 回 3000 行
+2. 不 能 进 行 连 表 查 询 ， 即 同 时 查 询 多 张 表 内 数 据
+示 例
+# 查询'股票基本信息表  - STK_STOCKINFO' 的数据 , 并返回前 10 条数据 
+from jqdata import jy 
+df = jy.run_query(query(jy.LC_StockArchives).limit(10)) 
+ 
+# 打印出公司名称 
+log.info(df['ChiName']) 
+gta.run_query - 更 多 财 务 及 宏 观 数 据
+from jqdata import gta 
+gta.run_query(query_object) 
+查 询 国 泰 安 数 据 ， 详 细 的 数 据 字 段 描 述 请 点 击 国 泰 安 数 据 查 看 ， 数 据 库 包 括 股 票 的 深 度 数 据 、 银 行 财 务 、 宏
+观 数 据 等 。
+注 意 未 来 函 数 ， 建 议 使 用 filter 进 行 过 滤 ；  需 导 入  jqdata 模 块 ， 即 在 策 略 或 研 究 起 始 位 置 加 入from
+jqdata import gta
+参 数
+query_object: 一 个 sqlalchemy.orm.query.Query 对 象
+(http://docs.sqlalchemy.org/en/rel_1_0/orm/query.html), 可 以 通 过 全 局 的 query 函 数 获 取 Query 对 象
+返 回 
+返 回 一 个pandas.DataFrame, 每 一 行 对 应 数 据 库 返 回 的 每 一 行 , 列 索 引 是 你 查 询 的 所 有 字 段
+注 意 ：
+1. 为 了 防 止 返 回 数 据 量 过 大 , 我 们 每 次 最 多 返 回 3000 行
+2. 不 能 进 行 连 表 查 询 ， 即 同 时 查 询 多 张 表 内 数 据
+示 例
+
+=== 第42页 ===
+# 查询'股票基本信息表  - STK_STOCKINFO' 的数据 , 并返回前 10 条数据 
+from jqdata import gta 
+df = gta.run_query(query(gta.STK_STOCKINFO).limit(10)) 
+ 
+# 打印出股票简称 
+log.info(df['SHORTNAME']) 
+ 
+— — — — — — — — — — — — — — — — — — — — — — — — — — — — — — — 
+ 
+# 选出所有的发行价格大于 10 元 , 股票类别为 A 类的的股票 , 并返回前 20 条记录 
+from jqdata import gta 
+df = gta.run_query(query( 
+        gta.STK_STOCKINFO 
+    ).filter( 
+        gta.STK_STOCKINFO.ISSUEPRICE > 10, 
+        gta.STK_STOCKINFO.SHARETYPE == 'A' 
+    ).limit(20)) 
+ 
+— — — — — — — — — — — — — — — — — — — — — — — — — — — — — — — 
+ 
+# 将国泰安数据取到的股票代码转化为聚宽所使用的代码形式 
+from jqdata import gta 
+df = gta.run_query(query(gta.STK_STOCKINFO)) 
+# 获取国泰安提供的 6 为股票代码 
+symbol = df['SYMBOL'][0] 
+# 转化为带后缀的股票代码 
+stock_code = normalize_code(symbol) 
+ 
+# symbol输出为 '000971' 
+# stock_code输出为 '000971.XSHE' 
+get_index_stocks - 获 取 指 数 成 份 股
+get_index_stocks(index_symbol, date=None) 
+获 取 一 个 指 数 给 定 日 期 在 平 台 可 交 易 的 成 分 股 列 表 ， 请 点 击 指 数 列 表 查 看 指 数 信 息
+参 数
+index_symbol: 指 数 代 码
+date: 查 询 日 期 , 一 个 字 符 串 ( 格 式 类 似 ’2015-10-15’) 或 者datetime.date/datetime.datetime 对 象, 可 以 是
+None, 使 用 默 认 日 期 . 这 个 默 认 日 期 在 回 测 和 研 究 模 块 上 有 点 差 别 : 
+1. 回 测 模 块 : 默 认 值 会 随 着 回 测 日 期 变 化 而 变 化 , 等 于 context.current_dt
+2. 研 究 模 块 : 默 认 是 今 天
+返 回 
+返 回 股 票 代 码 的 list
+示 例
+
+=== 第43页 ===
+# 获取所有沪深 300 的股票 
+stocks = get_index_stocks('000300.XSHG') 
+log.info(stocks) 
+get_industry_stocks - 获 取 行 业 成 份 股
+get_industry_stocks(industry_code, date=None) 
+获 取 在 给 定 日 期 一 个 行 业 的 所 有 股 票 ， 行 业 分 类 列 表 见 数 据 页 面 - 行 业 概 念 数 据 。
+参 数
+industry_code: 行 业 编 码
+date: 查 询 日 期 , 一 个 字 符 串 ( 格 式 类 似 ’2015-10-15’) 或 者datetime.date/datetime.datetime 对 象, 可 以 是
+None, 使 用 默 认 日 期 . 这 个 默 认 日 期 在 回 测 和 研 究 模 块 上 有 点 差 别 : 
+1. 回 测 模 块 : 默 认 值 会 随 着 回 测 日 期 变 化 而 变 化 , 等 于 context.current_dt
+2. 研 究 模 块 : 默 认 是 今 天
+返 回 
+返 回 股 票 代 码 的 list
+示 例
+# 获取计算机 /互联网行业的成分股 
+stocks = get_industry_stocks('I64') 
+get_concept_stocks - 获 取 概 念 成 份 股
+get_concept_stocks(concept_code, date=None) 
+获 取 在 给 定 日 期 一 个 概 念 板 块 的 所 有 股 票 ， 概 念 板 块 分 类 列 表 见 数 据 页 面 - 行 业 概 念 数 据 。
+参 数
+concept_code: 概 念 板 块 编 码
+date: 查 询 日 期 , 一 个 字 符 串 ( 格 式 类 似 ’2015-10-15’) 或 者datetime.date/datetime.datetime 对 象, 可 以 是
+None, 使 用 默 认 日 期 . 这 个 默 认 日 期 在 回 测 和 研 究 模 块 上 有 点 差 别 : 
+1. 回 测 模 块 : 默 认 值 会 随 着 回 测 日 期 变 化 而 变 化 , 等 于 context.current_dt
+2. 研 究 模 块 : 默 认 是 今 天
+返 回 
+返 回 股 票 代 码 的 list
+示 例
+# 获取风力发电概念板块的成分股 
+stocks = get_concept_stocks('GN036') 
+
+=== 第44页 ===
+get_all_securities - 获 取 所 有 标 的 信 息
+get_all_securities(types=[], date=None) 
+获 取 平 台 支 持 的 所 有 股 票 、 基 金 、 指 数 、 期 货 信 息
+参 数
+types: list: 用 来 过 滤 securities 的 类 型 , list 元 素 可 选 : ‘stock’, ‘fund’, ‘index’, ‘futures’, ‘etf’, ‘lof’, ‘fja’, ‘fjb’.
+types 为 空 时 返 回 所 有 股 票 , 不 包 括 基 金 , 指 数 和 期 货
+date: 日 期 , 一 个 字 符 串 或 者  datetime.datetime/datetime.date 对 象 , 用 于 获 取 某 日 期 还 在 上 市 的 股 票 信
+息. 默 认 值 为  None, 表 示 获 取 所 有 日 期 的 股 票 信 息
+返 回 
+pandas.DataFrame, 比 如 :get_all_securities()[:2] 返 回:
+display_namenamestart_dateend_date type
+000001.XSHE 平 安 银 行 PAYH1991-04-039999-01-01stock
+000002.XSHE 万 科 Ａ WKA 1991-01-299999-01-01stock
+display_name: 中 文 名 称
+name: 缩 写 简 称
+start_date: 上 市 日 期
+end_date: 退 市 日 期 ， 如 果 没 有 退 市 则 为 2200-01-01
+type: 类 型 ， stock( 股 票 ) ， index( 指 数 ) ， etf(ETF 基 金 ) ， fja （ 分 级 A ） ， fjb （ 分 级 B ）
+示 例
+
+=== 第45页 ===
+def initialize(context): 
+    #获得所有股票列表 
+    log.info(get_all_securities()) 
+    log.info(get_all_securities(['stock'])) 
+ 
+    #将所有股票列表转换成数组 
+    stocks = list(get_all_securities(['stock']).index) 
+ 
+    #获得所有指数列表 
+    get_all_securities(['index']) 
+ 
+    #获得所有基金列表 
+    df = get_all_securities(['fund']) 
+ 
+    #获取所有期货列表 
+    get_all_securities(['futures']) 
+ 
+    #获得etf基金列表 
+    df = get_all_securities(['etf']) 
+    #获得lof基金列表 
+    df = get_all_securities(['lof']) 
+    #获得分级 A基金列表 
+    df = get_all_securities(['fja']) 
+    #获得分级 B基金列表 
+    df = get_all_securities(['fjb']) 
+ 
+    #获得2015年 10 月 10 日还在上市的所有股票列表 
+    get_all_securities(date='2015-10-10') 
+    #获得2015年 10 月 10 日还在上市的  etf 和  lof 基金列表 
+    get_all_securities(['etf', 'lof'], '2015-10-10') 
+get_security_info - 获 取 单 个 标 的 信 息
+get_security_info(code) 
+获 取 股 票 / 基 金 / 指 数 的 信 息 .
+参 数
+code: 证 券 代 码
+返 回 值
+一 个 对 象 , 有 如 下 属 性 :
+
+=== 第46页 ===
+- display_name: 中文名称 
+ 
+ 
+ 
+name: 缩写简称
+start_date: 上市日期 , [datetime.date] 类型
+end_date: 退市日期，  [datetime.date] 类型 , 如果没有退市则为 2200-01-01
+type: 类型， stock( 股票 ) ， index( 指数 ) ， etf(ETF 基金 ) ， fja （分级 A ）， fjb （分级 B ）
+parent: 分级基金的母基金代码
+** 示 例 **
+# 获取基金的母基金 , 下面的判断为真 . 
+assert get_security_info('502050.XSHG').parent == '502048.XSHG' 
+get_billboard_list - 获 取 龙 虎 榜 数 据
+get_billboard_list(stock_list, start_date, end_date, count) 
+获 取 指 定 日 期 区 间 内 的 龙 虎 榜 数 据  ** 参 数 **
+stock_list: 一 个 股 票 代 码 的  list 。  当 值 为  None 时 ，  返 回 指 定 日 期 的 所 有 股 票 。
+start_date: 开 始 日 期
+end_date: 结 束 日 期
+count: 交 易 日 数 量 ，  可 以 与  end_date 同 时 使 用 ，  表 示 获 取  end_date 前  count 个 交 易 日 的 数 据 ( 含
+end_date 当 日 )
+** 返 回 值 **
+pandas.DataFrame ，  各  column 的 含 义 如 下 :
+
+=== 第47页 ===
+- code: 股票代码 
+ 
+ 
+ 
+day: 日期
+direction: ALL 表示『汇总』， SELL 表示『卖』， BUY 表示『买』
+abnormal_code: 异常波动类型
+abnormal_name: 异常波动名称
+sales_depart_name: 营业部名称
+rank: 0 表示汇总，  1~5 表示买一到买 5 ，  6~10 表示卖一到卖五
+buy_value:买入金额
+buy_rate:买入金额占比 ( 买入金额 / 市场总成交额 )
+sell_value:卖出金额
+sell_rate:卖出金额占比 ( 卖出金额 / 市场总成交额 )
+net_value:净额 ( 买入金额  - 卖出金额 )
+amount:市场总成交额
+** 示 例 **
+# 在策略中获取前一日的龙虎榜数据 
+get_billboard_list(stock_list=None, end_date = context.previous_date, count 
+=1) 
+get_locked_shares - 获 取 限 售 解 禁 数 据
+get_locked_shares(stock_list, start_date, end_date, forward_count) 
+获 取 指 定 日 期 区 间 内 的 限 售 解 禁 数 据  ** 参 数 **
+stock_list: 一 个 股 票 代 码 的  list
+start_date: 开 始 日 期
+end_date: 结 束 日 期
+forward_count: 交 易 日 数 量 ，  可 以 与  start_date 同 时 使 用 ，  表 示 获 取  start_date 到  forward_count 个
+交 易 日 区 间 的 数 据
+** 返 回 值 **
+pandas.DataFrame ，  各  column 的 含 义 如 下 :
+
+=== 第48页 ===
+- day: 解禁日期 
+ 
+ 
+ 
+code: 股票代码
+num: 解禁股数
+rate1: 解禁股数 / 总股本
+rate2: 解禁股数 / 总流通股本
+** 示 例 **
+# 在策略中获取个股未来 500 天的解禁情况 
+get_locked_shares(stock_list=['000001.XSHE', '000002.XSHE'], start_date=conte
+xt.current_dt, forward_count=500) 
+jqdata.get_all_trade_days - 获 取 所 有 交 易 日
+jqdata.get_all_trade_days() 
+获 取 所 有 交 易 日 , 不 需 要 传 入 参 数 , 返 回 一 个 包 含 所 有 交 易 日 的  [numpy.ndarray], 每 个 元 素 为 一 个
+[datetime.date] 类 型 . ** 注 ：  需 导 入  jqdata 模 块 ， 即 在 策 略 或 研 究 起 始 位 置 加 入 `import jqdata`**
+jqdata.get_trade_days - 获 取 指 定 范 围 交 易 日
+jqdata.get_trade_days(start_date=None, end_date=None, count=None) 
+获 取 指 定 日 期 范 围 内 的 所 有 交 易 日 , 返 回  [numpy.ndarray], 包 含 指 定 的  start_date 和  end_date, 默 认 返 回 至
+datatime.date.today() 的 所 有 交 易 日  ** 注 ：  需 导 入  jqdata 模 块 ， 即 在 策 略 或 研 究 起 始 位 置 加 入 `import
+jqdata`** ** 参 数 **
+start_date: 开 始 日 期 , 与 count 二 选 一 , 不 可 同 时 使 用. str/datetime.date/datetime.datetime 对 象
+end_date: 结 束 日 期 , str/datetime.date/datetime.datetime 对 象 , 默 认 为  datetime.date.today()
+count: 数 量 , 与 start_date 二 选 一 , 不 可 同 时 使 用, 必 须 大 于  0. 表 示 取  end_date 往 前 的  count 个 交 易
+日 ， 包 含  end_date 当 天 。
+jqdata.get_money_flow - 获 取 资 金 流 信 息
+jqdata.get_money_flow(security_list, start_date=None, end_date=None, fields=N
+one, count=None) 
+获 取 一 只 或 者 多 只 股 票 在 一 个 时 间 段 内 的 资 金 流 向 数 据 ， 仅 包 含 股 票 数 据 ， 不 可 用 于 获 取 期 货 数 据 。  ** 注 ：
+需 导 入  jqdata 模 块 ， 即 在 策 略 或 研 究 起 始 位 置 加 入 `import jqdata`** ** 参 数 **
+security_list: 一 只 股 票 代 码 或 者 一 个 股 票 代 码 的  list
+start_date: 开 始 日 期 , 与 count 二 选 一 , 不 可 同 时 使 用, 一 个 字 符 串 或 者
+datetime.datetime/datetime.date 对 象 , 默 认 为 平 台 提 供 的 数 据 的 最 早 日 期
+
+=== 第49页 ===
+end_date: 结 束 日 期 , 一 个 字 符 串 或 者  datetime.date/datetime.datetime 对 象 , 默 认 为
+datetime.date.today()
+count: 数 量 , 与 start_date 二 选 一 ， 不 可 同 时 使 用, 必 须 大 于  0. 表 示 返 回  end_date 之 前  count 个 交
+易 日 的 数 据 , 包 含  end_date
+fields: 字 段 名 或 者  list, 可 选 . 默 认 为  None, 表 示 取 全 部 字 段 , 各 字 段 含 义 如 下 ：
+|字段名|含义|备注| 
+|---|---|---|---| 
+|date|日期|---| 
+|sec_code|股票代码|---| 
+|change_pct|涨跌幅(%)|---| 
+|net_amount_main|主力净额(万 )|主力净额 = 超大单净额  + 大单净额| 
+|net_pct_main|主力净占比 (%)|主力净占比  = 主力净额  / 成交额| 
+|net_amount_xl|超大单净额 (万 )|超大单：大于等于 50 万股或者 100 万元的成交单| 
+|net_pct_xl|超大单净占比 (%)|超大单净占比  = 超大单净额  / 成交额| 
+|net_amount_l|大单净额(万 )|大单：大于等于 10 万股或则 20 万元且小于 50 万股或者 100 万元的成
+交单| 
+|net_pct_l|大单净占比 (%)|大单净占比  = 大单净额  / 成交额| 
+|net_amount_m|中单净额(万 )|中单：大于等于 2 万股或者 4 万元且小于 10 万股或则 20 万元的成交
+单| 
+|net_pct_m|中单净占比 (%)|中单净占比  = 中单净额  / 成交额| 
+|net_amount_s|小单净额(万 )|小单：小于 2万股或者 4 万元的成交单| 
+|net_pct_s|小单净占比 (%)|小单净占比  = 小单净额  / 成交额| 
+返 回
+返 回 一 个  pandas.DataFrame 对 象 ， 默 认 的 列 索 引 为 取 得 的 全 部 字 段 . 如 果 给 定 了  fields 参 数 , 则 列 索 引 与 给
+定 的 fields 对 应 .
+示 例
+# 获取一只股票在一个时间段内的资金流量数据 
+jqdata.get_money_flow('000001.XSHE', '2016-02-01', '2016-02-04') 
+jqdata.get_money_flow('000001.XSHE', '2015-10-01', '2015-12-30', fields="chan
+ge_pct") 
+jqdata.get_money_flow(['000001.XSHE'], '2010-01-01', '2010-01-30', ["date", 
+"sec_code", "change_pct", "net_amount_main", "net_pct_l", "net_amount_m"]) 
+ 
+— — — — — — — — — — — — — — — — — — — — — — — — — — — — — — — 
+ 
+# 获取多只股票在一个时间段内的资金流向数据 
+jqdata.get_money_flow(['000001.XSHE', '000040.XSHE', '000099.XSHE'], '2010-01
+-01', '2010-01-30') 
+# 获取多只股票在某一天的资金流向数据 
+jqdata.get_money_flow(['000001.XSHE', '000040.XSHE', '000099.XSHE'], '2016-04
+-01', '2016-04-01') 
+ 
+— — — — — — — — — — — — — — — — — — — — — — — — — — — — — — — 
+ 
+# 获取股票  000001.XSHE 在日期  2016-06-30 往前  20 个交易日的资金流量数据 
+jqdata.get_money_flow('000001.XSHE', end_date="2016-06-30", count=20) 
+# 获取股票  000001.XSHE 往前  20 个交易日的资金流量数据 
+jqdata.get_money_flow('000001.XSHE', count=20) 
+
+=== 第50页 ===
+jqdata.macro - 获 取 聚 宽 宏 观 经 济 数 据
+数 据 调 用 方 法
+from jqdata import macro 
+macro.run_query(query_object) 
+参 数
+query_object: 一 个sqlalchemy.orm.query.Query 对 象, 可 以 通 过 全 局 的 query 函 数 获 取 Query 对 象 。
+返 回 
+返 回 一 个  dataframe ，  每 一 行 对 应 数 据 库 返 回 的 每 一 行 ，  列 索 引 是 你 所 查 询 的 字 段
+注 意
+1. 为 了 防 止 返 回 数 据 量 过 大 , 我 们 每 次 最 多 返 回 3000 行
+2. 不 能 进 行 连 表 查 询 ， 即 同 时 查 询 多 张 表 内 数 据
+示 例
+# 查询分地区农林牧渔业总产值表 ( 季度累计 ) 的前 10 条数据 
+q = query(macro.MAC_INDUSTRY_AREA_AGR_OUTPUT_VALUE_QUARTER 
+    ).limit(10) 
+df = macro.run_query(q) 
+# 查询2014年的分地区农林牧渔业总产值表 ( 年度 ) 
+q = query(macro.MAC_INDUSTRY_AREA_AGR_OUTPUT_VALUE_YEAR 
+        ).filter(macro.MAC_INDUSTRY_AREA_AGR_OUTPUT_VALUE_YEAR.stat_year=='20
+14') 
+df = macro.run_query(q) 
+jqlib
+Alpha 101 因 子
+因 子 来 源 ： 
+根 据 WorldQuant LLC 发 表 的 论 文  101 Formulaic Alphas 中 给 出 的  101 个  Alphas 因 子 公 式 ， 我 们 将 公 式 编
+写 成 了 函 数 ， 方 便 大 家 使 用 。
+详 细 介 绍 ： 
+函 数 计 算 公 式 、 API 调 用 方 法 ， 输 入 输 出 值 详 情 请 见 : 数 据 - Alpha 101.
+使 用 方 法 ：
+
+=== 第51页 ===
+# 导入 Alpha101 库 
+>>> from jqlib.alpha101 import * 
+ 
+# 获取沪深 300成分股的  alpha_001 因子值 
+>>> a = alpha_001('2017-03-10','000300.XSHG') 
+ 
+# 查看前 5行的因子值 
+>>> a.head() 
+000001.XSHE   -0.496667 
+000002.XSHE    0.226667 
+000008.XSHE   -0.043333 
+000009.XSHE   -0.093333 
+000027.XSHE   -0.030000 
+Name: rank_value_boolean, dtype: float64 
+ 
+# 查看平安银行的因子值 
+>>> a['000001.XSHE'] 
+-0.49666666666666665 
+ 
+# 获取所有股票  alpha_007 的因子值 
+>>> a = alpha_007('2014-10-22') 
+# 查看欣旺达 (300207) 的因子值 
+>>> a['300207.XSHE'] 
+0.8 
+ 
+# 查询函数说明 
+>>> alpha_101? 
+Type:        cython_function_or_method 
+String form: <cyfunction alpha_101 at 0x7f037a0167d0> 
+Docstring: 
+公式： 
+((close - open) / ((high - low) + .001)) 
+ 
+Inputs: 
+    enddate: 查询日期 
+    index: 股票池 
+ 
+Outputs: 
+    因子的值 
+Alpha 191 因 子
+因 子 来 源 ： 
+根 据 国 泰 君 安 数 量 化 专 题 研 究 报 告  - 基 于 短 周 期 价 量 特 征 的 多 因 子 选 股 体 系 给 出 了  191 个 短 周 期 交 易 型 阿 尔
+法 因 子 ， 方 便 大 家 使 用 。
+详 细 介 绍 ： 
+函 数 计 算 公 式 、 API 调 用 方 法 ， 输 入 输 出 值 详 情 请 见 : 数 据 - Alpha 191.
+使 用 方 法 ：
+
+=== 第52页 ===
+# 导入 Alpha191 库 
+>>> from jqlib.alpha191 import * 
+ 
+# 获取沪深 300成分股的  alpha_001 因子值 
+>>> a = alpha_001('2017-03-10','000300.XSHG') 
+ 
+# 查看前 5行的因子值 
+>>> a.head() 
+000001.XSHE   -0.496667 
+000002.XSHE    0.226667 
+000008.XSHE   -0.043333 
+000009.XSHE   -0.093333 
+000027.XSHE   -0.030000 
+Name: rank_value_boolean, dtype: float64 
+ 
+# 查看平安银行的因子值 
+>>> a['000001.XSHE'] 
+-0.49666666666666665 
+ 
+# 获取所有股票  alpha_007 的因子值 
+>>>end_date = '2017-04-04' 
+>>>code = list(get_all_securities(['stock'],date=end_date).index) 
+>>> a = alpha_007(code,end_date) 
+# 查看欣旺达 (300207) 的因子值 
+>>> a['300207.XSHE'] 
+1.2494895018526142 
+ 
+# 查询函数说明 
+>>> alpha_001? 
+Signature: alpha_001(code, end_date=None) 
+Docstring: 
+公式： 
+    (-1 * CORR(RANK(DELTA(LOG(VOLUME),1)),RANK(((CLOSE-OPEN)/OPEN)),6) 
+Inputs: 
+    code: 股票池 
+    end_date: 查询日期 
+Outputs: 
+    因子的值 
+File:      ~/alpha191.py 
+Type:      function 
+技 术 分 析 指 标
+因 子 说 明 : 
+为 了 让 用 户 有 更 多 可 直 接 调 用 的 技 术 分 析 指 标 因 子 ， 我 们 计 划 基 于 通 达 信 、 东 方 财 富 、 同 花 顺 等 的 公 式 ， 来
+完 善 我 们 的 技 术 分 析 指 标 因 子 库 。
+我 们 给 出 了 公 式 的 API 、 参 数 说 明 、 返 回 值 的 结 果 及 类 型 说 明 、 备 注 （ 相 较 于 上 述 三 家 结 果 及 算 法 的 比 对 ） 、
+用 法 注 释 及 示 例 ， 旨 在 帮 助 您 更 方 便 、 更 快 速 的 在 策 略 研 究 中 使 用 这 些 因 子 函 数 。
+详 细 介 绍 ： 
+函 数 计 算 公 式 、 API 调 用 方 法 ， 用 法 注 释 ，  输 入 输 出 值 详 情 请 见 : 数 据 - 技 术 分 析 指 标.
+
+=== 第53页 ===
+使 用 方 法 ：
+# 导入 Alpha101 库 
+>>> from jqlib.technical_analysis import * 
+ 
+# 定义股票池列表 
+security_list1 = '000001.XSHE' 
+security_list2 = ['000001.XSHE','000002.XSHE','601211.XSHG','603177.XSHG'] 
+ 
+ 
+# 计算并输出  security_list1 的  GDX 值，分别返回：济安线、压力线和支撑线的值。 
+gdx_jax, gdx_ylx, gdx_zcx = GDX(security_list1,check_date='2017-01-04', N = 3
+0, M = 9) 
+print gdx_jax[security_list1] 
+print gdx_ylx[security_list1] 
+print gdx_zcx[security_list1] 
+ 
+# 输出 security_list2 的  GDX 值 
+gdx_jax, gdx_ylx, gdx_zcx = GDX(security_list2,check_date='2017-01-04', N = 3
+0, M = 9) 
+for stock in security_list2: 
+    print gdx_jax[stock] 
+    print gdx_ylx[stock] 
+    print gdx_zcx[stock] 
+ 
+# 查询函数说明 
+>>> GDX? 
+Signature: GDX(security_list, check_date, N=30, M=9) 
+Docstring: 
+ 计算公式： 
+    AA:=ABS((2*CLOSE+HIGH+LOW)/4-MA(CLOSE,N))/MA(CLOSE,N);  
+    JAX:DMA(CLOSE,AA); 
+    压力线 :(1+M/100)*JAX;  
+    支撑线 :(1-M/100)*JAX;  
+    AA赋值 :(2*收盘价+最高价 + 最低价 )/4-收盘价的 N日简单移动平均的绝对值 / 收盘价的 N 日简单
+移动平均 
+    输出济安线  = 以 AA 为权重收盘价的动态移动平均 
+    输出压力线  = (1+M/100)*JAX 
+    输出支撑线  = (1-M/100)*JAX 
+输入： 
+    security_list: 股票列表 
+    check_date ：要查询数据的日期 
+    N：统计的天数  N 
+    M：统计的天数  M 
+输出： 
+    济安线、压力线和支撑线的值。 
+输出结果类型： 
+    字典 (dict) ：键 (key) 为股票代码，值 (value) 为数据。 
+下 单 函 数
+
+=== 第54页 ===
+提 示 ： 所 有 下 单 函 数 可 以 在  handle_data 中  与  定 时 运 行 函 数 的 time 参 数 为  “every_bar”, “open”,
+“morning”, “night” 时 使 用 。
+order - 按 股 数 下 单
+order(security, amount, style=None, side='long', pindex=0) 
+买 卖 标 的 。 调 用 成 功 后 , 您 将 可 以 调 用get_open_orders 取 得 所 有 未 完 成 的 交 易 , 也 可 以 调 用cancel_order 取
+消 交 易
+参 数
+security: 标 的 代 码
+amount: 交 易 数 量 , 正 数 表 示 买 入 , 负 数 表 示 卖 出
+style: 参 见order styles, None 代 表 MarketOrder
+side: ‘long’/’short’ ， 开 空 单 还 是 多 单 。 默 认 为 多 单 ， 股 票 、 基 金 暂 不 支 持 开 空 单 。
+pindex: 在 使 用 set_subportfolios 创 建 了 多 个 仓 位 时 ， 指 定 subportfolio 的 序 号 , 从  0 开 始 , 比 如  0 指 定
+第 一 个  subportfolio, 1 指 定 第 二 个  subportfolio ， 默 认 为 0 。
+返 回 
+Order 对 象 或 者 None, 如 果 创 建 订 单 成 功 , 则 返 回 Order 对 象 , 失 败 则 返 回 None
+示 例
+#买入平安银行股票 100 股 
+order('000001.XSHE', 100) # 下一个市价单 
+order('000001.XSHE', 100, MarketOrderStyle()) # 下一个市价单 , 功能同上 
+order('000001.XSHE', 100, LimitOrderStyle(10.0)) # 以10块价格下一个限价单 
+可 能 的 失 败 原 因:
+1. 股 票 数 量 经 调 整 后 变 成 0 ( 请 看 下 面 的 说 明 )
+2. 股 票 停 牌
+3. 股 票 未 上 市 或 者 退 市
+4. 股 票 不 存 在
+5. 为 股 票 、 基 金 开 了 空 单
+6. 选 择 了 不 存 在 的 仓 位 号 ， 如 没 有 建 立 多 个 仓 位 ， 而 设 定 pindex 的 数 大 于 0
+对 于 原 因 4, 我 们 会 抛 出 异 常 停 止 运 行 , 因 为 我 们 认 为 这 是 您 代 码 的 bug.
+注 意:
+因 为 下 列 原 因 , 有 时 候 实 际 买 入 或 者 卖 出 的 股 票 数 量 跟 您 设 置 的 不 一 样 ， 这 个 时 候 我 们 会 在 您 的 log 中 添
+加 警 告 信 息 。
+1. 买 入 时 会 根 据 您 当 前 的 现 金 来 限 制 您 买 入 的 数 量
+2. 卖 出 时 会 根 据 您 持 有 股 票 的 数 量 来 限 制 您 卖 出 的 数 量
+3. 我 们 会 遵 守 A 股 交 易 规 则 : 每 次 交 易 数 量 只 能 是 100 的 整 数 倍 , 但 是 卖 光 所 有 股 票 时 不 受 这 个 限 制
+根 据 交 易 所 规 则 , 每 天 结 束 时 会 取 消 所 有 未 完 成 交 易
+
+=== 第55页 ===
+order_target - 目 标 股 数 下 单
+order_target(security, amount, style=None, side='long', pindex=0) 
+买 卖 标 的 , 使 最 终 标 的 的 数 量 达 到 指 定 的 amount
+参 数
+security: 标 的 代 码
+amount: 期 望 的 最 终 数 量
+style: 参 见order styles, None 代 表 MarketOrder
+side: ‘long’/’short’ ， 平 空 单 还 是 多 单 。 默 认 为 多 单 ， 股 票 、 基 金 暂 不 支 持 开 空 单 。
+pindex: 在 使 用 set_subportfolios 创 建 了 多 个 仓 位 时 ， 指 定 subportfolio 的 序 号 , 从  0 开 始 , 比 如  0 为  指
+定 第 一 个  subportfolio, 1 为 指 定 第 二 个  subportfolio ， 默 认 为 0 。
+返 回 
+Order 对 象 或 者 None, 如 果 创 建 委 托 成 功 , 则 返 回 Order 对 象 , 失 败 则 返 回 None
+示 例
+# 卖出平安银行所有股票 
+order_target('000001.XSHE', 0) 
+# 买入平安银行所有股票到 100 股 
+order_target('000001.XSHE', 100) 
+order_value - 按 价 值 下 单
+order_value(security, value, style=None, side='long', pindex=0) 
+买 卖 价 值 为 value 的 股 票 ， 金 融 期 货 暂 不 支 持 该 API
+参 数
+security: 股 票 名 字
+value: 股 票 价 值
+style: 参 见order styles, None 代 表 MarketOrder
+side: ‘long’/’short’ ， 平 空 单 还 是 多 单 。 默 认 为 多 单 ， 股 票 、 基 金 暂 不 支 持 开 空 单 。
+pindex: 在 使 用 set_subportfolios 创 建 了 多 个 仓 位 时 ， 指 定 subportfolio 的 序 号 , 从  0 开 始 , 比 如  0 为  指
+定 第 一 个  subportfolio, 1 为 指 定 第 二 个  subportfolio ， 默 认 为 0 。
+返 回 
+Order 对 象 或 者 None, 如 果 创 建 委 托 成 功 , 则 返 回 Order 对 象 , 失 败 则 返 回 None
+示 例
+#卖出价值为 10000 元的平安银行股票 
+order_value('000001.XSHE', -10000) 
+#买入价值为 10000 元的平安银行股票 
+order_value('000001.XSHE', 10000) 
+
+=== 第56页 ===
+order_target_value - 目 标 价 值 下 单
+order_target_value(security, value, style=None, side='long', pindex=0) 
+调 整 股 票 仓 位 到 value 价 值 ， 金 融 期 货 暂 不 支 持 该 API
+参 数
+security: 股 票 名 字
+value: 期 望 的 股 票 最 终 价 值
+style: 参 见order styles, None 代 表 MarketOrder
+side: ‘long’/’short’ ， 平 空 单 还 是 多 单 。 默 认 为 多 单 ， 股 票 、 基 金 暂 不 支 持 开 空 单 。
+pindex: 在 使 用 set_subportfolios 创 建 了 多 个 仓 位 时 ， 指 定 subportfolio 的 序 号 , 从  0 开 始 , 比 如  0 为  指
+定 第 一 个  subportfolio, 1 为 指 定 第 二 个  subportfolio ， 默 认 为 0 。
+返 回 
+Order 对 象 或 者 None, 如 果 创 建 委 托 成 功 , 则 返 回 Order 对 象 , 失 败 则 返 回 None
+示 例
+#卖出平安银行所有股票 
+order_target_value('000001.XSHE', 0) 
+#调整平安银行股票仓位到 10000 元价值 
+order_target_value('000001.XSHE', 10000) 
+cancel_order - 撤 单
+cancel_order(order) 
+取 消 订 单
+参 数
+order: Order 对 象 或 者 order_id
+返 回 
+Order 对 象 或 者 None, 如 果 取 消 委 托 成 功 , 则 返 回 Order 对 象 , 委 托 不 存 在 返 回 None
+示 例
+#每个交易日结束运行 
+def after_trading_end(context): 
+    # 得到当前未完成订单 
+    orders = get_open_orders() 
+    # 循环，撤销订单 
+    for _order in orders.values(): 
+        cancel_order(_order) 
+get_open_orders - 获 取 未 完 成 订 单
+
+=== 第57页 ===
+get_open_orders() 
+获 得 当 天 的 所 有 未 完 成 的 订 单
+参 数 
+无
+返 回 
+返 回 一 个 dict, key 是 order_id, value 是Order 对 象
+示 例
+#每个交易日结束运行 
+def after_trading_end(context): 
+    #得到当前未完成订单 
+    orders = get_open_orders() 
+    for _order in orders.values(): 
+        log.info(_order.order_id) 
+get_orders - 获 取 订 单 信 息
+get_orders(order_id=None, security=None, status=None) 
+获 取 当 天 的 所 有 订 单
+参 数
+order_id: 订 单  id
+security: 标 的 代 码 ， 可 以 用 来 查 询 指 定 标 的 的 所 有 订 单
+status: OrderStatus ， 查 询 特 定 订 单 状 态 的 所 有 订 单
+返 回 
+返 回 一 个 dict, key 是 order_id, value 是Order 对 象
+示 例
+
+=== 第58页 ===
+#每个交易日结束运行 
+def after_trading_end(context): 
+    #得到当天所有订单 
+    orders = get_orders() 
+    for _order in orders.values(): 
+        log.info(_order.order_id) 
+ 
+    # 根据订单 id查询订单 
+    get_orders(order_id='1517627499')    
+ 
+    # 查询所有标的为  000002.XSHE 的订单 
+    get_orders(security='000002.XSHE')   
+ 
+    # 查询订单状态为  OrderStatus.held 的所有订单 
+    get_orders(status=OrderStatus.held) 
+ 
+    # 查询标的为  000002.XSHE 且状态为  OrderStatus.held 的所有订单 
+    get_orders(security='000002.XSHE', status=OrderStatus.held) 
+ 
+get_trades - 获 取 成 交 信 息
+get_trades() 
+获 取 当 天 的 所 有 成 交 记 录 , 一 个 订 单 可 能 分 多 次 成 交
+参 数 
+无
+返 回 
+返 回 一 个 dict, key 是 trade_id, value 是Trade 对 象
+示 例
+#每个交易日结束运行 
+def after_trading_end(context): 
+    #得到当天所有成交记录 
+    trades = get_trades() 
+    for _trade in trades.values(): 
+        log.info(_trade.trade_id) 
+其 他 函 数
+定 时 运 行  ♠
+run_monthly
+run_weekly
+run_daily
+
+=== 第59页 ===
+def initialize(context): 
+    # 按月运行 
+    run_monthly(func, monthday, time='open', reference_security) 
+    # 按周运行 
+    run_weekly(func, weekday, time='open', reference_security) 
+    # 每天内何时运行 
+    run_daily(func, time='open', reference_security) 
+回 测 环 境 / 模 拟 专 用 API
+指 定 每 月 , 每 周 或 者 每 天 要 运 行 的 函 数 , 可 以 在 具 体 每 月 / 周 的 第 几 个 交 易 日 ( 或 者 倒 数 第 几 天 ) 的 某 一 分 钟 执
+行 。
+在 日 级 模 拟 中 使 用 时 ， 如 果 设 置  time=’open’ 或  time=’9:30’ ， 策 略 的 实 际 运 行 时 间 是 9:27~9:30 之 间 。 策 略 类
+获 取 到 逻 辑 时 间 (context.current_dt) 仍 然 是  9:30 。
+调 用 这 些 函 数 后 , handle_data 可 以 不 实 现
+参 数
+参 数 解 释
+func 一 个 函 数 , 此 函 数 必 须 接 受 context 参 数
+monthday 每 月 的 第 几 个 交 易 日 , 可 以 是 负 数 , 表 示 倒 数 第 几 个 交 易 日 。 如 果 超 出 每 月 总 交 易 日 个
+数 ， 则 取 临 近 的 交 易 日 执 行 。 （ 具 体 见 下 方 注 意 中 的 示 例 ）
+weekday 每 周 的 第 几 个 交 易 日 , 可 以 是 负 数 , 表 示 倒 数 第 几 个 交 易 日 。 如 果 超 出 每 周 总 交 易 日 个
+数 ， 则 取 临 近 的 交 易 日 执 行 。 （ 具 体 见 下 方 注 意 中 的 示 例 ）
+time 一 个 字 符 串 , 可 以 是 具 体 执 行 时 间 , 支 持  time 表 达 式 。 比 如  “10:00”, “01:00”, 或 者
+“every_bar”, “open”, “before_open”, “after_close”, “morning” 和  “night” 。 ( 具 体 执 行
+时 间 如 见 下 方 )
+time 表 达 式 具 有  ‘base +/-offset’ 的 形 式 ， 如 ： ’open-30m’ 表 示 开 盘 前 30 分
+钟 ，’close+1h30m’ 表 示 收 盘 后 一 小 时 三 十 分 钟 。
+reference_security 时 间 的 参 照 标 的 。
+如 参 照  ‘000001.XSHG’ ， 交 易 时 间 为  9:30-15:00 。
+如 参 照 ’IF1512.CCFX’ ， 2016-01-01 之 后 的 交 易 时 间 为  9:30-15:00 ， 在 此 之 前 为
+9:15-15:15 。
+如 参 照 ’A9999.XDCE’ ， 因 为 有 夜 盘 ， 因 此 开 始 时 间 为 21:00 ， 结 束 时 间 为 15:00 。
+base 具 体 执 行 时 间
+具 体 时 间 24 小 时 内 的 任 意 时 间 ， 如 ”10:00”, “01:00”
+every_bar 只 能 在  run_daily 中 调 用 ；  按 天 会 在 每 天 的 开 盘 时 调 用 一 次 ， 按 分 钟 会 在 每 天 的 每 分 钟 运
+行
+open 开 盘 时 运 行 ( 等 同 于 ”9:30”)
+before_open 早 上 9:00 运 行
+
+=== 第60页 ===
+base 具 体 执 行 时 间
+after_close 下 午 15:30 运 行
+morning 早 上 8:00 运 行
+night 晚 上 20:00 运 行
+返 回 值 
+None
+注 意
+参 数 func 必 须 是 一 个 全 局 的 函 数 , 不 能 是 类 的 成 员 函 数, 示 例 :
+```python 
+ 
+def on_week_start(context): 
+    pass 
+ 
+class MyObject(object): 
+    def on_week_start2(self, context): 
+        pass 
+ 
+def initialize(context): 
+    # OK 
+    run_weekly(on_week_start, 1) 
+    # 错误, 下面的语句会报错 
+    run_weekly(MyObject().on_week_start2, 1) 
+``` 
+通 过history/attribute_history 取 天 数 据 时 , 是 不 包 括 当 天 的 数 据 的( 即 使 在 15:00 和 after_close 里 面 也 是
+如 此), 要 取 得 当 天 数 据 , 只 能 取 分 钟 的
+这 些 函 数 可 以 重 复 调 用, 比 如 下 面 的 代 码 可 以 在 每 周 的 第 一 个 交 易 日 和 最 后 一 个 交 易 日 分 别 调 用 两 个 函
+数:
+```python 
+def on_week_start(context): 
+    pass 
+def on_week_end(context): 
+    pass 
+def initialize(context): 
+    run_weekly(on_week_start, 1) 
+    run_weekly(on_week_end, -1) 
+``` 
+每 次 调 用 这 些 函 数 都 会 产 生 一 个 新 的 定 时 任 务 , 如 果 想 修 改 或 者 删 除 旧 的 定 时 任 务 , 请 先 调 用
+unschedule_all 来 删 除 所 有 定 时 任 务 , 然 后 再 添 加 新 的 .
+在 一 月 / 一 周 交 易 日 数 不 够 以 致 于 monthday/weekday 无 法 满 足 时 , 我 们 会 找 这 周 内 最 近 的 一 个 日 期 来 执
+行, 比 如 , 如 果 某 一 周 只 有 4 个 交 易 日 :
+若 weekday == 5, 我 们 会 在 第 4 个 交 易 日 执 行
+
+=== 第61页 ===
+若 weekday == -5, 我 们 会 在 第 1 个 交 易 日 执 行
+如 果 要 避 免 这 样 的 行 为 , 您 可 以 这 样 做 :
+```python 
+def initialize(context): 
+    run_weekly(weekly, 1) 
+ 
+def weekly(context): 
+    if context.current_dt.isoweekday() != 1: 
+        # 不在周一 , 跳过执行 
+        return 
+``` 
+示 例
+def weekly(context): 
+    print 'weekly %s %s' % (context.current_dt, context.current_dt.isoweekday
+()) 
+ 
+ 
+def monthly(context): 
+    print 'monthly %s %s' % (context.current_dt, context.current_dt.month) 
+ 
+ 
+def daily(context): 
+    print 'daily %s' % context.current_dt 
+ 
+ 
+def initialize(context): 
+ 
+    # 指定每月第一个交易日 , 在开盘后十分钟执行 
+    run_monthly(monthly, 1, 'open+10m') 
+ 
+    # 指定每周倒数第一个交易日 , 在开盘前执行 
+    run_weekly(weekly, -1, 'before_open') 
+ 
+    # 指定每天收盘前 10 分钟运行 
+    run_weekly(daily, 'close - 10m') 
+ 
+    # 指定每天收盘后执行 
+    run_daily(daily, 'after_close') 
+ 
+    # 指定在每天的 10:00 运行 
+    run_daily(daily, '10:00') 
+ 
+    # 指定在每天的 01:00 运行 
+    run_daily(daily, '01:00') 
+ 
+    # 参照股指期货的时间每分钟运行一次 , 必须选择分钟回测 , 否则每天执行 
+    run_daily(daily, 'every_bar', reference_security='IF1512.CCFX') 
+
+=== 第62页 ===
+取 消 所 有 定 时 运 行  ♠
+# 取消所有定时运行 
+unschedule_all() 
+画 图 函 数 record ♠
+record(**kwargs) 
+回 测 环 境 / 模 拟 专 用 API
+我 们 会 帮 您 在 图 表 上 画 出 收 益 曲 线 和 基 准 的 收 益 曲 线 ， 您 也 可 以 调 用 record 函 数 来 描 画 额 外 的 曲 线 。  
+因 为 我 们 是 按 天 展 现 的 ， 如 果 您 使 用 按 分 钟 回 测 ， 我 们 画 出 的 点 是 您 最 后 一 次 调 用 record 的 值 。
+参 数 
+很 多key=>value 形 式 的 参 数 ， key 曲 线 名 称 ， value 为 值
+返 回 
+None
+示 例
+# d是一个 SecurityUnitData 结构体，会画出每个单元时间 ( 天或分钟 ) 的平均价 , 开始价 , 结束价 
+record(price=d.price, open=d.open, close=d.close) 
+# 也可以画一条 100 的直线 
+record(price=100) 
+发 送 自 定 义 消 息  ♠
+send_message(message, channel='weixin') 
+回 测 环 境 / 模 拟 专 用 API
+给 用 户 自 己 发 送 消 息 , 暂 时 只 支 持 微 信 消 息 .
+参 数 
+message: 消 息 内 容 . 字 符 串 . 
+channel: 消 息 渠 道 , 暂 时 只 支 持 微 信 : weixin. 默 认 值 是  weixin
+返 回 值 
+True/False, 表 示 是 否 发 送 成 功 . 当 发 送 失 败 时 , 会 在 日 志 中 显 示 错 误 信 息 .
+注 意
+要 使 用 功 能 , 必 须 开 启 模 拟 交 易 的  微 信 通 知.
+此 功 能 只 能 在  模 拟 交 易 中 使 用 , 回 测 中 使 用 会 直 接 忽 略 , 无 任 何 提 示 .
+微 信 消 息 每 人 每 天 不 超 过  5 条, 超 出 会 失 败 .
+微 信 消 息 主 页 只 显 示 前  200 个 字 符 , 点 击 详 情 可 查 看 全 部 消 息 , 全 部 消 息 不 得 超 过  10000 个 字 符 .
+
+=== 第63页 ===
+示 例
+send_message("测试消息 ") 
+日 志log
+log.error(content) 
+log.warn(content) 
+log.info(content) 
+log.debug(content) 
+print content1, content2, ... 
+分 级 别 打 log, 跟 python 的 logging 模 块 一 致  
+print 输 出 的 结 果 等 同 于 log.info, 但 是 print 后 面 的 每 一 个 元 素 会 占 用 一 行
+参 数 
+参 数 可 以 是 字 符 串 、 对 象 等
+返 回 
+None
+示 例
+log.info(history(10)) # 打印出  history(10) 返回的结果 
+log.info("Selling %s, amount=%s", security, amount) # 打印出一个格式化后的字符串 
+print history(10), data, context.portfolio 
+设 定log 级 别 ： log.set_level
+log.set_level(name, level) 
+设 置 不 同 种 类 的 log 的 级 别 , 低 于 这 个 级 别 的 log 不 会 输 出 . 所 有 log 的 默 认 级 别 是 debug
+参 数 
+name: 字 符 串 , log 种 类 , 必 须 是 ’order’, ‘history’, ‘strategy’ 中 的 一 个 , 含 义 分 别 是 :
+order: 调 用 order 系 列 API 产 生 的 log
+history: 调 用 history 系 列 API(history/attribute_history/get_price) 产 生 的 log
+strategy: 您 自 己 在 策 略 代 码 中 打 的 log
+level: 字 符 串 , 必 须 是 ’debug’, ‘info’, ‘warning’, ‘error’ 中 的 一 个 , 级 别 : debug < info < warning < error
+返 回 
+None
+示 例
+
+=== 第64页 ===
+# 过滤掉 order 系列 API 产生的比 error 级别低的 log 
+log.set_level('order', 'error') 
+write_file - 写 文 件
+write_file(path, content, append=False) 
+写 入 内 容 到 研 究 模 块 path 文 件 , 写 入 后 , 您 可 以 立 即 在 研 究 模 块 中 看 到 这 个 文 件
+参 数
+path: 相 对 路 径 , 相 对 于 您 的 私 有 空 间 的 根 目 录 的 路 径
+content: 文 件 内 容 , str 或 者 unicode, 如 果 是 unicode, 则 会 使 用 UTF-8 编 码 再 存 储 . 可 以 是 二 进 制 内 容 .
+append: 是 否 是 追 加 模 式 , 当 为 False 会 清 除 原 有 文 件 内 容 ， 默 认 为 False.
+返 回 
+None 
+如 果 写 入 失 败 ( 一 般 是 因 为 路 径 不 合 法 ), 会 抛 出 异 常
+示 例
+write_file("test.txt", "hello world") 
+ 
+# 写入沪深 300的股票到 HS300.stocks.json 文件中 
+import json 
+write_file('HS300.stocks.json', json.dumps(get_index_stocks('000300.XSHG'))) 
+ 
+# 把 DataFrame 表保存到文件 
+df = attribute_history('000001.XSHE', 5, '1d') #获取DataFrame 表 
+write_file('df.csv', df.to_csv(), append=False) #写到文件中 
+ 
+## 详细用法可以参考文档： https://www.joinquant.com/post/580 
+ 
+read_file - 读 文 件
+read_file(path) 
+读 取 你 的 私 有 文 件 ( 您 的 私 有 文 件 可 以 在 研 究 模 块 中 看 到 )
+参 数 
+path: 相 对 路 径 , 相 对 于 您 的 私 有 空 间 的 根 目 录 的 路 径
+返 回 
+返 回 文 件 的 原 始 内 容 , 不 做 任 何 decode.
+示 例
+
+=== 第65页 ===
+#解析json文件 
+import json 
+content = read_file('HS300.stocks.json') 
+securities = json.loads(content) 
+log.info(securities) 
+ 
+#解析csv文件 
+import pandas as pd 
+from six import StringIO 
+body=read_file("open.csv") 
+data=pd.read_csv(StringIO(body)) 
+ 
+## 详细用法可以参考文档： https://www.joinquant.com/post/580 
+自 定 义 python 库
+您 可 以 在 把 .py 文 件 放 在 ’ 研 究 ’ 的 根 目 录 , 然 后 在 回 测 中 就 可 以 通 过 import 的 方 式 来 引 用 此 文 件 . 比 如
+研 究 根 目 录 /mylib.py:
+#-*- coding: utf-8 -*- 
+# 如果你的文件包含中文 , 请在文件的第一行使用上面的语句指定你的文件编码 
+ 
+# 用到回测 API请加入下面的语句 
+from kuanke.user_space_api import * 
+ 
+my_stocks = get_index_stocks('000300.XSHG') 
+ 
+在 策 略 代 码 中 :
+# 导入自己创建的库 
+from mylib import * 
+ 
+def initialize(context): 
+    log.info(my_stocks) 
+注 意: 暂 时 只 能 import 研 究 根 目 录 下 的 .py 文 件 , 还 不 能 import 子 目 录 下 的 文 件 ( 比 如 通 过  import a.b.c 来 引 用
+a/b/c.py)
+研 究 中 创 建 回 测 函 数
+create_backtest(algorithm_id, start_date, end_date, frequency="day", initial_
+cash=10000, initial_positions=None, extras=None, name=None) 
+通 过 一 个 策 略 ID 从 研 究 中 创 建 回 测 ， 暂 不 支 持 期 货 回 测
+参 数 ：
+
+=== 第66页 ===
+algorithm_id: 策 略 ID ， 从 策 略 编 辑 页 的  url 中 获 取 , 比 如  ‘/algorithm/index/edit?algorithmId=xxxx’ ， 则 策
+略ID 为  xxxx
+start_date: 回 测 开 始 日 期
+end_date: 回 测 结 束 日 期
+frequency: 数 据 频 率 ， 支 持  day ， minute
+initial_cash: 初 始 资 金
+extras: 额 外 参 数 ， 一 个  dict ，  用 于 设 置 全 局 的  g 变 量 ， 如  extras={‘x’:1, ‘y’:2} ， 则 回 测 中  g.x = 1, g.y
+= 2 ， 需 要 注 意 的 是 ， 该 参 数 的 值 是在 initialize 函数执行之后 才 设 置 给  g 变 量 的 ， 所 以 这 会 覆
+盖 掉 initialize 函 数 中  g 变 量 同 名 属 性 的 值
+name: 回 测 名 , 用 于 指 定 回 测 名 称 , 如 果 没 有 指 定 则 默 认 采 用 策 略 名 作 为 回 测 名
+initial_positions: 初 始 持 仓 。 持 仓 会 根 据 价 格 换 成 现 金 加 到 初 始 资 金 中 ， 如 果 没 有 给 定 价 格 则 默 认 获 取
+股 票 最 近 的 价 格 。 格 式 如 下 :
+initial_positions = [ 
+    { 
+        'security':'000001.XSHE', 
+        'amount':'100', 
+    }, 
+    { 
+        'security':'000063.XSHE', 
+        'amount':'100', 
+        'avg_cost': '1.0' 
+    }, 
+] 
+返 回 ：
+一 个 字 符 串 , 即  backtest_id
+示 例 ：
+
+=== 第67页 ===
+algorithm_id = "xxxx" 
+extra_vars = {'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5} 
+initial_positions = [ 
+    { 
+        'security':'000001.XSHE', 
+        'amount':'100', 
+    }, 
+    { 
+        'security':'000063.XSHE', 
+        'amount':'100', 
+        'avg_cost': '1.0' 
+    }, 
+] 
+ 
+params = { 
+    "algorithm_id": algorithm_id, 
+    "start_date": "2015-10-01", 
+    "end_date": "2016-07-31", 
+    "frequency": "day", 
+    "initial_cash": "1000000", 
+    "initial_positions": initial_positions, 
+    "extras": extra_vars, 
+} 
+ 
+created_bt_id = create_backtest(**params) 
+print(created_bt_id) 
+研 究 中 获 取 回 测 信 息
+gt = get_backtest(backtest_id) 
+参 数 ：
+backtest_id: 回 测 ID ， 从 回 测 详 情 页 的  url 中 获 取 , 比 如  ‘/algorithm/backtest/detail?backtestId=’ ， 则 回
+测ID 为  xxxx 。 如 下 图 所 示 ：
+返 回 ：
+gt.get_status(): 获 取 回 测 状 态. 返 回 一 个 字 符 串 ， 其 含 义 分 别 为 ：  
+none: 未 开 始
+running: 正 在 进 行
+done: 完 成
+failed: 失 败
+
+=== 第68页 ===
+canceled: 取 消
+paused: 暂 停
+deleted: 已 删 除
+gt.get_params() ： 获 得 回 测 参 数. 返 回 一 个  dict, 包 含 调 用  create_backtest 时 传 入 的 所 有 信 息 . ( 注 ：
+algorithm_id ， initial_positions ， extras 只 有 在 研 究 中 创 建 的 回 测 才 能 取 到 )
+gt.get_results() ： 获 得 收 益 曲 线. 返 回 一 个  list ， 每 个 交 易 日 是 一 个  dict ， 键 的 含 义 如 下 ：  
+time: 时 间
+returns: 收 益
+benchmark_returns: 基 准 收 益
+如 果 没 有 收 益 则 返 回 一 个 空 的  list
+gt.get_positions() ： 获 得 持 仓 详 情. 返 回 一 个  list ， 每 个 交 易 日 为 一 个  dict ， 键 的 含 义 为 ：  
+time: 时 间
+security: 证 券 代 码
+security_name: 证 券 名 称
+amount: 持 仓 数 量
+price: 股 票 价 格
+avg_cost: 买 入 股 票 平 均 每 股 所 花 的 钱
+closeable_amount: 可 平 仓 数 量
+如 果 没 有 持 仓 则 返 回 一 个 空 的  list
+gt.get_orders() ： 获 得 交 易 详 情. 返 回 一 个  list ， 每 个 交 易 日 为 一 个  dict ， 键 的 含 义 为 ：  
+time: 时 间
+security: 证 券 代 码
+security_name: 证 券 名 称
+action: 交 易 类 型 , 开 仓 (‘open’)/ 平 仓 (‘close’)
+amount: 下 单 数 量
+filled: 成 交 数 量
+price: 平 均 成 交 价 格
+commission: 交 易 佣 金
+如 果 没 有 持 仓 则 返 回 一 个 空 的  list
+gt.get_records() ： 获 得 所 有  record 记 录. 返 回 一 个  list ， 每 个 交 易 日 为 一 个  dict ， 键 是  time 以 及 调 用
+record() 函 数 时 设 置 的 值 .
+gt.get_risk() ： 获 得 总 的 风 险 指 标. 返 回 一 个  dict ， 键 是 各 类 收 益 指 标 数 据 ， 如 果 没 有 风 险 指 标 则 返 回 一
+个 空 的  dict.
+gt.get_period_risks() ： 获 得 分 月 计 算 的 风 险 指 标. 返 回 一 个  dict ， 键 是 各 类 指 标 , 值 为 一 个
+pandas.DataFrame. 如 果 没 有 风 险 指 标 则 返 回 一 个 空 的  dict.
+示 例 ：
+gt = get_backtest("xxxx") 
+ 
+gt.get_status()        # 获取回测状态 
+gt.get_params()        # 获取回测参数 
+gt.get_results()       # 获取收益曲线 
+gt.get_positions()     # 获取所有持仓列表 
+gt.get_orders()        # 获取交易列表 
+gt.get_records()       # 获取所有 record() 记录 
+gt.get_risk()          # 获取总的风险指标 
+gt.get_period_risks()  # 获取分月计算的风险指标 
+
+=== 第69页 ===
+股 票 代 码 格 式 转 换
+normalize_code() 
+将 其 他 形 式 的 股 票 代 码 转 换 为 聚 宽 可 用 的 股 票 代 码 形 式 。
+仅 适 用 于 A 股 市 场 股 票 代 码 以 及 基 金 代 码
+示 例
+#输入 
+for code in ('000001', 'SZ000001', '000001SZ', '000001.sz', '000001.XSHE'): 
+        print normalize_code(code) 
+ 
+#输出 
+000001.XSHE 
+000001.XSHE 
+000001.XSHE 
+000001.XSHE 
+000001.XSHE 
+性 能 分 析  ♠
+enable_profile() 
+回 测 环 境 / 模 拟 专 用 API
+开 启 性 能 分 析 功 能 , 请 在 所 有 代 码 之 前 调 用 这 句 话 ( 即 在 策 略 编 译 页 面 的 代 码 编 辑 框 最 上 方 放 置 该 代 码 ), 只 在
+点 击 ‘ 运 行 回 测 ’ 运 行 的 时 候 才 能 看 到 性 能 分 析 结 果 . 
+开 启 性 能 分 析 之 后 , 你 会 在 回 测 结 果 页 面 看 到 性 能 分 析 结 果 . 
+请 注 意 , 不 需 要 时 , 请 不 要 调 用 此 函 数 , 因 为 它 本 身 会 影 响 程 序 性 能 .
+结 果 示 例 ( 真 实 输 出 中 没 有 中 文 说 明 ):
+
+=== 第70页 ===
+// 时间单位 : 微秒 
+Timer unit: 1e-06 s 
+ 
+// 函数执行总时间 
+Total time: 0.00277 s 
+// 文件名 
+File: user_code.py 
+// 函数名 
+Function: initialize at line 3 
+ 
+//  行号 , 这一行执行次数 , 总执行时间 , 每次执行时间 , 这一行执行时间在整个函数的比例 
+Line #      Hits         Time  Per Hit   % Time  Line Contents 
+============================================================== 
+     3                                           def initialize(context): 
+     4                                               # 定义一个全局变量 , 保存要
+操作的股票 
+     5                                               # 000001(股票 : 平安银行 ) 
+     6         1           31     31.0      1.1      g.security = '000001.XSH
+E' 
+     7                                               # 初始化此策略 
+     8                                               # 设置我们要操作的股票池 ,
+ 这里我们只操作一支股票 
+     9         1         2739   2739.0     98.9      set_universe([g.securit
+y]) 
+ 
+Total time: 0.426325 s 
+File: user_code.py 
+Function: handle_data at line 12 
+ 
+Line #      Hits         Time  Per Hit   % Time  Line Contents 
+============================================================== 
+    12                                           def handle_data(context, dat
+a): 
+    13       122          398      3.3      0.1      security = g.security 
+    14                                               # 取得过去五天的平均价格 
+    15       122       168565   1381.7     39.5      average_price = data[sec
+urity].mavg(5) 
+    16                                               # 取得上一时间点价格 
+    17       122          493      4.0      0.1      current_price = data[sec
+urity].price 
+    18                                               # 取得当前的现金 
+    19       122          240      2.0      0.1      cash = context.portfoli
+o.cash 
+    20 
+    21                                               # 如果上一时间点价格高出五
+天平均价1%, 则全仓买入 
+    22       122          396      3.2      0.1      if current_price > 1.01*
+average_price: 
+    23                                                   # 计算可以买多少只股票 
+    24        30          124      4.1      0.0          number_of_shares = i
+nt(cash/current_price) 
+    25                                                   # 购买量大于 0时，下单 
+    26        30           56      1.9      0.0          if number_of_shares
+ > 0: 
+    27                                                       # 买入股票 
+
+=== 第71页 ===
+    28        30        83190   2773.0     19.5              order(security,
+ +number_of_shares) 
+    29                                                       # 记录这次买入 
+    30        30        16202    540.1      3.8              log.info("Buying
+ %s" % (security)) 
+    31                                               # 如果上一时间点价格低于五
+天平均价, 则空仓卖出 
+    32        92         1119     12.2      0.3      elif current_price < ave
+rage_price and context.portfolio.positions[security].amount > 0: 
+    33                                                   # 卖出所有股票 , 使这只
+股票的最终持有量为 0 
+    34        13        86702   6669.4     20.3          order_target(securit
+y, 0) 
+    35                                                   # 记录这次卖出 
+    36        13         8210    631.5      1.9          log.info("Selling %
+s" % (security)) 
+    37                                               # 画出上一时间点价格 
+    38       122        60630    497.0     14.2      record(stock_price=data
+[security].price) 
+对 象
+全 局 对 象  g
+全 局 对 象  g ， 用 来 存 储 用 户 的 各 类 可 被pickle.dumps 函 数 序 列 化 的 全 局 数 据
+在 模 拟 盘 中 ， 如 果 中 途 进 程 中 断 ， 我 们 会 使 用pickle.dumps 序 列 化 所 有 的 g 下 面 的 变 量 内 容 , 保 存 到 磁 盘 中 ，
+再 启 动 的 时 候 模 拟 盘 就 不 会 有 任 何 数 据 影 响 。 如 果 没 有 用 g 声 明 ， 会 出 现 模 拟 盘 重 启 后 ， 变 量 数 据 丢 失 的 问
+题 。
+如 果 不 想  g 中 的 某 个 变 量 被 序 列 化 , 可 以 让 变 量 以  ‘__’ 开 头 , 这 样 , 这 个 变 量 在 序 列 化 时 就 会 被 忽 略
+更 多 模 拟 盘 细 节 , 请 看  模 拟 盘 注 意 事 项.
+def initialize(context): 
+    g.security = "000001.XSHE" 
+    g.count = 1 
+    g.flag = 0 
+ 
+def process_initialize(context): 
+    # 保存不能被序列化的对象 , 进程每次重启都初始化 , 更多信息 , 请看  [process_initial
+ize] 
+    g.__q = query(valuation) 
+ 
+def handle_data(context, data): 
+    log.info(g.security) 
+    log.info(g.count) 
+    log.info(g.flag) 
+Context
+
+=== 第72页 ===
+subportfolios: 当 前 单 个 操 作 仓 位 的 资 金 、 标 的 信 息 ， 是 一 个SubPortfolio 的 数 组
+portfolio: 账 户 信 息 ， 即 subportfolios 的 汇 总 信 息 , Portfolio 对 象 ， 单 个 操 作 仓 位 时 ， portfolio 指 向
+subportfolios[0]
+current_dt: 当 前 单 位 时 间 的 开 始 时 间 , datetime.datetime 对 象, 
+按 天 回 测 时 , hour = 9, minute = 30, second = microsecond = 0,
+按 分 钟 回 测 时 , second = microsecond = 0
+previous_date: 前 一 个 交 易 日 , datetime.date 对 象, 注 意 , 这 是 一 个 日 期 , 是  date, 而 不 是  datetime
+universe: 查 询 set_universe() 设 定 的 股 票 池 , 比 如 : [‘000001.XSHE’, ‘600000.XSHG’]
+run_params: 表 示 此 次 运 行 的 参 数 , 有 如 下 属 性
+start_date: 回 测 / 模 拟 开 始 日 期 , datetime.date 对 象
+end_date: 回 测 / 模 拟 结 束 日 期 , datetime.date 对 象
+type: 运 行 方 式 , 如 下 三 个 字 符 串 之 一  
+’simple_backtest’: 回 测 , 通 过 点 击 ’ 编 译 运 行 ’ 运 行
+‘full_backtest’: 回 测 , 通 过 点 击 ’ 运 行 回 测 ’ 运 行
+‘sim_trade’: 模 拟 交 易
+frequency: 运 行 频 率 , 如 下 三 个 字 符 串 之 一  
+’day’
+‘minute’
+‘tick’
+为 了 让 从 其 他 平 台 迁 移 过 来 的 同 学 更 顺 手 的 使 用 系 统 , 我 们 对 此 对 象 也 做 了 和  g 一 样 的 处 理 :
+可 以 添 加 自 己 的 变 量 , 每 次 进 程 关 闭 时 持 久 保 存 , 进 程 重 启 时 恢 复 .
+以 ‘__’ 开 头 的 变 量 不 会 被 持 久 保 存
+如 果 添 加 的 变 量 与 系 统 的 冲 突 , 将 覆 盖 掉 系 统 变 量 , 如 果 想 恢 复 系 统 变 量 , 请 删 除 自 己 的 变 量 . 示
+例:
+def handle_data(context, data): 
+    # 执行下面的语句之后 , context.portfolio 的整数  1 
+    context.portfolio = 1 
+    log.info(context.portfolio) 
+    # 要恢复系统的变量 , 只需要使用下面的语句即可 
+    del context.portfolio 
+    # 此时, context.portfolio 将变成账户信息 . 
+    log.info(context.portfolio.portfolio_value) 
+我 们 以 后 可 能 会 往  context 添 加 新 的 变 量 来 支 持 更 多 功 能 , 为 了 减 少 不 必 要 的 迷 惑 , 还 是 建 议 大 家
+使 用 g
+示 例
+
+=== 第73页 ===
+def handle_data(context, data): 
+ 
+    #获得当前回测相关时间 
+    year = context.current_dt.year 
+    month = context.current_dt.month 
+    day = context.current_dt.day 
+    hour = context.current_dt.hour 
+    minute = context.current_dt.minute 
+    second = context.current_dt.second 
+    #得到"年 -月 -日 " 格式 
+    date = context.current_dt.strftime("%Y-%m-%d") 
+    #得到周几 
+    weekday = context.current_dt.isoweekday() 
+ 
+    # 获取账户的持仓价值 
+    positions_value = context.portfolio.positions_value 
+ 
+    # 获取仓位 subportfolios[0] 的可用资金 
+    available_cash = context.subportfolios[0].available_cash 
+ 
+    # 获取subportfolios[0] 中多头仓位的 security 的持仓成本 
+    hold_cost = context.subportfolios[0].long_positions[security].hold_cost 
+SubPortfolio
+某 个 仓 位 的 资 金 ， 标 的 信 息 ， 如 未 使 用  SubPortfolioConfig 设 置 多 仓 位 ， 默 认 只 有 subportfolios[0] 一 个 仓
+位 ，Portfolio 指 向 该 仓 位 。
+inout_cash: 累 计 出 入 金 , 比 如 初 始 资 金  1000, 后 来 转 移 出 去  100, 则 这 个 值 是  1000 - 100
+available_cash: 可 用 资 金 , 可 用 来 购 买 证 券 的 资 金
+transferable_cash: 可 取 资 金 , 即 可 以 提 现 的 资 金 , 不 包 括 今 日 卖 出 证 券 所 得 资 金
+locked_cash: 挂 单 锁 住 资 金
+type: 账 户 所 属 类 型
+long_positions: 多 单 的 仓 位 , 一 个  dict, key 是 证 券 代 码 , value 是  Position 对 象
+short_positions: 空 单 的 仓 位 , 一 个  dict, key 是 证 券 代 码 , value 是  Position 对 象
+positions_value: 持 仓 价 值 , 股 票 基 金 才 有 持 仓 价 值 , 期 货 为 0
+total_value: 总 资 产 , 包 括 现 金 , 保 证 金 , 仓 位 的 总 价 值 , 可 用 来 计 算 收 益
+total_liability: 总 负 债 , 等 于 融 资 负 债 、 融 券 负 债 、 利 息 总 负 债 的 总 和
+net_value: 净 资 产 , 等 于 总 资 产 减 去 总 负 债
+cash_liability: 融 资 负 债
+sec_liability: 融 券 负 债
+interest: 利 息 总 负 债
+maintenance_margin_rate: 维 持 担 保 比 例
+available_margin: 融 资 融 券 可 用 保 证 金
+margin: 保 证 金 ， 股 票 、 基 金 保 证 金 都 为 100% ； 融 资 融 券 保 证 金 为 0 ； 期 货 保 证 金 会 实 时 更 新 , 总 是 等
+于 当 前 期 货 价 值  乘 以  保 证 金 比 率 , 当 保 证 金 不 足 时 , 强 制 平 仓 . 平 仓 顺 序 是 : 亏 损 多 的 ( 相 对 于 开 仓 均 价 )
+先 平 仓
+Portfolio
+
+=== 第74页 ===
+账 户 当 前 的 资 金 ， 标 的 信 息 ， 即 所 有 标 的 操 作 仓 位 的 信 息 汇 总 。 如 未 使 用  SubPortfolioConfig 设 置 多 仓 位 ，
+默 认 只 有 subportfolios[0] 一 个 仓 位 ， Portfolio 指 向 该 仓 位 。
+inout_cash: 累 计 出 入 金 , 比 如 初 始 资 金  1000, 后 来 转 移 出 去  100, 则 这 个 值 是  1000 - 100
+available_cash: 可 用 资 金 , 可 用 来 购 买 证 券 的 资 金
+transferable_cash: 可 取 资 金 , 即 可 以 提 现 的 资 金 , 不 包 括 今 日 卖 出 证 券 所 得 资 金
+locked_cash: 挂 单 锁 住 资 金
+margin: 保 证 金 ， 股 票 、 基 金 保 证 金 都 为 100%
+positions: 等 同 于  long_positions
+long_positions: 多 单 的 仓 位 , 一 个  dict, key 是 证 券 代 码 , value 是  Position 对 象
+short_positions: 空 单 的 仓 位 , 一 个  dict, key 是 证 券 代 码 , value 是  Position 对 象
+total_value: 总 的 权 益 , 包 括 现 金 , 保 证 金 , 仓 位 的 总 价 值 , 可 用 来 计 算 收 益
+returns: 总 权 益 的 累 计 收 益
+starting_cash: 初 始 资 金 , 现 在 等 于  inout_cash
+positions_value: 持 仓 价 值 , 股 票 基 金 才 有 持 仓 价 值 , 期 货 为 0
+cash: 已 过 时 ， 等 价 于  available_cash
+portfolio_value: 已 过 时 ， 等 价 于  total_value
+unsell_positions: 已 过 时 , 请 使 用  positions 代 替, 当 前 持 有 的 不 可 以 卖 出 的 持 仓 ( 比 如 在 A 股 T+1 市 场 ,
+今 天 购 票 的 股 票 ), 并 没 有 考 虑 股 票 今 天 是 否 停 牌 , 一 个 dict, key 是 股 票 代 码 , value 是Position 对 象.
+Position
+持 有 的 某 个 标 的 的 信 息
+security: 标 的 代 码
+price: 最 新 行 情 价 格
+avg_cost: 开 仓 均 价 ， 买 入 标 的 的 加 权 平 均 价 , 计 算 方 法 是 : 
+(buy_volume1 * buy_price1 + buy_volume2 * buy_price2 + …) / (buy_volume1 + buy_volume2 + …)
+每 次 买 入 后 会 调 整 avg_cost, 卖 出 时 avg_cost 不 变 . 这 个 值 也 会 被 用 来 计 算 浮 动 盈 亏 .
+hold_cost: 持 仓 成 本 ， 针 对 期 货 有 效 。
+init_time: 建 仓 时 间 ， 格 式 为  datetime.datetime
+transact_time: 最 后 交 易 时 间 ， 格 式 为  datetime.datetime
+total_amount: 总 仓 位 , 但 不 包 括 挂 单 冻 结 仓 位
+closeable_amount: 可 卖 出 的 仓 位
+today_amount: 今 天 开 的 仓 位
+locked_amount: 挂 单 冻 结 仓 位
+value: 标 的 价 值 ， 计 算 方 法 是 : price * total_amount * multiplier, 其 中 股 票 、 基 金 的 multiplier 为 1 ， 期 货
+为 相 应 的 合 约 乘 数
+side: 多 / 空 ， ’long’ or ‘short’
+pindex: 仓 位 索 引 ， subportfolio index
+sellable_amount: 已 过 时, 为 了 向 前 兼 容 , 等 同 于  closeable_amount
+amount: 已 过 时, 为 了 向 前 兼 容 , 等 同 于  closeable_amount
+SecurityUnitData
+一 个 单 位 时 间 内 的 股 票 的 数 据
+基 本 属 性
+以 下 属 性 也 能 通 过history/attribute_history/get_price 获 取 到
+open: 时 间 段 开 始 时 价 格
+
+=== 第75页 ===
+close: 时 间 段 结 束 时 价 格
+low: 最 低 价
+high: 最 高 价
+volume: 成 交 的 股 票 数 量
+money: 成 交 的 金 额
+factor: 前 复 权 因 子 , 我 们 提 供 的 价 格 都 是 前 复 权 后 的 , 但 是 利 用 这 个 值 可 以 算 出 原 始 价 格 , 方 法 是 价 格 除
+以factor, 比 如 : close/factor
+high_limit: 涨 停 价
+low_limit: 跌 停 价
+avg: 这 段 时 间 的 平 均 价 , 等 于money/volume
+price: 已 经 过 时, 为 了 向 前 兼 容 , 等 同 于  avg
+pre_close: 前 一 个 单 位 时 间 结 束 时 的 价 格 , 按 天 则 是 前 一 天 的 收 盘 价 , 按 分 钟 则 是 前 一 分 钟 的 结 束 价 格
+paused: bool 值 , 这 只 股 票 是 否 停 牌 , 停 牌 时 open/close/low/high/pre_close 依 然 有 值 , 都 等 于 停 牌 前 的 收
+盘 价, volume=money=0
+额 外 的 属 性 和 方 法
+security: 股 票 代 码 , 比 如 ’000001.XSHE’
+returns: 股 票 在 这 个 单 位 时 间 的 相 对 收 益 比 例 , 等 于  (close-pre_close)/pre_close
+isnan(): 数 据 是 否 有 效 , 当 股 票 未 上 市 或 者 退 市 时 , 无 数 据 , isnan() 返 回 True
+mavg(days, field='close'): 过 去 days 天 的 每 天 收 盘 价 的 平 均 值 , 把 field 设 成 ’avg’( 等 同 于 已 过 时
+的’price’) 则 为 每 天 均 价 的 平 均 价 , 下 同
+vwap(days): 过 去 days 天 的 每 天 均 价 的 加 权 平 均 值 , 以 days=2 为 例 子 , 算 法 是 :
+(avg1 * volume1 + avg2 * volume2) / (volume1 + volume2) 
+stddev(days): 过 去 days 天 的 每 天 收 盘 价 的 标 准 差
+注 ：mavg/vwap/stddev: 都 会 跳 过 停 牌 日 期 , 如 果 历 史 交 易 天 数 不 足 , 则 返 回 nan
+Trade 对 象
+订 单 的 一 次 交 易 记 录 , 一 个 订 单 可 能 分 多 次 交 易 .
+time: 交 易 时 间 , datetime.datetime 对 象
+amount: 交 易 数 量
+price: 交 易 价 格
+trade_id: 交 易 记 录 id
+order_id: 对 应 的 订 单 id
+Order 对 象
+买 卖 订 单
+status: 状 态 , 一 个OrderStatus 值
+add_time: 订 单 添 加 时 间 , datetime.datetime 对 象
+is_buy: bool 值 , 买 还 是 卖 ， 对 于 期 货 : 
+开 多/ 平 空  -> 买
+开 空/ 平 多  -> 卖
+amount: 下 单 数 量 , 不 管 是 买 还 是 卖 , 都 是 正 数
+filled: 已 经 成 交 的 股 票 数 量 , 正 数
+
+=== 第76页 ===
+security: 股 票 代 码
+order_id: 订 单 ID
+price: 平 均 成 交 价 格 , 已 经 成 交 的 股 票 的 平 均 成 交 价 格 ( 一 个 订 单 可 能 分 多 次 成 交 )
+avg_cost: 卖 出 时 表 示 下 卖 单 前 的 此 股 票 的 持 仓 成 本 , 用 来 计 算 此 次 卖 出 的 收 益 . 买 入 时 表 示 此 次 买 入 的
+均 价( 等 同 于 price).
+side: 多 / 空 ， ’long’/’short’
+action: 开 / 平 ，  ‘open’/’close’
+OrderStatus - 订 单 状 态
+订 单 状 态 , Enum 特 性 使 用 的 第 三 方 库 (https://pypi.python.org/pypi/enum34)
+class OrderStatus(Enum): 
+    # 订单新创建未委托，用于盘前 / 隔夜单，订单在开盘时变为  open 状态开始撮合 
+    new = 8 
+ 
+    # 订单未完成 , 无任何成交 
+    open = 0 
+ 
+    # 订单未完成 , 部分成交 
+    filled = 1 
+ 
+    # 订单完成 , 已撤销 , 可能有成交 , 需要看  Order.filled 字段 
+    canceled = 2 
+ 
+    # 订单完成 , 交易所已拒绝 , 可能有成交 , 需要看  Order.filled 字段 
+    rejected = 3 
+ 
+    # 订单完成 , 全部成交 , Order.filled 等于  Order.amount 
+    held = 4 
+ 
+    # 订单取消中，只有实盘会出现，回测 / 模拟不会出现这个状态 
+    pending_cancel = 9  
+OrderStyle - 下 单 方 式
+下 单 方 式 , 有 如 下 子 类
+市 价 单 : 不 论 价 格 , 直 接 下 单 , 直 到 交 易 全 部 完 成
+class MarketOrderStyle(OrderStyle): 
+    pass 
+限 价 单 : 指 定 一 个 价 格 , 买 入 时 不 能 高 于 它 , 卖 出 时 不 能 低 于 它 , 如 果 不 满 足 , 则 等 待 满 足 后 再 交 易
+class LimitOrderStyle(OrderStyle): 
+    def __init__(self, limit_price): 
+        self.limit_price = limit_price 
+
+=== 第77页 ===
+策 略 组 合 操 作
+初 始 化 仓 位  subportfolios
+set_subportfolios([SubPortfolioConfig(cash,type), ... ]) 
+初 始 化 或 者 修 改  subportfolios 的 配 置 ， 只 能 在  initialize 中 调 用 , 每 个  SubPortfolioConfig 中  cash 的 和
+应 该 等 于 总 的 初 始 资 金
+SubPortfolioConfig 参 数
+SubPortfolioConfig(cash,type) 
+cash: 仓 位 初 始 资 金
+type: 可 操 作 标 的 的 类 型 ， ’stock’ / ‘index_futures’ / ‘futures’ / ‘stock_margin’, 其 中 stock 包 括 股 票 和 基
+金 ，index_futures 指 金 融 期 货 ， futures 包 含 股 指 期 货 和 商 品 期 货 ， stock_margin 为 融 资 融 券 账 户 。
+示 例
+init_cash = 500000 # 定义一个变量 
+# 设定subportfolios[0] 为  股票和基金仓位，初始资金为  init_cash 变量代表的数值 
+# 设定subportfolios[1] 为  金融期货仓位，初始资金为  init_cash 变量代表的数值 
+# 设定subportfolios[2] 为  融资融券账户，初始资金为  init_cash 变量代表的数值 
+set_subportfolios([SubPortfolioConfig(cash=init_cash, type='stock'),\ 
+                   SubPortfolioConfig(cash=init_cash, type='futures'),\ 
+                   SubPortfolioConfig(cash=init_cash, type='stock_margin')]) 
+SubPortfolio
+某 个 仓 位 的 资 金 ， 标 的 信 息 ， 如 不 使 用  SubPortfolioConfig 设 置 多 仓 位 ， 默 认 只 有 subportfolios[0] 一 个 仓
+位 ，Portfolio 指 向 该 仓 位 。 每 个 策 略 最 多 可 以 创 建 100 个  subportfolio 。
+有 关 SubPortfolio 详 情 见 对 象 - SubPortfolio
+仓 位 间 转 移 资 金
+transfer_cash(from_pindex, to_pindex, cash) 
+从 序 号 为  from_pindex 的  subportfolio 转 移  cash 到 序 号 为  to_pindex 的  subportfolio 
+资 金 转 移 及 时 到 账
+示 例
+从subportfolio[0] 向 subportfolio[1] 转移 500000 
+transfer_cash(from_pindex=0, to_pindex=1, cash=500000) 
+
+=== 第78页 ===
+融 资 融 券 专 用 API
+初 始 化 融 资 融 券 账 户
+初 始 化 的 仓 位 是 不 允 许 直 接 进 行 融 资 融 券 操 作 的 ， 因 为 初 始 默 认  subportfolios[0] 中  SubPortfolioConfig 的
+type = ‘stock’ ， 只 允 许 买 卖 股 票 与 基 金 等 。
+因 此 要 买 卖 金 融 期 货 ， 您 需 要 设 定  SubPortfolioConfig 的  type = ‘stock_margin’ ， 具 体 方 法 如 下 ：
+def initialize(context): 
+ 
+    ## 设置单个账户 
+ 
+    # 获取初始资金 
+    init_cash = context.portfolio.starting_cash  
+ 
+    # 设定账户为融资融券账户，初始资金为  init_cash 变量代表的数值（如不使用设置多账
+户，默认只有 subportfolios[0] 一个账户， Portfolio 指向该账户。） 
+    set_subportfolios([SubPortfolioConfig(cash=init_cash, 
+type='stock_margin')]) 
+ 
+    — — — — — — — — — — — — — — — — — — — — — — — — — — — — — — — 
+ 
+    ## 设置多个账户 
+ 
+    # 获取初始资金，并等分为三份 
+    init_cash = context.portfolio.starting_cash/3 
+ 
+    # 设定subportfolios[0] 为  股票和基金仓位，初始资金为  init_cash 变量代表的数值 
+    # 设定subportfolios[1] 为  金融期货仓位，初始资金为  init_cash 变量代表的数值 
+    # 设定subportfolios[2] 为  融资融券账户，初始资金为  init_cash 变量代表的数值 
+    set_subportfolios([SubPortfolioConfig(cash=init_cash, type='stock'),\ 
+                       SubPortfolioConfig(cash=init_cash, type='index_future
+s'),\ 
+                       SubPortfolioConfig(cash=init_cash, 
+type='stock_margin')]) 
+设 置 融 资 利 率
+set_option('margincash_interest_rate', value) 
+设 定 融 资 利 率 , 默 认  8%
+参 数
+value: 融 资 利 率 的 值 , 默 认  8%
+示 例
+
+=== 第79页 ===
+# 设定融资利率 : 年化 8% 
+set_option('margincash_interest_rate', 0.08) 
+设 置 融 资 保 证 金 比 率
+set_option('margincash_margin_rate', value) 
+设 置 融 资 保 证 金 比 率 , 默 认  100%
+参 数
+value: 融 资 保 证 金 比 率 的 值 , 默 认  100%
+示 例
+# 设置融资保证金比率 : 150% 
+set_option('margincash_margin_rate', 1.5) 
+设 置 融 券 利 率
+set_option('marginsec_interest_rate', value) 
+设 定 融 券 利 率 : 年 化  10%, 默 认  10%
+参 数
+value: 融 券 利 率 的 值 , 默 认  10%
+示 例
+# 设定融券利率 : 年化 10% 
+set_option('marginsec_interest_rate', 0.10) 
+设 置 融 券 保 证 金 比 率
+set_option('marginsec_margin_rate', value) 
+设 定 融 券 保 证 金 比 率 : 150%, 默 认  100%
+参 数
+value: 融 券 保 证 金 比 率 的 值 , 默 认  100%
+示 例
+
+=== 第80页 ===
+# 设定融券保证金比率 : 150% 
+set_option('marginsec_margin_rate', 1.5) 
+margincash_open - 融 资 买 入
+margincash_open(security, amount, style=None, pindex=0) 
+融 资 买 入
+参 数
+security: 标 的 代 码
+amount: 数 量
+style: 参 见order styles, None 代 表 MarketOrder
+pindex: 在 使 用 set_subportfolios 创 建 了 多 个 仓 位 时 ， 指 定 subportfolio 的 序 号 , 从  0 开 始 , 比 如  0 为  指
+定 第 一 个  subportfolio, 1 为 指 定 第 二 个  subportfolio ， 默 认 为 0 。
+返 回 
+Order 对 象 或 者 None, 如 果 创 建 委 托 成 功 , 则 返 回 Order 对 象 , 失 败 则 返 回 None
+示 例
+# 融资买入平安银行  1000 股 
+margincash_open('000001.XSHE', 1000) 
+margincash_close - 卖 券 还 款
+margincash_close(security, amount, style=None, pindex=0) 
+卖 券 还 款
+参 数
+security: 标 的 代 码
+amount: 数 量
+style: 参 见order styles, None 代 表 MarketOrder
+pindex: 在 使 用 set_subportfolios 创 建 了 多 个 仓 位 时 ， 指 定 subportfolio 的 序 号 , 从  0 开 始 , 比 如  0 为  指
+定 第 一 个  subportfolio, 1 为 指 定 第 二 个  subportfolio ， 默 认 为 0 。
+返 回 
+None
+示 例
+# 卖出 1000 股平安银行用以还款 
+margincash_close('000001.XSHE', 1000) 
+
+=== 第81页 ===
+margincash_direct_refund - 直 接 还 款
+margincash_direct_refund(value, pindex=0) 
+直 接 还 款
+参 数
+value: 还 款 金 额
+返 回 
+None
+示 例
+# 还款 100000 元 
+margincash_direct_refund(100000) 
+marginsec_open - 融 券 卖 出
+marginsec_open(security, amount, style=None, pindex=0) 
+融 券 卖 出
+参 数
+security: 标 的 代 码
+amount: 数 量
+style: 参 见order styles, None 代 表 MarketOrder
+pindex: 在 使 用 set_subportfolios 创 建 了 多 个 仓 位 时 ， 指 定 subportfolio 的 序 号 , 从  0 开 始 , 比 如  0 为  指
+定 第 一 个  subportfolio, 1 为 指 定 第 二 个  subportfolio ， 默 认 为 0 。
+返 回 
+Order 对 象 或 者 None, 如 果 创 建 委 托 成 功 , 则 返 回 Order 对 象 , 失 败 则 返 回 None
+示 例
+# 融券卖出  1000 股  平安银行 
+marginsec_open('000001.XSHE', 1000) 
+marginsec_close - 买 券 还 券
+marginsec_close(security, amount, style=None, pindex=0) 
+买 券 还 券
+参 数
+
+=== 第82页 ===
+security: 标 的 代 码
+amount: 数 量
+style: 参 见order styles, None 代 表 MarketOrder
+pindex: 在 使 用 set_subportfolios 创 建 了 多 个 仓 位 时 ， 指 定 subportfolio 的 序 号 , 从  0 开 始 , 比 如  0 为  指
+定 第 一 个  subportfolio, 1 为 指 定 第 二 个  subportfolio ， 默 认 为 0 。
+返 回 
+None
+示 例
+# 买入 1000 股平安银行用以还券 
+marginsec_close('000001.XSHE', 1000) 
+marginsec_direct_refund - 直 接 还 券
+marginsec_direct_refund(security, amount, pindex=0) 
+直 接 还 券
+参 数
+security: 标 的 代 码
+amount: 数 量
+pindex: 在 使 用 set_subportfolios 创 建 了 多 个 仓 位 时 ， 指 定 subportfolio 的 序 号 , 从  0 开 始 , 比 如  0 为  指
+定 第 一 个  subportfolio, 1 为 指 定 第 二 个  subportfolio ， 默 认 为 0 。
+返 回 
+None
+示 例
+## 如果账户持仓中 " 有 " 1000 股  平安银行 
+# 直接还  1000 股平安银行 
+marginsec_direct_refund('000001.XSHE', 1000) 
+ 
+— — — — — — — — — — — — — — — — — — — — — — — — — — — — — — — 
+ 
+## 如果账户持仓中 " 没有 " 1000 股  平安银行 
+# 需先买入  1000 股平安银行 
+order('000001.XSHE', 1000) 
+# 再直接还  1000 股平安银行 
+marginsec_direct_refund('000001.XSHE', 1000) 
+get_margincash_stocks - 获 取 融 资 标 的 列 表
+get_margincash_stocks() 
+
+=== 第83页 ===
+返 回 
+返 回 上 交 所 、 深 交 所 最 近 一 次 披 露 的 的 可 融 资 标 的 列 表 的 list 。
+示 例
+# 获取融资标的列表，并赋值给  margincash_stocks 
+margincash_stocks = get_margincash_stocks() 
+ 
+# 判断平安银行是否在可融资列表 
+>>> '000001.XSHE' in get_margincash_stocks() 
+>>> True 
+get_marginsec_stocks - 获 取 融 券 标 的 列 表
+get_marginsec_stocks() 
+返 回 
+返 回 上 交 所 、 深 交 所 最 近 一 次 披 露 的 的 可 融 券 标 的 列 表 的 list 。
+示 例
+# 获取融券标的列表，并赋值给  marginsec_stocks 
+marginsec_stocks= get_marginsec_stocks() 
+ 
+# 判断平安银行是否在可融券列表 
+>>> '000001.XSHE' in get_marginsec_stocks() 
+>>> True 
+jqdata.get_mtss - 获 取 融 资 融 券 信 息
+jqdata.get_mtss(security_list, start_date=None, end_date=None, fields=None, c
+ount=None) 
+获 取 一 只 或 者 多 只 股 票 在 一 个 时 间 段 内 的 融 资 融 券 信 息
+注 ： 需 导 入  jqdata 模 块 ， 即 在 策 略 或 研 究 起 始 位 置 加 入import jqdata
+参 数
+security_list: 一 只 股 票 代 码 或 者 一 个 股 票 代 码 的  list
+start_date: 开 始 日 期 , 与 count 二 选 一 , 不 可 同 时 使 用. 一 个 字 符 串 或 者
+datetime.datetime/datetime.date 对 象 , 默 认 为 平 台 提 供 的 数 据 的 最 早 日 期
+end_date: 结 束 日 期 , 一 个 字 符 串 或 者  datetime.date/datetime.datetime 对 象 , 默 认 为
+datetime.date.today()
+count: 数 量 , 与 start_date 二 选 一 ， 不 可 同 时 使 用, 必 须 大 于  0. 表 示 返 回  end_date 之 前  count 个 交
+易 日 的 数 据 , 包 含  end_date
+fields: 字 段 名 或 者  list, 可 选 . 默 认 为  None, 表 示 取 全 部 字 段 , 各 字 段 含 义 如 下 ：
+
+=== 第84页 ===
+|字段名|含义| 
+|---|---|---| 
+|date|日期| 
+|sec_code|股票代码| 
+|fin_value|融资余额| 
+|fin_buy_value|融资买入额| 
+|fin_refund_value|融资偿还额| 
+|sec_value|融券余额| 
+|sec_sell_value|融券卖出额| 
+|sec_refund_value|融券偿还额| 
+|fin_sec_value|融资融券余额| 
+返 回
+返 回 一 个  pandas.DataFrame 对 象 ， 默 认 的 列 索 引 为 取 得 的 全 部 字 段 . 如 果 给 定 了  fields 参 数 , 则 列 索 引 与 给
+定 的 fields 对 应 .
+示 例
+# 导入聚宽函数库 
+import jqdata 
+ 
+# 获取一只股票的融资融券信息 
+jqdata.get_mtss('000001.XSHE', '2016-01-01', '2016-04-01') 
+jqdata.get_mtss('000001.XSHE', '2016-01-01', '2016-04-01', fields=["date", "s
+ec_code", "fin_value", "fin_buy_value"]) 
+jqdata.get_mtss('000001.XSHE', '2016-01-01', '2016-04-01', fields="sec_sell_v
+alue") 
+ 
+# 获取多只股票的融资融券信息 
+jqdata.get_mtss(['000001.XSHE', '000002.XSHE', '000099.XSHE'], '2015-03-25', 
+'2016-01-25') 
+jqdata.get_mtss(['000001.XSHE', '000002.XSHE', '000099.XSHE'], '2015-03-25', 
+'2016-01-25', fields=["date", "sec_code", "sec_value", "fin_buy_value", "sec_
+sell_value"]) 
+ 
+# 获取股票  000001.XSHE 在日期  2016-06-30 往前  20 个交易日的融资融券信息 
+jqdata.get_mtss('000001.XSHE', end_date="2016-06-30", count=20) 
+# 获取股票  000001.XSHE 往前  20 个交易日的融资融券信息 
+jqdata.get_mtss('000001.XSHE', count=20) 
+期 货 专 用 API
+初 始 化 期 货 账 户
+初 始 化 的 仓 位 是 不 允 许 直 接 买 卖 期 货 的 ， 因 为 初 始 默 认  subportfolios[0] 中  SubPortfolioConfig 的  type =
+‘stock’ ， 只 允 许 买 卖 股 票 与 基 金 等 。
+因 此 要 买 卖 期 货 ， 您 需 要 设 定  SubPortfolioConfig 的  type = ‘futures’ ， 具 体 方 法 如 下 ：
+
+=== 第85页 ===
+def initialize(context): 
+ 
+    ## 设置单个账户 
+ 
+    # 获取初始资金 
+    init_cash = context.portfolio.starting_cash  
+ 
+    # 设定账户为金融账户，初始资金为  init_cash 变量代表的数值（如不使用设置多账户，默
+认只有subportfolios[0] 一个账户， Portfolio 指向该账户。） 
+    set_subportfolios([SubPortfolioConfig(cash=init_cash, type='futures')]) 
+ 
+    — — — — — — — — — — — — — — — — — — — — — — — — — — — — — — — 
+ 
+    ## 设置多个账户 
+ 
+    # 获取初始资金，并等分为三份 
+    init_cash = context.portfolio.starting_cash/3 
+ 
+    # 设定subportfolios[0] 为  股票和基金仓位，初始资金为  init_cash 变量代表的数值 
+    # 设定subportfolios[1] 为  金融期货仓位，初始资金为  init_cash 变量代表的数值 
+    # 设定subportfolios[2] 为  融资融券账户，初始资金为  init_cash 变量代表的数值 
+    set_subportfolios([SubPortfolioConfig(cash=init_cash, type='stock'),\ 
+                       SubPortfolioConfig(cash=init_cash, type='futures'),\ 
+                       SubPortfolioConfig(cash=init_cash, 
+type='stock_margin')]) 
+主 力 连 续 合 约
+1. 期 货 合 约 的 生 存 周 期 是 有 限 的 ， 到 合 约 最 后 交 易 日 后 就 要 交 割 。 因 此 我 们 根 据 持 仓 量 对 期 货 合 约 进 行
+拼 接 ， 形 成 主 力 连 续 合 约 。
+2. 合 约 代 码 ： 品 种 代 号 +9999 ， 例 如 AG9999( 白 银 主 力 合 约 ) 、 Y9999( 豆 油 主 力 合 约 ) 。
+3. 主 力 合 约 定 义 ： 如 果 某 合 约 持 仓 量 连 续 2 天 为 同 一 个 品 种 中 最 大 的 ， 且 该 合 约 相 对 于 当 前 主 力 合 约 为 远
+期 合 约 ， 则 自 动 变 成 主 力 合 约 。 不 会 在 日 内 进 行 主 力 合 约 切 换 。
+下 面 是 主 要 期 货 交 易 所 的 主 力 合 约 列 表 ：
+中 金 所
+代 码 名 称 代 码 名 称
+IC9999.CCFX 中 证500 主 力 合 约T9999.CCFX 10 年 期 国 债 主 力 合 约
+IF9999.CCFX 沪 深300 主 力 合 约TF9999.CCFX5 年 期 国 债 主 力 合 约
+IH9999.CCFX 上 证50 主 力 合 约 - -
+上 期 所
+代 码 名 称 代 码 名 称
+AG9999.XSGE 白 银 主 力 合 约 PB9999.XSGE 铅 主 力 合 约
+AU9999.XSGE 黄 金 主 力 合 约 RB9999.XSGE 螺 纹 钢 主 力 合 约
+
+=== 第86页 ===
+代 码 名 称 代 码 名 称
+AL9999.XSGE 铝 主 力 合 约 RU9999.XSGE 天 然 橡 胶 主 力 合 约
+BU9999.XSGE 石 油 沥 青 主 力 合 约SN9999.XSGE 锡 主 力 合 约
+CU9999.XSGE 铜 主 力 合 约 WR9999.XSGE 线 材 主 力 合 约
+FU9999.XSGE 燃 料 油 主 力 合 约 ZN9999.XSGE 锌 主 力 合 约
+HC9999.XSGE 热 轧 卷 板 主 力 合 约NI9999.XSGE 镍 主 力 合 约
+郑 商 所
+代 码 名 称 代 码 名 称
+CY9999.XZCE 棉 纱 主 力 合 约 RM9999.XZCE 菜 籽 粕 主 力 合 约
+CF9999.XZCE 棉 花 主 力 合 约 RM9999.XZCE 菜 籽 粕 主 力 合 约
+FG9999.XZCE 玻 璃 主 力 合 约 RS9999.XZCE 油 菜 籽 主 力 合 约
+JR9999.XZCE 粳 稻 谷 主 力 合 约 SF9999.XZCE 硅 铁 主 力 合 约
+LR9999.XZCE 晚 籼 稻 主 力 合 约 SM9999.XZCE 锰 硅 主 力 合 约
+MA9999.XZCE 甲 醇 主 力 合 约 SR9999.XZCE 白 糖 主 力 合 约
+ME9999.XZCE 甲 醇 主 力 合 约 [ 退 市 ] TA9999.XZCEPTA 主 力 合 约
+OI9999.XZCE 菜 籽 油 主 力 合 约 WH9999.XZCE 强 麦 主 力 合 约
+RO9999.XZCE 菜 籽 油 主 力 合 约 [ 退 市 ] WS9999.XZCE 强 麦 主 力 合 约 [ 退 市 ]
+PM9999.XZCE 普 麦 主 力 合 约 ZC9999.XZCE 动 力 煤 主 力 合 约
+WT9999.XZCE 硬 白 小 麦 主 力 合 约 [ 退 市 ]TC9999.XZCE 动 力 煤 主 力 合 约 [ 退 市 ]
+RI9999.XZCE 早 籼 稻 主 力 合 约 GN9999.XZCE 绿 豆 主 力 合 约 [ 退 市 ]
+ER9999.XZCE 早 籼 稻 主 力 合 约 [ 退 市 ] - -
+大 商 所
+代 码 名 称 代 码 名 称
+A9999.XDCE 豆 一 主 力 合 约 JD9999.XDCE 鸡 蛋 主 力 合 约
+B9999.XDCE 豆 二 主 力 合 约 JM9999.XDCE 焦 煤 主 力 合 约
+BB9999.XDCE 胶 合 板 主 力 合 约 L9999.XDCE 聚 乙 烯 主 力 合 约
+C9999.XDCE 玉 米 主 力 合 约 M9999.XDCE 豆 粕 主 力 合 约
+CS9999.XDCE 玉 米 淀 粉 主 力 合 约P9999.XDCE 棕 榈 油 主 力 合 约
+FB9999.XDCE 纤 维 板 主 力 合 约 PP9999.XDCE 聚 丙 烯 主 力 合 约
+
+=== 第87页 ===
+代 码 名 称 代 码 名 称
+I9999.XDCE 铁 矿 石 主 力 合 约 V9999.XDCE 聚 氯 乙 烯 主 力 合 约
+J9999.XDCE 焦 炭 主 力 合 约 Y9999.XDCE 豆 油 主 力 合 约
+品 种 指 数
+下 面 是 主 要 期 货 交 易 所 的 期 货 指 数 列 表 ：
+中 金 所
+代 码 名 称 代 码 名 称
+IC8888.CCFX 中 证500 期 货 指 数T8888.CCFX 10 年 期 国 债 期 货 指 数
+IF8888.CCFX 沪 深300 期 货 指 数TF8888.CCFX5 年 期 国 债 期 货 指 数
+IH8888.CCFX 上 证50 期 货 指 数 - -
+上 期 所
+代 码 名 称 代 码 名 称
+AG8888.XSGE 白 银 期 货 指 数 PB8888.XSGE 铅 期 货 指 数
+AU8888.XSGE 黄 金 期 货 指 数 RB8888.XSGE 螺 纹 钢 期 货 指 数
+AL8888.XSGE 铝 期 货 指 数 RU8888.XSGE 天 然 橡 胶 期 货 指 数
+BU8888.XSGE 石 油 沥 青 期 货 指 数SN8888.XSGE 锡 期 货 指 数
+CU8888.XSGE 铜 期 货 指 数 WR8888.XSGE 线 材 期 货 指 数
+FU8888.XSGE 燃 料 油 期 货 指 数 ZN8888.XSGE 锌 期 货 指 数
+HC8888.XSGE 热 轧 卷 板 期 货 指 数NI8888.XSGE 镍 期 货 指 数
+郑 商 所
+代 码 名 称 代 码 名 称
+CY8888.XZCE 棉 纱 期 货 指 数 RM8888.XZCE 菜 籽 粕 期 货 指 数
+CF8888.XZCE 棉 花 期 货 指 数 RM8888.XZCE 菜 籽 粕 期 货 指 数
+FG8888.XZCE 玻 璃 期 货 指 数 RS8888.XZCE 油 菜 籽 期 货 指 数
+JR8888.XZCE 粳 稻 谷 期 货 指 数 SF8888.XZCE 硅 铁 期 货 指 数
+LR8888.XZCE 晚 籼 稻 期 货 指 数 SM8888.XZCE 锰 硅 期 货 指 数
+MA8888.XZCE 甲 醇 期 货 指 数 SR8888.XZCE 白 糖 期 货 指 数
+ME8888.XZCE 甲 醇 期 货 指 数 [ 退 市 ] TA8888.XZCEPTA 期 货 指 数
+
+=== 第88页 ===
+代 码 名 称 代 码 名 称
+OI8888.XZCE 菜 籽 油 期 货 指 数 WH8888.XZCE 强 麦 期 货 指 数
+RO8888.XZCE 菜 籽 油 期 货 指 数 [ 退 市 ] WS8888.XZCE 强 麦 期 货 指 数 [ 退 市 ]
+PM8888.XZCE 普 麦 期 货 指 数 ZC8888.XZCE 动 力 煤 期 货 指 数
+WT8888.XZCE 硬 白 小 麦 期 货 指 数 [ 退 市 ]TC8888.XZCE 动 力 煤 期 货 指 数 [ 退 市 ]
+RI8888.XZCE 早 籼 稻 期 货 指 数 GN8888.XZCE 绿 豆 期 货 指 数 [ 退 市 ]
+ER8888.XZCE 早 籼 稻 期 货 指 数 [ 退 市 ] - -
+大 商 所
+代 码 名 称 代 码 名 称
+A8888.XDCE 豆 一 期 货 指 数 JD8888.XDCE 鸡 蛋 期 货 指 数
+B8888.XDCE 豆 二 期 货 指 数 JM8888.XDCE 焦 煤 期 货 指 数
+BB8888.XDCE 胶 合 板 期 货 指 数 L8888.XDCE 聚 乙 烯 期 货 指 数
+C8888.XDCE 玉 米 期 货 指 数 M8888.XDCE 豆 粕 期 货 指 数
+CS8888.XDCE 玉 米 淀 粉 期 货 指 数P8888.XDCE 棕 榈 油 期 货 指 数
+FB8888.XDCE 纤 维 板 期 货 指 数 PP8888.XDCE 聚 丙 烯 期 货 指 数
+I8888.XDCE 铁 矿 石 期 货 指 数 V8888.XDCE 聚 氯 乙 烯 期 货 指 数
+J8888.XDCE 焦 炭 期 货 指 数 Y8888.XDCE 豆 油 期 货 指 数
+期 货 注 意 事 项
+有 夜 盘 的 商 品 期 货 的 一 个 交 易 日 从 前 一 天 晚 上  21:00 开 始
+每 日 在 16:00:00 结 算 , 对 于 期 货 , 使 用 结 算 价 结 算
+期 货 持 仓 到 交 割 日 ， 没 有 手 动 交 割 ， 系 统 会 以 当 天 结 算 价 平 仓 , 没 有 手 续 费 , 不 会 有 交 易 记 录
+获 取 主 力 合 约 对 应 的 标 的
+get_dominant_future(security) 
+参 数
+security: 期 货 合 约 品 种 ， 如  ‘AG’( 白 银 )
+返 回
+主 力 合 约 对 应 的 期 货 合 约
+示 例
+
+=== 第89页 ===
+# 获取某一天的主力合约对应的期货合约代码（策略当前日期是 20160801 ） 
+>>> get_dominant_future('IF') 
+ 
+# 输出 
+'IF1608.CCFX' 
+期 货 可 交 易 合 约 列 表
+get_future_contracts(security) 
+获 取 某 期 货 品 种 在 策 略 当 前 日 期 的 可 交 易 合 约 标 的 列 表
+参 数
+security: 期 货 合 约 品 种 ， 如  ‘AG’( 白 银 )
+返 回
+某 期 货 品 种 在 策 略 当 前 日 期 的 可 交 易 合 约 标 的 列 表
+示 例
+# 获取某一天的主力合约对应的期货合约代码（策略当前日期是 20160601 ） 
+get_future_contracts('IF') 
+ 
+# 输出 
+[u'IF1606.CCFX', u'IF1607.CCFX', u'IF1609.CCFX', u'IF1612.CCFX'] 
+设 置 期 货 保 证 金 比 例
+set_option('futures_margin_rate', value) 
+设 置 期 货 保 证 金 比 例 .
+参 数
+value: value 是 一 个  float 值 ， 为 期 货 的 保 证 金 比 例 。
+示 例
+# 设定期货保证金比例 
+set_option('futures_margin_rate', 0.25) # 设定期货保证金比例为 25% 
+期 货 保 证 金 预 警
+判 断 指 定 仓 位 ， 是 否 低 于 指 定 的 保 证 金 比 率 ， 高 于 该 比 例 返 回False ， 低 于 该 比 例 返 回True.
+
+=== 第90页 ===
+context.subportfolios[i].is_dangerous(margin_rate) 
+其 中 i 是 要 查 询 的 仓 位 编 号 , margin_rate 是 要 查 询 的 保 证 金 比 例
+返 回 ： True 或  False
+示 例 ：
+# 查询 subportfolios[1] 中保证金是否低于  20% 
+context.subportfolios[1].is_dangerous(0.2) 
+ 
+# 低于则返回 True ，  高则返回  False 
+获 取 期 货 的 行 情 数 据
+获 取 期 货 行 情 与 获 取 股 票 行 情 的 方 法 相 同 ，
+get_price 、history 、attribute_history 、get_current_data 、get_bars 等 API 均 可 正 常 使 用 。
+order - 期 货 按 股 数 下 单
+order(security, amount, style=None, side='long', pindex=0) 
+买 卖 标 的 。 调 用 成 功 后 , 您 将 可 以 调 用get_open_orders 取 得 所 有 未 完 成 的 交 易 , 也 可 以 调 用cancel_order 取
+消 交 易
+参 数
+security: 标 的 代 码
+amount: 交 易 数 量 , 正 数 表 示 买 入 , 负 数 表 示 卖 出
+style: 参 见order styles, None 代 表 MarketOrder
+side: ‘long’/’short’ ， 开 空 单 还 是 多 单 ， 默 认 为 多 单 。
+pindex: 在 使 用 set_subportfolios 创 建 了 多 个 仓 位 时 ， 指 定 subportfolio 的 序 号 , 从  0 开 始 , 比 如  0 指 定
+第 一 个  subportfolio, 1 指 定 第 二 个  subportfolio ， 默 认 为 0 。
+返 回 
+Order 对 象 或 者 None, 如 果 创 建 订 单 成 功 , 则 返 回 Order 对 象 , 失 败 则 返 回 None
+示 例
+
+=== 第91页 ===
+## 如果期货账户是默认账户 
+# 在仓位 0中开一手沪深 300 指数期货的空单 
+order('IF1412.CCFX', 1 , side='short', pindex=0) 
+ 
+# 在仓位 0中开一手沪深 300 指数期货的多单 
+order('IF1412.CCFX', 1 , side='long', pindex=0) 
+ 
+## 如果期货账户是仓位 1 
+# 在仓位 1中以 3600 的限价单，平一手沪深 300 指数期货的空单 
+order('IF1412.CCFX', -1 , LimitOrderStyle(3600.0), side='short', pindex=1) 
+ 
+# 在仓位 1中平一手沪深 300 指数期货的多单 
+order('IF1412.CCFX', -1 , side='long', pindex=1) 
+可 能 的 失 败 原 因:
+1. 标 的 不 存 在 ， 对 于 该 原 因 , 我 们 会 抛 出 异 常 停 止 运 行 , 因 为 我 们 认 为 这 是 您 代 码 的 bug.
+2. 选 择 了 不 存 在 的 仓 位 号 ， 如 没 有 建 立 多 个 仓 位 ， 而 设 定 pindex 的 数 大 于 0
+注 意:
+因 为 下 列 原 因 , 有 时 候 实 际 买 入 或 者 卖 出 的 股 票 数 量 跟 您 设 置 的 不 一 样 ， 这 个 时 候 我 们 会 在 您 的 log 中 添
+加 警 告 信 息 。
+1. 买 入 时 会 根 据 您 当 前 的 现 金 来 限 制 您 买 入 的 数 量
+2. 卖 出 时 会 根 据 您 持 有 股 票 的 数 量 来 限 制 您 卖 出 的 数 量
+3. 我 们 会 遵 守 A 股 交 易 规 则 : 每 次 交 易 数 量 只 能 是 100 的 整 数 倍 , 但 是 卖 光 所 有 股 票 时 不 受 这 个 限 制
+根 据 交 易 所 规 则 , 每 天 结 束 时 会 取 消 所 有 未 完 成 交 易
+order_target - 期 货 目 标 股 数 下 单
+order_target(security, amount, style=None, side='long', pindex=0) 
+买 卖 标 的 , 使 最 终 标 的 的 数 量 达 到 指 定 的 amount
+参 数
+security: 标 的 代 码
+amount: 期 望 的 最 终 数 量
+style: 参 见order styles, None 代 表 MarketOrder
+side: ‘long’/’short’ ， 平 空 单 还 是 多 单 ， 默 认 为 多 单 。
+pindex: 在 使 用 set_subportfolios 创 建 了 多 个 仓 位 时 ， 指 定 subportfolio 的 序 号 , 从  0 开 始 , 比 如  0 为  指
+定 第 一 个  subportfolio, 1 为 指 定 第 二 个  subportfolio ， 默 认 为 0 。
+返 回 
+Order 对 象 或 者 None, 如 果 创 建 委 托 成 功 , 则 返 回 Order 对 象 , 失 败 则 返 回 None
+示 例
+
+=== 第92页 ===
+# 如果期货账户是仓位 1 
+# 平掉空单标的 
+order_target('IF1412.CCFX', 0 , side='short', pindex=1) 
+Python 库
+标 准 库
+我 们 支 持 所 有 Python 标 准 库 (https://docs.python.org/2/library/index.html) ， 您 可 以 通 过 import 的 方 式 进 行 引
+入, 下 面 列 出 了 一 些 常 用 的 库 ：
+库 名 帮 助 文 档
+array https://docs.python.org/2.7/library/array.html
+cmath https://docs.python.org/2.7/library/cmath.html
+collectionshttps://docs.python.org/2.7/library/collections.html
+copy https://docs.python.org/2.7/library/copy.html
+datetime https://docs.python.org/2.7/library/datetime.html
+dateutil https://pypi.python.org/pypi/dateutils/0.6.6
+functools https://docs.python.org/2.7/library/functools.html
+heapq https://docs.python.org/2.7/library/heapq.html
+itertools https://docs.python.org/2.7/library/itertools.html
+json https://docs.python.org/2.7/library/json.html
+math https://docs.python.org/2.7/library/math.html
+operator https://docs.python.org/2.7/library/operator.html
+pytz https://pypi.python.org/pypi/pytz/2015.2
+random https://docs.python.org/2.7/library/random.html
+re https://docs.python.org/2.7/library/re.html
+string https://docs.python.org/2.7/library/string.html
+time https://docs.python.org/2.7/library/time.html
+xml https://docs.python.org/2.7/library/xml.html
+第 三 方 库
+
+=== 第93页 ===
+我 们 支 持 以 下 Python 第 三 方 库 ， 您 可 以 通 过 import 的 方 式 进 行 引 入 : 
+在 研 究 模 拟 中 , 您 可 以 运 行  !pip list 来 查 看 所 有 安 装 的 第 三 库 和 版 本 .
+回 测 模 块 ：
+anyjson, arch, graphviz, Lasagne, numpy, pandas, pybrain, scipy, seaborn, sklearn,
+statsmodels, talib, tushare, Theanom, requests, hmm, hmmlearn, pywt, pycrypto,
+beautifulsoup4, prettytable, PyBrain, xlrd
+研 究 模 块 ：
+anyjson, arch, beautifulsoup4, cvxopt, graphviz, gensim, jieba, matplotlib, mpl_toolkits,
+numpy, pandas, pybrain, pymc, pillow, scipy, seaborn, sklearn, statsmodels, tables, talib,
+hmm, hmmlearn, tushare, theano, Lasagne, requests, pywt, zipline, xlrd, xlwt, openpyxl,
+snownlp, pycrypto, prettytable, PyBrain, seaborn
+主 要 模 块 介 绍 ：
+模 块 名 称 版 本 简 介 网 址
+arch 3.1 Arch 模 型 的 lib 库 https://pypi.python.org/pypi/arch
+cvxopt 1.1.8 cvxopt 是 一 个 最 优 化
+计 算 包 ， 进 行 线 性 规
+划 、 二 次 规 划 、 半 正
+定 规 划 等 的 计 算https://pypi.python.org/pypi/cvxopt/1.1.8
+gensim 0.12.2gensim 用 于 计 算 文
+本 相 似 度 ， 依 赖
+NumPy 和 SciPy 这 两
+大Python 科 学 计 算 工
+具 包http://radimrehurek.com/gensim/tutorial.html
+jieba 0.37 jieba 是 一 个 中 文 分 词
+组 件https://pypi.python.org/pypi/jieba
+matplotlib 1.4.3 matplotlib 可 能 是
+Python 2D 绘 图 领 域
+使 用 最 广 泛 的 库 。 它
+能 让 使 用 者 很 轻 松 地
+将 数 据 图 形 化 ， 并 且
+提 供 多 样 化 的 输 出 格
+式http://matplotlib.org/contents.html
+mpl_toolkits 1.4.3 mpl_toolkits 是 一 个
+Python 3D 绘 图 领 域
+函 数 库http://matplotlib.org/mpl_toolkits/index.html
+
+=== 第94页 ===
+模 块 名 称 版 本 简 介 网 址
+NumPy 1.9.3 NumPy 系 统 是
+Python 的 一 种 开 源 的
+数 值 计 算 扩 展 。
+NumPy （ Numeric
+Python ） 提 供 了 许 多
+高 级 的 数 值 编 程 工
+具 ， 如 ： 矩 阵 数 据 类
+型 、 矢 量 处 理 ， 以 及
+精 密 的 运 算 库 。 专 为
+进 行 严 格 的 数 字 处 理
+而 产 生http://www.numpy.org/
+pandas 0.16.2Python Data
+Analysis Library 或
+pandas 是 基 于
+NumPy 的 一 种 工
+具 ， 该 工 具 是 为 了 解
+决 数 据 分 析 任 务 而 创
+建 的 。 Pandas 纳 入
+了 大 量 库 和 一 些 标 准
+的 数 据 模 型 ， 提 供 了
+高 效 地 操 作 大 型 数 据
+集 所 需 的 工 具 。
+pandas 提 供 了 大 量
+能 使 我 们 快 速 便 捷 地
+处 理 数 据 的 函 数 和 方
+法http://pandas.pydata.org/pandas-
+docs/version/0.16.2/
+pybrain 0.3 pybrain 一 个 开 源 的
+Python 神 经 网 络 库http://pybrain.org/docs/
+pymc 2.3.6 pymc 是 机 器 学 习 中
+一 个 图 模 型 的 Python
+库https://pypi.python.org/pypi/pymc/
+SciPy 0.15.1SciPy 是 一 款 方 便 、
+易 于 使 用 、 专 为 科 学
+和 工 程 设 计 的 Python
+工 具 包 。 它 包 括 统
+计 ， 优 化 ， 整 合 ， 线
+性 代 数 模 块 ， 傅 里 叶
+变 换 ， 信 号 和 图 像 处
+理, 常 微 分 方 程 求 解
+器 等 等http://www.scipy.org/
+seaborn 0.6.0 该 模 块 是 一 个 统 计 数
+据 可 视 化 库http://web.stanford.edu/~mwaskom/software/seaborn/
+
+=== 第95页 ===
+模 块 名 称 版 本 简 介 网 址
+sklearn 0.18 Scikit-Learn 是 基 于
+python 的 机 器 学 习 模
+块 ， 基 于 BSD 开 源 许
+可 证 。 scikit-learn 的
+基 本 功 能 主 要 被 分 为
+六 个 部 分 ， 分 类 ， 回
+归 ， 聚 类 ， 数 据 降
+维 ， 模 型 选 择 ， 数 据
+预 处 理 。 Scikit-
+Learn 中 的 机 器 学 习
+模 型 非 常 丰 富 ， 包 括
+SVM ， 决 策 树 ，
+GBDT ， KNN 等 等 ，
+可 以 根 据 问 题 的 类 型
+选 择 合 适 的 模 型http://scikit-learn.org/stable/
+Statsmodels 0.6.1 Statismodels 是 一 个
+Python 包 ， 提 供 一 些
+互 补scipy 统 计 计 算
+的 功 能 ， 包 括 描 述 性
+统 计 和 统 计 模 型 估 计
+和 推 断http://statsmodels.sourceforge.net/
+PyTables 3.2.2 PyTables 提 供 了 一 些
+用 于 结 构 化 数 组 的 高
+级 查 询 功 能 ， 而 且 还
+能 添 加 列 索 引 以 提 升
+查 询 速 度 ， 这 跟 关 系
+型 数 据 库 所 提 供 的 表
+索 引 功 能 非 常 类 似http://www.pytables.org/usersguide/tutorials.html
+TALib 0.4.9 TALib 是 一 个 处 理 金
+融 数 据 和 技 术 分 析 的
+开 放 代 码 库http://mrjbq7.github.io/ta-lib/funcs.html
+hmmlearn 0.2.0 是 在python 上 实 现 隐
+马 可 夫 模 型 的 一 个 组
+件 包https://github.com/hmmlearn/hmmlearn
+Theano 0.8.1 Pyhton 深 度 学 习 库 http://deeplearning.net/software/theano/
+Lasagne 0.1 Pyhton 深 度 学 习 库 http://lasagne.readthedocs.org/en/latest/
+requests 2.7.0 网 络 访 问 模 块 http://docs.python-requests.org/en/v2.7.0/
+pywt 0.4.0 小 波 工 具 箱 http://pywavelets.readthedocs.io/en/v0.4.0/
+Zipline 0.9.0 开 源 的 交 易 算 法 库 ，
+目 前 作 为
+Quantopian 的 回 溯
+检 验 引 擎https://github.com/quantopian/zipline
+
+=== 第96页 ===
+模 块 名 称 版 本 简 介 网 址
+xlrd 1.0.0 Python 语 言 中 ， 读 取
+Excel 的 扩 展 工 具https://pypi.python.org/pypi/xlrd/
+xlwt 1.1.2 Python 语 言 中 ， 写 入
+Excel 文 件 的 扩 展 工
+具https://pypi.python.org/pypi/xlwt/
+openpyxl 2.4.0 Openpyxl 是 一 个
+python 读 写 Excel
+2010 文 件 的 库http://openpyxl.readthedocs.io/en/default/
+snownlp 0.12.3 处 理 中 文 文 本 的
+Python 库https://pypi.python.org/pypi/snownlp/
+pycrypto 2.6.2 Python 加 密 工 具 包 https://pypi.python.org/pypi/pycrypto
+beautifulsoup44.5.1 python 下 很 帅 气 的 爬
+虫 包https://www.crummy.com/software/BeautifulSoup/
+prettytable 0.7.2 Python 通 过
+prettytable 模 块 可 以
+将 输 出 内 容 如 表 格 方
+式 整 齐 的 输 出 。https://pypi.python.org/pypi/PrettyTable
+PyBrain 0.3 Python 的 一 个 机 器 学
+习 模 块 ， 它 的 目 标 是
+为 机 器 学 习 任 务 提 供
+灵 活 、 易 应 、 强 大 的
+机 器 学 习 算 法 。http://www.pybrain.org/
+seaborn 0.6.0 基 于matplotlib 的
+Python 可 视 化 库http://seaborn.pydata.org/
+共 享 函 数 库
+用 户 产 生 的 函 数 ， 并 分 享 出 来 。  
+使 用 共 享 函 数 库 ， 可 以 避 免 用 户 再 做 重 复 的 工 作 ， 也 可 以 学 习 其 他 宽 客 的 代 码 思 路 。  
+详 情 查 看 ： 帮 助  -> 共 享 函 数 库
+策 略 示 例
+以 下 为 常 见 的 量 化 基 础 算 法 示 例 ， 您 也 可 以 访 问 社 区 寻 找 更 多 量 化 策 略 。
+双 均 线 策 略
+最 基 础 的 量 化 策 略 之 一 ， 当 五 日 均 线 高 于 十 日 均 线 时 买 入 ， 当 五 日 均 线 低 于 十 日 均 线 时 卖 出 。
+
+=== 第97页 ===
+# 导入聚宽函数库 
+import jqdata 
+ 
+# 初始化函数，设定要操作的股票、基准等等 
+def initialize(context): 
+    # 定义一个全局变量 , 保存要操作的股票 
+    # 000001(股票 : 平安银行 ) 
+    g.security = '000001.XSHE' 
+    # 设定沪深 300作为基准 
+    set_benchmark('000300.XSHG') 
+    # 开启动态复权模式 ( 真实价格 ) 
+    set_option('use_real_price', True) 
+ 
+# 每个单位时间 ( 如果按天回测 , 则每天调用一次 , 如果按分钟 , 则每分钟调用一次 ) 调用一次 
+def handle_data(context, data): 
+    security = g.security 
+    # 获取股票的收盘价 
+    close_data = attribute_history(security, 10, '1d', ['close'],df=False) 
+    # 取得过去五天的平均价格 
+    ma5 = close_data['close'][-5:].mean() 
+    # 取得过去 10天的平均价格 
+    ma10 = close_data['close'].mean() 
+    # 取得当前的现金 
+    cash = context.portfolio.cash 
+ 
+    # 如果当前有余额，并且五日均线大于十日均线 
+    if ma5 > ma10: 
+        # 用所有  cash 买入股票 
+        order_value(security, cash) 
+        # 记录这次买入 
+        log.info("Buying %s" % (security)) 
+ 
+    # 如果五日均线小于十日均线，并且目前有头寸 
+    elif ma5 < ma10 and context.portfolio.positions[security].closeable_amoun
+t> 0: 
+        # 全部卖出 
+        order_target(security, 0) 
+        # 记录这次卖出 
+        log.info("Selling %s" % (security)) 
+ 
+    # 绘制五日均线价格 
+    record(ma5=ma5) 
+    # 绘制十日均线价格 
+    record(ma10=ma10) 
+双 均 线 策 略 均 线 回 归 策 略
+当 价 格 低 于 5 日 均 线 平 均 价 格 *0.95 时 买 入 ， 当 价 格 高 于 5 日 平 均 价 格 *1.05 时 卖 出 。
+
+=== 第98页 ===
+# 导入聚宽函数库 
+import jqdata 
+ 
+# 初始化函数，设定要操作的股票、基准等等 
+def initialize(context): 
+    # 定义一个全局变量 , 保存要操作的股票 
+    # 000001(股票 : 平安银行 ) 
+    g.security = '000001.XSHE' 
+    # 设定沪深 300作为基准 
+    set_benchmark('000300.XSHG') 
+    # 开启动态复权模式 ( 真实价格 ) 
+    set_option('use_real_price', True) 
+ 
+# 每个单位时间 ( 如果按天回测 , 则每天调用一次 , 如果按分钟 , 则每分钟调用一次 ) 调用一次 
+def handle_data(context, data): 
+    security = g.security 
+    # 获取股票的收盘价 
+    close_data = attribute_history(security, 5, '1d', ['close']) 
+    # 取得过去五天的平均价格 
+    MA5 = close_data['close'].mean() 
+    # 取得上一时间点价格 
+    current_price = close_data['close'][-1] 
+    # 取得当前的现金 
+    cash = context.portfolio.cash 
+ 
+    # 如果上一时间点价格高出五天平均价 1%, 则全仓买入 
+    if current_price > 1.05*MA5: 
+        # 用所有  cash 买入股票 
+        order_value(security, cash) 
+        # 记录这次买入 
+        log.info("Buying %s" % (security)) 
+    # 如果上一时间点价格低于五天平均价 , 则空仓卖出 
+    elif current_price < 0.95*MA5 and context.portfolio.positions[security].c
+loseable_amount > 0: 
+        # 卖出所有股票 , 使这只股票的最终持有量为 0 
+        order_target(security, 0) 
+        # 记录这次卖出 
+        log.info("Selling %s" % (security)) 
+    # 画出上一时间点价格 
+    record(stock_price=current_price) 
+ 
+多 股 票 持 仓 示 例
+这 是 一 个 较 简 单 的 多 股 票 操 作 示 例 ， 当 价 格 高 于 三 天 平 均 价 *1.005 则 买 入 100 股 ， 当 价 格 小 于 三 天 平 均 价
+*0.995 则 卖 出 。
+
+=== 第99页 ===
+# 导入聚宽函数库 
+import jqdata 
+ 
+def initialize(context): 
+    # 初始化此策略 
+    # 设置我们要操作的股票池 
+    g.stocks = ['000001.XSHE','000002.XSHE','000004.XSHE','000005.XSHE'] 
+    # 设定沪深 300作为基准 
+    set_benchmark('000300.XSHG') 
+    # 开启动态复权模式 ( 真实价格 ) 
+    set_option('use_real_price', True) 
+ 
+# 每个单位时间 ( 如果按天回测 , 则每天调用一次 , 如果按分钟 , 则每分钟调用一次 ) 调用一次 
+def handle_data(context, data): 
+    # 循环每只股票 
+    for security in g.stocks: 
+        # 得到股票之前 3 天的平均价 
+        vwap = data[security].vwap(3) 
+        # 得到上一时间点股票平均价 
+        price = data[security].close 
+        # 得到当前资金余额 
+        cash = context.portfolio.cash 
+ 
+        # 如果上一时间点价格小于三天平均价 *0.995 ，并且持有该股票，卖出 
+        if price < vwap * 0.995 and context.portfolio.positions[security].clo
+seable_amount > 0: 
+            # 下入卖出单 
+            order(security,-100) 
+            # 记录这次卖出 
+            log.info("Selling %s" % (security)) 
+        # 如果上一时间点价格大于三天平均价 *1.005 ，并且有现金余额，买入 
+        elif price > vwap * 1.005 and cash > 0: 
+            # 下入买入单 
+            order(security,100) 
+            # 记录这次买入 
+            log.info("Buying %s" % (security)) 
+多 股 票 追 涨 策 略
+当 股 票 在 当 日 收 盘 30 分 钟 内 涨 幅 到 达 9.5%~9.9% 时 间 段 的 时 候 ， 我 们 进 行 买 入 ， 在 第 二 天 开 盘 卖 出 。 注 意 ：
+请 按 照 分 钟 进 行 回 测 该 策 略 。
+
+=== 第100页 ===
+# 导入聚宽函数库 
+import jqdata 
+ 
+# 初始化程序 , 整个回测只运行一次 
+def initialize(context): 
+    # 开启动态复权模式 ( 真实价格 ) 
+    set_option('use_real_price', True) 
+ 
+    # 每天买入股票数量 
+    g.daily_buy_count  = 5 
+ 
+    # 设置我们要操作的股票池 , 这里我们操作多只股票，下列股票选自计算机信息技术相关板块 
+    g.stocks = get_industry_stocks('I64') + get_industry_stocks('I65') 
+ 
+    # 防止板块之间重复包含某只股票 , 排除掉重复的 , g.stocks 现在是一个集合 (set) 
+    g.stocks = set(g.stocks) 
+ 
+    # 让每天早上开盘时执行  morning_sell_all 
+    run_daily(morning_sell_all, 'open') 
+ 
+def morning_sell_all(context): 
+    # 将目前所有的股票卖出 
+    for security in context.portfolio.positions: 
+        # 全部卖出 
+        order_target(security, 0) 
+        # 记录这次卖出 
+        log.info("Selling %s" % (security)) 
+ 
+def before_trading_start(context): 
+    # 今天已经买入的股票 
+    g.today_bought_stocks = set() 
+ 
+    # 得到所有股票昨日收盘价 , 每天只需要取一次 , 所以放在  before_trading_start 中 
+    g.last_df = history(1,'1d','close',g.stocks) 
+ 
+# 在每分钟的第一秒运行 , data 是上一分钟的切片数据 
+def handle_data(context, data): 
+ 
+    # 判断是否在当日最后的 2 小时，我们只追涨最后 2 小时满足追涨条件的股票 
+    if context.current_dt.hour < 13: 
+        return 
+ 
+    # 每天只买这么多个 
+    if len(g.today_bought_stocks) >= g.daily_buy_count: 
+        return 
+ 
+    # 只遍历今天还没有买入的股票 
+    for security in (g.stocks - g.today_bought_stocks): 
+ 
+        # 得到当前价格 
+        price = data[security].close 
+ 
+        # 获取这只股票昨天收盘价 
+        last_close = g.last_df[security][0] 
+ 
+
+=== 第101页 ===
+        # 如果上一时间点价格已经涨了 9.5%~9.9% 
+        # 今天的涨停价格区间大于 1 元，今天没有买入该支股票 
+        if price/last_close > 1.095 \ 
+                and price/last_close < 1.099 \ 
+                and data[security].high_limit - last_close >= 1.0: 
+ 
+            # 得到当前资金余额 
+            cash = context.portfolio.cash 
+ 
+            # 计算今天还需要买入的股票数量 
+            need_count = g.daily_buy_count - len(g.today_bought_stocks) 
+ 
+            # 把现金分成几份 , 
+            buy_cash = context.portfolio.cash / need_count 
+ 
+            # 买入这么多现金的股票 
+            order_value(security, buy_cash) 
+ 
+            # 放入今日已买股票的集合 
+            g.today_bought_stocks.add(security) 
+ 
+            # 记录这次买入 
+            log.info("Buying %s" % (security)) 
+ 
+            # 买够5个之后就不买了 
+            if len(g.today_bought_stocks) >= g.daily_buy_count: 
+                break 
+万 圣 节 效 应 策 略
+股 市 投 资 中 的 “ 万 圣 节 效 应 ” 是 指 在 北 半 球 的 冬 季 (11 月 至 4 月 份 ) ， 股 市 回 报 通 常 明 显 高 於 夏 季 (5 月 至 10 月 份 ) 。
+这 里 我 们 选 取 了 中 国 蓝 筹 股 ， 采 用 10 月 15 日 后 买 入 ， 5 月 15 日 后 卖 出 的 简 单 策 略 进 行 示 例 。
+
+=== 第102页 ===
+# 导入聚宽函数库 
+import jqdata 
+ 
+# 初始化此策略 
+def initialize(context): 
+    # 开启动态复权模式 ( 真实价格 ) 
+    set_option('use_real_price', True) 
+ 
+    # 设置我们要操作的股票池，这里我们选择蓝筹股 
+    g.stocks = ['000001.XSHE','600000.XSHG','600019.XSHG','600028.XSHG','6000
+30.XSHG','600036.XSHG','600519.XSHG','601398.XSHG','601857.XSHG','601988.XSH
+G'] 
+ 
+# 每个单位时间 ( 如果按天回测 , 则每天调用一次 , 如果按分钟 , 则每分钟调用一次 ) 调用一次 
+def handle_data(context, data): 
+    # 得到每只股票可以花费的现金，这里我们使用总现金股票数数量 
+    cash = context.portfolio.cash / len(g.stocks) 
+    # 获取数据 
+    hist = history(1,'1d','close',g.stocks) 
+    # 循环股票池 
+    for security in g.stocks: 
+        # 得到当前时间 
+        today = context.current_dt 
+        # 得到该股票上一时间点价格 
+        current_price = hist[security][0] 
+        # 如果当前为 10 月且日期大于 15 号，并且现金大于上一时间点价格，并且当前该股票空仓 
+        if today.month == 10 and today.day > 15 and cash > current_price and 
+context.portfolio.positions[security].closeable_amount == 0: 
+            order_value(security, cash) 
+            # 记录这次买入 
+            log.info("Buying %s" % (security)) 
+        # 如果当前为 5月且日期大于 15 号，并且当前有该股票持仓，则卖出 
+        elif today.month == 5 and today.day > 15 and context.portfolio.positi
+ons[security].closeable_amount > 0: 
+            # 全部卖出 
+            order_target(security, 0) 
+            # 记录这次卖出 
+            log.info("Selling %s" % (security)) 
+如 果 以 上 内 容 仍 没 有 解 决 您 的 问 题 ， 请 您 通 过 社 区 提 问 的 方 式 告 诉 我 们 ， 谢 谢
