@@ -219,6 +219,8 @@ def get_current_holding_stocks():
 		if pos.volume == 0:
 			continue
 		#print(pos.stock_code)
+		if pos.stock_code in g.positions[MOM_IDX]:
+			continue
 		current_holdings.append(pos.stock_code)
 
 	return current_holdings
@@ -724,6 +726,8 @@ def mom_rebalance():
 		if stock not in weights:
 			print(f"  [调出] {get_stock_name(stock)}({stock}) → 清仓")
 			sell_target_value(stock, 0, MOM_IDX)
+			print("sleep 30s")
+			sleep_sec(30)
 
 	for stock, weight in weights.items():
 		target = strategy_budget * weight
@@ -732,6 +736,8 @@ def mom_rebalance():
 		if current_val - target > max(3000, price * 100 if price else 10000):
 			print(f"  [减仓] {get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f}")
 			sell_target_value(stock, target, MOM_IDX)
+			print("sleep 30s")
+			sleep_sec(30)
 		else:
 			print(f"  [与目标差异太小，不减仓] {get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f}")
 
@@ -1512,7 +1518,7 @@ def buy_stocks():
 				print(f'委托买入: {get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'
 					f'\n预计最终持股{amount}股，每股{current_price:.2f}元，合计:{amount * current_price:.2f}')
 				buy_target_value(stock, target_value_per_stock, SC_IDX)
-			#sleep_sec(10)
+			sleep_sec(10)
 
 def get_blank(ratio):
 	blank_num = 2
