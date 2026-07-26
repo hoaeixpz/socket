@@ -16,10 +16,11 @@ import re
 import numpy as np
 import pandas as pd
 from apscheduler.schedulers.background import BackgroundScheduler
+import os
 import signal
 
-#DEBUG_DAILY_MODE = False
-DEBUG_DAILY_MODE = True
+DEBUG_DAILY_MODE = False
+#DEBUG_DAILY_MODE = True
 
 ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
@@ -323,10 +324,23 @@ def get_market(stock_list):
 
 	return market
 
+def get_userdata_mini_path():
+	"""检查多个可能的userdata_mini路径，返回第一个存在的"""
+	candidates = [
+		'C:\\QMT\\国金证券QMT交易端\\userdata_mini',
+		'D:\\国金证券QMT交易端\\userdata_mini',
+		'C:\\QMT\\userdata_mini',
+	]
+	for p in candidates:
+		if os.path.exists(p):
+			print(f'QMT路径: {p}')
+			return p
+	print('未找到userdata_mini路径，使用默认路径')
+	return candidates[0]
+
 def init():
 	print("init — 双策略合并版")
-	path = 'C:\\QMT\\国金证券QMT交易端\\userdata_mini'
-	#path = 'C:\\QMT\\userdata_mini'
+	path = get_userdata_mini_path()
 	session_id = int(time.time())
 	g.xt_trader = XtQuantTrader(path, session_id)
 	g.callback = MyXtQuantTraderCallback()
@@ -1168,7 +1182,7 @@ def sc_calc_position():
 
 					sell_target_value(stock, exce_pos * strategy_total, SC_IDX)
 					cash -= diff_pos * strategy_total
-					print(f'调整{stock_name}市值，卖出{abs(diff_pos) * strategy_value:.2f}元')
+					print(f'调整{stock_name}市值，卖出{abs(diff_pos) * strategy_total:.2f}元')
 
 		if cash > 0:
 			print("sleep 30s")
@@ -1464,12 +1478,12 @@ def buy_stocks():
 			if current_price is None or current_price == 0:
 				continue
 
-			info = g.xt_trader.query_stock_asset(g.account)
 			print("")
-			print(f'{green_c}✅\033[0m===可用资金 {info.cash}===')
+			available_cash = get_strategy_available_cash(SC_IDX)
+			print(f'{green_c}✅\033[0m===可用资金 {available_cash}===')
 
 			if stock == g.etf:
-				target_value_per_stock = min(info.cash, target_value_per_stock)
+				target_value_per_stock = min(available_cash, target_value_per_stock)
 				amount = int(target_value_per_stock / current_price / 100) * 100
 				if amount > 0:
 					print(f'买入ETF {stock} {get_stock_name(stock)} 目标市值{target_value_per_stock:.2f}, {amount}股 * {current_price}元')
@@ -1481,7 +1495,7 @@ def buy_stocks():
 					positions = get_positions()
 					if stock in positions:
 						current_value = positions[stock].market_value
-					target_value_per_stock = min(info.cash + current_value, target_value_per_stock)
+					target_value_per_stock = min(available_cash + current_value, target_value_per_stock)
 				
 				raw_amount = target_value_per_stock / current_price
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
@@ -1551,8 +1565,8 @@ def sc_info_position():
 
 
 if __name__ == '__main__':
-	#init()
-	#run_strategy()
+	init()
+	run_strategy()
 
 	#=============================
 	#DEBUG_DAILY_MODE == True
@@ -1562,9 +1576,9 @@ if __name__ == '__main__':
 	#exec_all_weather()
 	#info_position()
 
-	#'''
+	'''
 	init()
-	if g.portfolio_value_proportion[SC_IDX] > 0 and False:
+	if g.portfolio_value_proportion[SC_IDX] > 0:
 		sc_judge_date()
 		sc_prepare_stock_list()
 		#sc_trade_etf()
@@ -1578,4 +1592,4 @@ if __name__ == '__main__':
 
 	if g.portfolio_value_proportion[MOM_IDX] > 0:
 		mom_rebalance()
-	#'''
+	'''
