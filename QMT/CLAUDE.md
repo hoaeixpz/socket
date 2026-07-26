@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **QMT (迅投QMT) automated trading system** using the `xtquant` Python SDK. It contains **three independent strategy families**:
+This is a **QMT (迅投QMT) automated trading system** using the `xtquant` Python SDK. It contains **four strategy families**:
 
-1. **Small-cap rotation** — holds the N smallest market-cap A-share stocks, rebalanced weekly on Tuesdays. During January and April (seasonal underperformance months), switches to all-weather ETFs.
-2. **All-weather ETF** — monthly rebalance across 5 assets (gold, soybean meal, Nasdaq, AgBank, Yangtze Power) using ES-based risk-parity weighting.
+1. **Small-cap rotation** — holds the N smallest market-cap A-share stocks, rebalanced weekly on Tuesdays. During January and April, switches to all-weather ETFs.
+2. **All-weather ETF** — monthly rebalance across 5 assets using ES-based risk-parity weighting.
 3. **All-weather + bond** — same as all-weather plus bond ETFs with drawdown-graded bond liquidation.
+4. **Dual-strategy (动量+小市值)** — ETF momentum rotation + small-cap rotation combined, 50/50 capital allocation with independent position and budget tracking.
 
 ## Key Files
 
@@ -48,6 +49,20 @@ This is a **QMT (迅投QMT) automated trading system** using the `xtquant` Pytho
 |-----------|----------|
 | `gjzqqmt/QMT操作说明文档/` | Official 国金证券 QMT platform PDF manuals — including Python API reference (`模型资料_Python_API_说明文档_Python3.pdf`), VBA model editor, grid strategy, algorithm trading docs |
 | `安装目录/userdata_mini/` | Local copy of MiniQMT data directory (contains `down_queue_6689`, a 75 MB binary message queue file). Used by `miniqmt_test.py` for testing against local data. |
+
+### Dual-strategy family (`code/miniqmt_moment_small_0_1.py`)
+
+| File | Platform | Role |
+|------|----------|------|
+| `code/miniqmt_moment_small_0_1.py` | MiniQMT | **Dual-strategy combined** — 动量ETF轮动(50%) + 小市值轮动(50%), independent capital tracking |
+| `code/miniqmt_moment_0_1.py` | MiniQMT | **Momentum-only** — ETF dual-momentum rotation, standalone for testing |
+| `code/moment.py` | JoinQuant | **Dual-strategy JoinQuant版** — same two strategies on JoinQuant platform, used as reference logic |
+
+### Utility / tutorial files (continued)
+
+| File | Role |
+|------|------|
+| `code/_small_cap_class.py` | Temporary file from development, can be deleted |
 
 ## Architecture
 
@@ -168,11 +183,48 @@ All MiniQMT strategies share the same architecture:
 - `login.ps1` uses Windows `CredentialManager` module to retrieve stored password (target: `QMT_AutoLogin`), then `SendKeys` to type password and press Enter
 - Requires: Import-Module CredentialManager, stored Windows credential named `QMT_AutoLogin`
 
+### Dual-Strategy (动量+小市值) Architecture
+
+The combined file `miniqmt_moment_small_0_1.py` runs two independent strategies sharing one QMT connection:
+
+**Capital isolation**:
+- `g.portfolio_value_proportion = [0.25, 0.75]` — 动量25%, 小市值75% of total asset
+- `g.capital = {0: ..., 1: ...}` — each strategy's budget ceiling, initialized as `total_asset * proportion`
+- `g.positions = {0: {}, 1: {}}` — per-strategy position tracking
+- `get_strategy_available_cash(idx)` — returns `g.capital[idx] - current_holdings_value(idx)`, the actual remaining budget
+- `sell_target_value`/`buy_target_value`/`buy_target_shares` accept `strat_idx` parameter; after trade, `g.capital[strat_idx]` is updated (sells add back, buys deduct)
+
+**Momentum strategy** (MOM_IDX=0):
+- ETF pool: 9 ETFs across 境外/商品/债券/国内
+- Scoring: dual-momentum — short-term (25-day, max_score=6) + long-term (250-day, max_score=0.5)
+- Formula: `score = annualized_return × R²` from weighted log-price regression
+- Dip filter: any 3-day drop >5% disqualifies the ETF
+- If no ETF qualifies, falls back to SAFE_ETF (城投债 511220.SH)
+- Rebalance: daily at 11:00
+- Budget: `g.capital[MOM_IDX]`
+
+**Small-cap strategy** (SC_IDX=1):
+- Same logic as `miniqmt_small_cap_0_1.py` with all stock filtering, industry diversification, stop-loss, Jan/Apr all-weather
+- Key adaptation: position calculation uses `strategy_total = total_asset * 0.75` instead of full portfolio value
+- Buy cash capped by `get_strategy_available_cash(SC_IDX)`
+
+**Scheduling**:
+- Momentum: daily 11:00
+- Small-cap: 09:30 judge_date, 09:31 prepare, 09:35 trade_etf, 10:00 rebalance_sell, 10:15 stop_loss, 10:30 rebalance_buy, 14:00 check_limit_up, 14:02 check_remain_amount, 15:01 info_position
+
+**`get_userdata_mini_path()`**: checks multiple paths and returns the first existing one (国金证券QMT on C:, D:, and fallback C:\QMT\userdata_mini).
+
 ## Running the Strategies
 
 ```bash
 # Main small-cap strategy (standalone)
 cd code && python miniqmt_small_cap_0_1.py
+
+# Dual-strategy (momentum + small-cap)
+cd code && python miniqmt_moment_small_0_1.py
+
+# Momentum-only (standalone, for testing)
+cd code && python miniqmt_moment_0_1.py
 
 # Process manager daemon (auto-restarts small-cap strategy on first Friday of month)
 cd code && python strategy_scheduler.py
