@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 import math
 import sys
 import subprocess
-import psutil
 import re
 import numpy as np
 import pandas as pd
@@ -20,7 +19,7 @@ import os
 import signal
 
 DEBUG_DAILY_MODE = False
-#DEBUG_DAILY_MODE = True
+DEBUG_DAILY_MODE = True
 
 ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
@@ -356,13 +355,14 @@ def init():
 	info = g.xt_trader.query_stock_asset(g.account)
 
 	# 多策略配置
-	g.portfolio_value_proportion = [0.25, 0.75]
+	g.portfolio_value_proportion = [0.9, 0.1]
 	# 每个策略的预留现金（买卖驱动），互相隔离
 	g.cash_reserved = {MOM_IDX: g.portfolio_value_proportion[MOM_IDX] * info.cash,
 					   SC_IDX: g.portfolio_value_proportion[SC_IDX] * info.cash}
 	# 各策略持仓股票集合，初始化时扫描已有持仓归入对应策略
 	g.positions = {MOM_IDX: set(), SC_IDX: set()}
-	g.positions[MOM_IDX].add('511880.SH')
+	g.positions[MOM_IDX].add('159985.SZ')
+	g.positions[MOM_IDX].add('513520.SH')
 	g.positions[SC_IDX].add('002513.SZ')
 	g.positions[SC_IDX].add('002591.SZ')
 	g.positions[SC_IDX].add('002760.SZ')
@@ -446,7 +446,7 @@ def reconnect():
 
 
 def kill_process_by_name(name):
-	"""终止所有名称包含 name 的进程 (使用psutil)"""
+	"""终止所有名称包含 name 的进程"""
 	try:
 		subprocess.run(['taskkill', '/f', '/im', name], capture_output=True,text=True,check=True)
 		print(f"close {name} success")
@@ -566,8 +566,10 @@ def sell_target_value(stock, target_value, strat_idx=None):
 		if target_value == 0:
 			g.cash_reserved[strat_idx] += pos.market_value
 			g.positions[strat_idx].discard(stock)
+			print(f"成功清仓 {stock} 后，策略{strat_idx} 增加资金{pos.market_value:.2f}, 现有资金为 {g.cash_reserved[strat_idx]:.2f}")
 		else:
 			g.cash_reserved[strat_idx] += pos.market_value - target_value
+			print(f"成功卖出 {stock} 后，策略{strat_idx} 增加资金{pos.market_value:.2f} - {target_value:.2f}, 现有资金为 {g.cash_reserved[strat_idx]:.2f}")
 
 def buy_target_value(stock, target_value, strat_idx=None):
 	if DEBUG_DAILY_MODE:
@@ -603,6 +605,8 @@ def buy_target_value(stock, target_value, strat_idx=None):
 			if async_seq != -1 and async_seq is not None and strat_idx is not None:
 				g.cash_reserved[strat_idx] -= amount * buy_price
 				g.positions[strat_idx].add(stock)
+				print(f"成功买入 {stock} 后，策略{strat_idx} 减少资金{amount * buy_price:.2f}, 现有资金为 {g.cash_reserved[strat_idx]:.2f}")
+
 	print("async_seq ", async_seq)
 	if async_seq == -1 or async_seq is None:
 		print(f"buy_target_value failed {stock} {get_stock_name(stock)}")
@@ -632,6 +636,7 @@ def buy_target_shares(stock, amount, strat_idx=None):
 	if async_seq != -1 and async_seq is not None and strat_idx is not None:
 		g.cash_reserved[strat_idx] -= amount * current_price
 		g.positions[strat_idx].add(stock)
+		print(f"成功买入 {stock} 后，策略{strat_idx} 减少资金{amount * current_price:.2f}, 现有资金为 {g.cash_reserved[strat_idx]:.2f}")
 
 
 # ================================================================
@@ -1589,7 +1594,16 @@ def sc_info_position():
 				print(f'    持仓: (空)')
 		print()
 
-		if current_date.hour == 15:
+		if current_date.hour == 16:
+			cash = 0
+			for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
+				cash += g.cash_reserved[idx]
+
+			if available_cash == cash:
+				print(f"  各策略的资金总和与账面资金吻合\n")
+			else:
+				print(f"  策略资金总和为{cash}，账面资金为{available_cash}\n")
+
 			daily_return = total_value - g.last_pos_value
 			rate_of_return = daily_return / g.last_pos_value * 100
 			color = red_c if daily_return > 0 else green_c
@@ -1603,7 +1617,7 @@ def sc_info_position():
 
 if __name__ == '__main__':
 	init()
-	run_strategy()
+	#run_strategy()
 
 	#=============================
 	#DEBUG_DAILY_MODE == True
