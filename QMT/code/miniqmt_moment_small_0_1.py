@@ -19,7 +19,7 @@ import os
 import signal
 
 DEBUG_DAILY_MODE = False
-DEBUG_DAILY_MODE = True
+#DEBUG_DAILY_MODE = True
 
 ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
@@ -1602,7 +1602,16 @@ def sc_info_position():
 			if available_cash == cash:
 				print(f"  各策略的资金总和与账面资金吻合\n")
 			else:
-				print(f"  策略资金总和为{cash}，账面资金为{available_cash}\n")
+				print(f"  策略资金总和为{cash:.2f}，账面资金为{available_cash:.2f}\n")
+				cash_diff = available_cash - cash
+				print(f"资金差额为{cash_diff:.2f}")
+				if abs(cash_diff / available_cash) > 0.3:
+					print("资金差额较大，可能代码有问题，请调试")
+				else:
+					print("资金差额较小，可能是手续费或者分红导致。现决定2个策略各分走一半差额资金")
+					for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
+						g.cash_reserved[idx] += cash_diff / 2
+						print(f'  [{name}策略] 预留现金: {g.cash_reserved[idx]:,.2f}')
 
 			daily_return = total_value - g.last_pos_value
 			rate_of_return = daily_return / g.last_pos_value * 100
@@ -1617,7 +1626,7 @@ def sc_info_position():
 
 if __name__ == '__main__':
 	init()
-	#run_strategy()
+	run_strategy()
 
 	#=============================
 	#DEBUG_DAILY_MODE == True
