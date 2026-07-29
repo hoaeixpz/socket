@@ -359,6 +359,8 @@ def init():
 	# 每个策略的预留现金（买卖驱动），互相隔离
 	g.cash_reserved = {MOM_IDX: g.portfolio_value_proportion[MOM_IDX] * info.cash,
 					   SC_IDX: g.portfolio_value_proportion[SC_IDX] * info.cash}
+	#记录上一交易日现金
+	g.cash_record = g.cash_reserved
 	# 各策略持仓股票集合，初始化时扫描已有持仓归入对应策略
 	g.positions = {MOM_IDX: set(), SC_IDX: set()}
 	g.positions[MOM_IDX].add('159985.SZ')
@@ -755,7 +757,7 @@ def mom_rebalance():
 			print(f"  [加仓] {get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f}")
 			buy_target_value(stock, target, MOM_IDX)
 		else:
-			print(f"  [与目标差异太大，不加仓] {get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f} 策略资金{stra_avi_cash:,.2f}")
+			print(f"  [与目标差异太小，不加仓] {get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f} 策略资金{stra_avi_cash:,.2f}")
 
 	print(f'{green_c}✅========== [动量策略] 调仓结束 ==========\033[0m\n')
 
@@ -1594,7 +1596,7 @@ def sc_info_position():
 				print(f'    持仓: (空)')
 		print()
 
-		if current_date.hour == 16:
+		if current_date.hour == 15:
 			cash = 0
 			for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
 				cash += g.cash_reserved[idx]
@@ -1605,13 +1607,28 @@ def sc_info_position():
 				print(f"  策略资金总和为{cash:.2f}，账面资金为{available_cash:.2f}\n")
 				cash_diff = available_cash - cash
 				print(f"资金差额为{cash_diff:.2f}")
+				for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
+					print(f'  [{name}策略] 上一交易日现金记录{g.cash_record[idx]:,.2f}')
+					
 				if abs(cash_diff / available_cash) > 0.3:
 					print("资金差额较大，可能代码有问题，请调试")
 				else:
-					print("资金差额较小，可能是手续费或者分红导致。现决定2个策略各分走一半差额资金")
+					if g.cash_reserved[MOM_IDX] == g.cash_record[MOM_IDX]:
+						print("动量策略资金与上一交易日持平，更新小市值策略资金")
+						g.cash_reserved[SC_IDX] = abs(available_cash - g.cash_record[MOM_IDX])
+						g.cash_record[SC_IDX] = g.cash_reserved[SC_IDX]
+					elif g.cash_reserved[SC_IDX] == g.cash_record[SC_IDX]:
+						print("小市值策略资金与上一交易日持平，更新动量策略资金")
+						g.cash_reserved[MOM_IDX] = abs(available_cash - g.cash_record[SC_IDX])
+						g.cash_record[MOM_IDX] = g.cash_reserved[MOM_IDX]
+					else:
+						print("资金差额较小，可能是手续费或者分红导致。现决定2个策略各分走一半差额资金")
+						for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
+							g.cash_reserved[idx] += cash_diff / 2
+							g.cash_record[idx] = g.cash_reserved[idx]
+
 					for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
-						g.cash_reserved[idx] += cash_diff / 2
-						print(f'  [{name}策略] 预留现金: {g.cash_reserved[idx]:,.2f}')
+						print(f'  [{name}策略] 预留现金: {g.cash_reserved[idx]:,.2f}, 现金记录更新{g.cash_record[idx]:,.2f}')
 
 			daily_return = total_value - g.last_pos_value
 			rate_of_return = daily_return / g.last_pos_value * 100
