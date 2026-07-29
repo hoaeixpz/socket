@@ -355,7 +355,7 @@ def init():
 	info = g.xt_trader.query_stock_asset(g.account)
 
 	# 多策略配置
-	g.portfolio_value_proportion = [0.9, 0.1]
+	g.portfolio_value_proportion = [0.95, 0.05]
 	# 每个策略的预留现金（买卖驱动），互相隔离
 	g.cash_reserved = {MOM_IDX: g.portfolio_value_proportion[MOM_IDX] * info.cash,
 					   SC_IDX: g.portfolio_value_proportion[SC_IDX] * info.cash}
@@ -363,11 +363,18 @@ def init():
 	g.cash_record = g.cash_reserved
 	# 各策略持仓股票集合，初始化时扫描已有持仓归入对应策略
 	g.positions = {MOM_IDX: set(), SC_IDX: set()}
-	g.positions[MOM_IDX].add('159985.SZ')
+	g.positions[MOM_IDX].add('513130.SH')
 	g.positions[MOM_IDX].add('513520.SH')
-	g.positions[SC_IDX].add('002513.SZ')
+
+	g.positions[SC_IDX].add('002188.SZ')
+	g.positions[SC_IDX].add('002316.SZ')
+	g.positions[SC_IDX].add('002494.SZ')
+	g.positions[SC_IDX].add('002529.SZ')
 	g.positions[SC_IDX].add('002591.SZ')
-	g.positions[SC_IDX].add('002760.SZ')
+	g.positions[SC_IDX].add('002743.SZ')
+	g.positions[SC_IDX].add('002820.SZ')
+	g.positions[SC_IDX].add('002910.SZ')
+	g.positions[SC_IDX].add('003003.SZ')
 
 	# ===== 小市值全局变量 =====
 	g.stock_pool = []
