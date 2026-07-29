@@ -112,28 +112,39 @@ def initialize(context):
 	log.set_level("order", "error")  # 过滤掉order系列API产生的比error级别低的log
     #log.set_level('strategy', 'error')
 	# set_slippage(PriceRelatedSlippage(0.002), type="stock")
+	set_slippage(PriceRelatedSlippage(0))
+	set_order_cost(OrderCost(open_tax=0, close_tax=0, 
+                            open_commission=0, close_commission=0, 
+                            close_today_commission=0, min_commission=0), type='fund')
+	set_order_cost(OrderCost(open_tax=0, close_tax=0, 
+                            open_commission=0, close_commission=0, 
+                            close_today_commission=0, min_commission=0), type='stock')
 
 	# 全局变量
 	g.strategys = {}
-	g.portfolio_value_proportion = [0.5, 0.5]  # 50% ETF轮动, 50% 小市值轮动
-	g.positions = {i: {} for i in range(len(g.portfolio_value_proportion))}  # 记录每个子策略的持仓股票
+	# 资金分离：每个策略独立追踪自己的现金，不再按总资产比例再平衡
+	# strategy_cash[i] = 策略i当前可用的现金（买入时扣减、卖出时增加）
+	g.strategy_cash = {}  # 初始化见下方
+	g.positions = {0: {}, 1: {}}  # 记录每个子策略的持仓股票及数量
+	g._cash_initialized = False   # 首次 process_initialize 时分配初始现金
 
-	# 子策略执行计划
-	if g.portfolio_value_proportion[0] > 0:
-		run_daily(etf_rotation_adjust, "11:00")
+	# 子策略执行计划（两个策略始终注册，是否交易由各自内部判断）
+	run_daily(etf_rotation_adjust, "11:00")
 
 	# 小市值轮动子策略调度
-	if len(g.portfolio_value_proportion) > 1 and g.portfolio_value_proportion[1] > 0:
-		run_daily(small_cap_judge_date, "9:00")
-		run_daily(small_cap_prepare_stock_list, "9:05")
-		run_daily(small_cap_trade_etf, "9:35")
-		run_weekly(small_cap_rebalance, 2, "10:00")     # 周二卖出
-		run_daily(small_cap_stop_loss, "10:02")
-		run_weekly(small_cap_rebalance, 2, "10:10")     # 周二买入
-		run_daily(small_cap_trade_afternoon, "14:00", reference_security='399101.XSHE')
+	run_daily(small_cap_judge_date, "9:00")
+	run_daily(small_cap_prepare_stock_list, "9:05")
+	run_daily(small_cap_trade_etf, "9:35")
+	run_weekly(small_cap_rebalance, 2, "10:00")     # 周二卖出
+	run_daily(small_cap_stop_loss, "10:02")
+	run_weekly(small_cap_rebalance, 2, "10:10")     # 周二买入
+	run_daily(small_cap_trade_afternoon, "14:00", reference_security='399101.XSHE')
 
 	# 每日剩余资金购买货币ETF
 	run_daily(end_trade, "14:59")
+
+	# 收盘后核对：策略端 vs 账户端，检测资金分离是否有偏差
+	run_daily(daily_reconcile, "15:00")
 
 
 def process_initialize(context):
@@ -144,6 +155,16 @@ def process_initialize(context):
 			("小市值轮动策略", "small_cap_rotation_strategy", Small_Cap_Rotation_Strategy, 1),
 		]
 	}
+
+	# 首次运行时，将初始现金平分给两个策略（仅执行一次）
+	if not g._cash_initialized:
+		initial_cash = context.portfolio.total_value  # 初始状态下 total_value == 现金
+		g.strategy_cash = {
+			0: initial_cash * 0.5,
+			1: initial_cash * 0.5,
+		}
+		g._cash_initialized = True
+		log.info(f"资金分离初始化: 策略0(动量)={g.strategy_cash[0]:,.2f}, 策略1(小市值)={g.strategy_cash[1]:,.2f}")
 
 
 # 事件处理
@@ -171,6 +192,92 @@ def end_trade(context):
 			log.info(f"卖出{stock}因送股未记录在持仓中")
 
 
+def daily_reconcile(context):
+	"""每日收盘后核对：策略端 (g.strategy_cash + g.positions) vs 账户端 (portfolio)"""
+	portfolio = context.portfolio
+	current_data = get_current_data()
+
+	log.info("=" * 70)
+	log.info(f"========== 每日资金核对 [{context.current_dt.strftime('%Y-%m-%d')}] ==========")
+	log.info("=" * 70)
+
+	# ===== 1. 账户端概况 =====
+	account_positions = {}
+	for stock, pos in portfolio.positions.items():
+		account_positions[stock] = {
+			"amount": pos.total_amount,
+			"value": pos.value,
+		}
+
+	log.info(f"  [账户端] 总资产={portfolio.total_value:,.2f}  可用现金={portfolio.available_cash:,.2f}  持仓市值={portfolio.positions_value:,.2f}")
+	if account_positions:
+		for stock, info in account_positions.items():
+			name = get_security_info(stock).display_name
+			log.info(f"    持仓: {stock}({name}) {info['amount']}股, 市值{info['value']:,.2f}")
+	else:
+		log.info(f"    (空仓)")
+
+	# ===== 2. 策略端逐个打印 =====
+	total_strat_cash = 0
+	total_strat_pos_value = 0
+
+	for idx in [0, 1]:
+		strategy = g.strategys.get(
+			"etf_rotation_strategy" if idx == 0 else "small_cap_rotation_strategy"
+		)
+		display_name = strategy.display_name if strategy else f"策略{idx}"
+		cash = g.strategy_cash.get(idx, 0)
+		positions = g.positions[idx]
+
+		holdings_value = 0
+		for stock, amount in positions.items():
+			price = current_data[stock].last_price
+			holdings_value += amount * price
+
+		total_strat_cash += cash
+		total_strat_pos_value += holdings_value
+
+		log.info(f"  [策略{idx}] {display_name}: 现金={cash:,.2f}  持仓市值={holdings_value:,.2f}  总资本={cash + holdings_value:,.2f}")
+		if positions:
+			for stock, amount in positions.items():
+				name = get_security_info(stock).display_name
+				price = current_data[stock].last_price if stock in current_data else 0
+				log.info(f"    持仓: {stock}({name}) {amount}股, 市值{amount * price:,.2f}")
+		else:
+			log.info(f"    (空仓)")
+
+	# ===== 3. 差异对比 =====
+	total_strat_value = total_strat_cash + total_strat_pos_value
+	cash_diff = portfolio.available_cash - total_strat_cash
+	pos_diff = portfolio.positions_value - total_strat_pos_value
+	total_diff = portfolio.total_value - total_strat_value
+
+	log.info(f"  {'─' * 50}")
+	log.info(f"  [差异] 账户总资产({portfolio.total_value:,.2f}) - 策略总资本({total_strat_value:,.2f}) = {total_diff:,.2f} {'✓' if abs(total_diff) <= 10 else '⚠️ 偏差!'}")
+	log.info(f"  [差异] 账户现金({portfolio.available_cash:,.2f}) - 策略现金({total_strat_cash:,.2f}) = {cash_diff:,.2f} {'✓' if abs(cash_diff) <= 10 else '⚠️ 偏差!'}")
+	log.info(f"  [差异] 账户持仓({portfolio.positions_value:,.2f}) - 策略持仓({total_strat_pos_value:,.2f}) = {pos_diff:,.2f} {'✓' if abs(pos_diff) <= 10 else '⚠️ 偏差!'}")
+
+	# 逐股票核对持仓数量
+	all_stocks = set()
+	for idx in [0, 1]:
+		all_stocks.update(g.positions[idx].keys())
+	all_stocks.update(account_positions.keys())
+
+	mismatch_found = False
+	for stock in sorted(all_stocks):
+		strat_amount = sum(g.positions[idx].get(stock, 0) for idx in [0, 1])
+		acct_amount = account_positions.get(stock, {}).get("amount", 0)
+		if strat_amount != acct_amount:
+			name = get_security_info(stock).display_name
+			log.info(f"  [⚠️] {stock}({name}) 策略记录{strat_amount}股 != 账户{acct_amount}股, 差{acct_amount - strat_amount}股")
+			mismatch_found = True
+
+	if not mismatch_found and all_stocks:
+		log.info(f"  [✓] 所有{len(all_stocks)}只股票持仓数量一致")
+
+	log.info("=" * 70)
+
+
 # -------------------- 各子策略调度函数 --------------------
 def etf_rotation_adjust(context):
 	g.strategys["etf_rotation_strategy"].adjust()
@@ -178,26 +285,38 @@ def etf_rotation_adjust(context):
 
 # -------------------- 小市值策略调度函数 --------------------
 def small_cap_judge_date(context):
+    if g.strategy_cash[1] == 0:
+        return
 	g.strategys["small_cap_rotation_strategy"].judge_date()
 
 
 def small_cap_prepare_stock_list(context):
+    if g.strategy_cash[1] == 0:
+        return
 	g.strategys["small_cap_rotation_strategy"].prepare_stock_list()
 
 
 def small_cap_trade_etf(context):
+    if g.strategy_cash[1] == 0:
+        return
 	g.strategys["small_cap_rotation_strategy"].trade_etf()
 
 
 def small_cap_rebalance(context):
+    if g.strategy_cash[1] == 0:
+        return
 	g.strategys["small_cap_rotation_strategy"].adjust()
 
 
 def small_cap_stop_loss(context):
+    if g.strategy_cash[1] == 0:
+        return
 	g.strategys["small_cap_rotation_strategy"].stop_loss()
 
 
 def small_cap_trade_afternoon(context):
+    if g.strategy_cash[1] == 0:
+        return
 	g.strategys["small_cap_rotation_strategy"].trade_afternoon()
 
 
@@ -247,13 +366,18 @@ class Strategy:
 		self.hold_list = list(g.positions[self.index].keys())
 		portfolio = self.context.portfolio
 
-		# 获取目标策略市值
-		target_value = self.context.portfolio.total_value * g.portfolio_value_proportion[self.index]
+		# 计算策略自有总资本（现金 + 持仓市值），不再按总资产比例再平衡
+		holdings_value = sum(
+			portfolio.positions[s].value for s in g.positions[self.index]
+			if s in portfolio.positions
+		)
+		strategy_capital = g.strategy_cash[self.index] + holdings_value
+		target_value = strategy_capital
 
 		# ---------- 打印调仓前状态 ----------
 		log.info(f"========== [{self.display_name}] 开始调仓 ==========")
 		log.info(f"  当前日期: {self.context.current_dt.strftime('%Y-%m-%d %H:%M')}")
-		log.info(f"  总资产: {portfolio.total_value:,.2f}, 可用资金: {portfolio.available_cash:,.2f}, 策略分配资金: {target_value:,.2f}")
+		log.info(f"  总资产: {portfolio.total_value:,.2f}, 可用资金: {portfolio.available_cash:,.2f}, 策略总资本: {strategy_capital:,.2f} (现金{g.strategy_cash[self.index]:,.2f} + 持仓{holdings_value:,.2f})")
 		log.info(f"  目标持仓:")
 		for stock, weight in targets.items():
 			log.info(f"    {current_data[stock].name}({stock}): 权重={weight:.1%}, 目标市值={target_value * weight:,.2f}")
@@ -286,7 +410,7 @@ class Strategy:
 			target = target_value * weight
 			price = current_data[stock].last_price
 			value = g.positions[self.index].get(stock, 0) * price
-			if min(target - value, portfolio.available_cash) > max(self.min_money, price * 100):
+			if min(target - value, g.strategy_cash[self.index]) > max(self.min_money, price * 100):
 				log.error(f"  [加仓] {current_data[stock].name}({stock}): 当前市值={value:,.2f} → 目标市值={target:,.2f}")
 				self.order_target_value_(stock, target)
 
@@ -352,12 +476,19 @@ class Strategy:
 				# 如果目标持仓为零，移除该证券
 				if g.positions[self.index][security] == 0:
 					g.positions[self.index].pop(security, None)
+				# 更新策略自有现金（买入扣减，卖出增加）
+				cash_change = o.filled * o.price
+				if o.is_buy:
+					g.strategy_cash[self.index] -= cash_change
+				else:
+					g.strategy_cash[self.index] += cash_change
 				# 更新持有列表
 				self.hold_list = list(g.positions[self.index].keys())
 				log.error(f"    ✓ {direction} {current_data[security].name}({security}): "
 						 f"{abs(filled)}股 @ {o.price:.3f}, "
 						 f"成交金额={abs(filled) * o.price:,.2f}, "
-						 f"当前持仓={g.positions[self.index].get(security, 0)}股")
+						 f"当前持仓={g.positions[self.index].get(security, 0)}股, "
+						 f"策略现金={g.strategy_cash[self.index]:,.2f}")
 				return True
 			else:
 				log.error(f"    ✗ {direction} {current_data[security].name}({security}): 下单失败")
@@ -471,6 +602,7 @@ class Etf_Rotation_Strategy(Strategy):
 			#"511220.XSHG",  # 城投债ETF 2014/11
 			# 国内
 			"513130.XSHG",  # 恒生科技 2021/05
+			"515980.XSHG",  # 人工智能 2020/02
 			#"600900.XSHG",  # 长江电力 2003/12
 			#"601088.XSHG",  # 中国神华 2007/07
 			#"000429.XSHE",  # 粤高速A 1998/03
@@ -722,10 +854,10 @@ class Small_Cap_Rotation_Strategy(Strategy):
 		for stock, w in fin_weights.items():
 			log.info('%s %s 权重%.2f%%' % (stock, get_security_info(stock).display_name, 100 * w))
 
-		# 策略可用资金 = 总可用资金 × 本策略占比
-		strategy_budget = self.context.portfolio.total_value * g.portfolio_value_proportion[self.index]
+		# 资金分离：使用策略自有现金
+		strategy_budget = g.strategy_cash[self.index]
 		available_cash = min(self.context.portfolio.available_cash, strategy_budget)
-		log.info('available_cash: %s' % available_cash)
+		log.info('策略现金: %s, 实际可用: %s' % (strategy_budget, available_cash))
 
 		current_data = get_current_data()
 		for stock in self.all_weather_list:
@@ -960,7 +1092,7 @@ class Small_Cap_Rotation_Strategy(Strategy):
 					for stock in self.stocks_to_buy:
 						log.info("待买入 %s" % get_security_info(stock).display_name)
 
-				log.info('有余额可用' + str(round(self.context.portfolio.cash, 2)) + '元。买入' + str(self.stocks_to_buy))
+				log.info('有余额可用' + str(round(g.strategy_cash[self.index], 2)) + '元。买入' + str(self.stocks_to_buy))
 				self.info_position()
 				self.calc_position()
 				self.buy_stocks()
@@ -968,7 +1100,7 @@ class Small_Cap_Rotation_Strategy(Strategy):
 			self.reason_to_sell = ''
 
 		elif self.reason_to_sell == 'stoploss' or self.reason_to_sell == 'takeprofit':
-			log.info('止盈止损后，有余额可用' + str(round(self.context.portfolio.cash, 2)) + '元。买入' + str(self.etf))
+			log.info('止盈止损后，有余额可用' + str(round(g.strategy_cash[self.index], 2)) + '元。买入' + str(self.etf))
 			self.stocks_to_buy = [self.etf]
 			self.buy_stocks()
 			self.reason_to_sell = ''
@@ -1184,20 +1316,22 @@ class Small_Cap_Rotation_Strategy(Strategy):
 
 		available_cash = self.context.portfolio.available_cash
 		position_value = self.context.portfolio.positions_value
-		total_value = self.context.portfolio.total_value
+		account_total = self.context.portfolio.total_value
 
-		# 限制买入金额不超过本策略分配的资金
-		strategy_budget = total_value * g.portfolio_value_proportion[self.index]
-		strategy_current_value = sum(
-			self.context.portfolio.positions[key].price * value
-			for key, value in g.positions[self.index].items()
-		) if g.positions[self.index] else 0
-		max_buy = max(0, strategy_budget - strategy_current_value)
-		available_cash = min(available_cash, max_buy)
+		# 资金分离：计算策略自有总资本
+		portfolio = self.context.portfolio
+		strat_holdings_value = sum(
+			portfolio.positions[s].value for s in g.positions[self.index]
+			if s in portfolio.positions
+		)
+		strategy_total = g.strategy_cash[self.index] + strat_holdings_value
+
+		# 资金分离：限制买入金额不超过策略自有现金
+		available_cash = min(available_cash, g.strategy_cash[self.index])
 
 		self.each_cash = available_cash / len(self.stocks_to_buy)
-		log.info("====调整每股额度====\n当前可用资金 %s\n持仓市值 %s\n总资产: %s\n每股额度 %s" % (
-			available_cash, position_value, total_value, self.each_cash))
+		log.info("====调整每股额度====\n当前可用资金 %s\n持仓市值 %s\n总资产: %s\n策略现金: %s\n策略总资本: %s\n每股额度 %s" % (
+			available_cash, position_value, account_total, g.strategy_cash[self.index], strategy_total, self.each_cash))
 
 		current_data = get_current_data()
 		target_value_per_stock = self.each_cash
@@ -1217,7 +1351,7 @@ class Small_Cap_Rotation_Strategy(Strategy):
 					target_value_per_stock, amount, current_price, amount * current_price))
 			else:
 				if self.excepted_position.get(stock) is not None:
-					target_value_per_stock = self.excepted_position[stock] * total_value
+					target_value_per_stock = self.excepted_position[stock] * strategy_total
 				order_info = self.order_target_value_(stock, target_value_per_stock)
 				raw_amount = target_value_per_stock / current_price
 				amount = int(raw_amount / 100) * 100
@@ -1227,7 +1361,13 @@ class Small_Cap_Rotation_Strategy(Strategy):
 
 	def calc_position(self):
 		"""计算等权仓位，含失败卖出和涨停锁定股的偏差修正"""
-		total_value = self.context.portfolio.total_value
+		# 资金分离：使用策略自有总资本，而非整体账户总资产
+		portfolio = self.context.portfolio
+		holdings_value = sum(
+			portfolio.positions[s].value for s in g.positions[self.index]
+			if s in portfolio.positions
+		)
+		total_value = g.strategy_cash[self.index] + holdings_value
 		current_holdings = list(g.positions[self.index].keys())
 		holding_num = len(current_holdings) + len(self.stocks_to_buy)
 
@@ -1346,7 +1486,7 @@ class Small_Cap_Rotation_Strategy(Strategy):
 
 			elif avai_cash < 0 and cash == 0 and len(self.stocks_to_buy) > 0:
 				log.info('未重新分配资金，调整买入仓位比重')
-				available_cash = self.context.portfolio.available_cash
+				available_cash = min(self.context.portfolio.available_cash, g.strategy_cash[self.index])
 				for stock in self.stocks_to_buy:
 					self.excepted_position[stock] = available_cash / len(self.stocks_to_buy) / total_value
 					log.info('期望持仓: %s(%s)，占比%.2f%%' % (
@@ -1461,6 +1601,7 @@ class Small_Cap_Rotation_Strategy(Strategy):
 		own_positions = {s: p for s, p in positions.items() if s in g.positions[self.index]}
 		if len(own_positions) > 0:
 			strategy_value = sum(p.value for p in own_positions.values())
+			strategy_total = strategy_value + g.strategy_cash[self.index]
 			log.info('******************当日(%s) [%s]持仓市值: %.2f元*******************' % (
 				self.context.current_dt, self.display_name, strategy_value))
 			sorted_pos = dict(sorted(own_positions.items(), key=lambda x: x[0]))
@@ -1470,13 +1611,14 @@ class Small_Cap_Rotation_Strategy(Strategy):
 				avg_cost = positions[stock].avg_cost
 				ratio = (price / avg_cost - 1) * 100 if avg_cost > 0 else 0
 				diff_price = price - avg_cost
-				cangwei = pos.value / self.context.portfolio.total_value * 100
+				cangwei = pos.value / strategy_total * 100
 				log.info('✅持仓: %s(%s), 占比 %.2f%%, 涨跌幅: %.2f%% (%.2f), 数量: %d, 市值: %.2f元' % (
 					stock_name, stock, cangwei, ratio, diff_price * pos.total_amount,
 					pos.total_amount, pos.value))
-			strategy_budget = self.context.portfolio.total_value * g.portfolio_value_proportion[self.index]
-			log.info('✅*****[%s]策略市值: %.2f/%.2f, 总资产 %.2f, 剩余可用金额 %.2f元*****\n\n' % (
-				self.display_name, strategy_value, strategy_budget,
-				self.context.portfolio.total_value, self.context.portfolio.available_cash))
+
+			log.info('✅*****[%s]市值: %.2f, 现金: %.2f, 策略总资本: %.2f, 总资产: %.2f元*****\n\n' % (
+				self.display_name, strategy_value,
+				g.strategy_cash[self.index], strategy_total,
+				self.context.portfolio.total_value))
 		else:
 			log.info('[%s] 当前空仓' % self.display_name)
