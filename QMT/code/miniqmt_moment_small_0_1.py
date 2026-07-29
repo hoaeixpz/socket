@@ -721,11 +721,11 @@ def calc_momentum_score(etf, days):
 	xtdata.download_history_data(etf, period='1d', incrementally=True)
 	history_data = xtdata.get_market_data_ex(['close', 'high'], [etf], period='1d', start_time='', count=days)
 	if etf not in history_data or history_data[etf].empty:
-		return 0, 0, 0
+		return 0, 0, 0, 0
 	close_prices = history_data[etf]['close'].values
 	current_price = get_last_price(etf)
 	if not current_price:
-		return 0, 0, 0
+		return 0, 0, 0, 0
 	prices = np.append(close_prices, current_price)
 	y = np.log(prices)
 	x = np.arange(len(y))
@@ -738,18 +738,18 @@ def calc_momentum_score(etf, days):
 	score = annualized_return * r2
 	if len(prices) >= 4:
 		recent_ratios = [prices[-1] / prices[-2], prices[-2] / prices[-3], prices[-3] / prices[-4]]
-		if min(recent_ratios) < 0.95: score = 0
-	return annualized_return, r2, score
+	return annualized_return, r2, score, min(recent_ratios)
 
 def select_etf():
 	def filter_etf(max_score, days, label):
 		print(f"\n========== [{label}] 开始 (窗口={days}天, 上限={max_score}) ==========")
 		results = {}
 		for etf in ETF_POOL:
-			ann_ret, r2, score = calc_momentum_score(etf, days)
+			ann_ret, r2, score, recent_ratio = calc_momentum_score(etf, days)
 			name = get_stock_name(etf) or etf
-			bad = (score <= 0 or score >= max_score)
-			print(f"  {name}({etf}): 年化={ann_ret:.4%} R²={r2:.4f} 得分={score:.4f}{' [淘汰]' if bad else ''}")
+			bad = (score <= 0 or score >= max_score) or recent_ratio < 0.95
+			down_ratio = (1 - recent_ratio) * 100
+			print(f"  {name}({etf}): 年化={ann_ret:.4%} R²={r2:.4f} 近3日最大跌幅 {down_ratio:.2f}% 得分={score:.4f}{' [淘汰]' if bad else ''}")
 			if not bad: results[etf] = score
 		if not results:
 			print(f"  无符合条件ETF → 选用{get_stock_name(SAFE_ETF)}({SAFE_ETF})")
