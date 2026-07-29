@@ -16,16 +16,16 @@ from datetime import datetime, timedelta
 # ======================== 手动输入你的实际持仓 ========================
 
 ACTUAL_POSITIONS = {
-    "518880.SH": 2200,      # 黄金ETF
-    "159985.SZ": 11200,      # 豆粕ETF
-    "513100.SH": 14900,      # 纳指ETF
-    "601288.SH": 3300,      # 农业银行
-    "600900.SH": 1300,      # 长江电力
     "511270.SH": 400,      # 十年地方债
-    "511220.SH": 2900,      # 城投债ETF（由 buy_bond/sell_bond 管理，不参与权重计算）
+    "511220.SH": 3400,      # 城投债ETF（由 buy_bond/sell_bond 管理，不参与权重计算）
+    "513100.SH": 14900,      # 纳指ETF
+    "159985.SZ": 11200,      # 豆粕ETF
+    "601288.SH": 3300,      # 农业银行
+    "600900.SH": 700,      # 长江电力
+    "518880.SH": 2200,      # 黄金ETF
 }
 
-AVAILABLE_CASH = 4718   # 账户可用资金（元）
+AVAILABLE_CASH = 17994.53   # 账户可用资金（元）
 
 # ======================== 策略参数 ========================
 
@@ -46,7 +46,7 @@ rebalance_tolerance = 0.06  # 偏离 6% 才交易
 weights = {}
 
 # 回撤管理
-record_max = 204598
+record_max = 219202
 max_down_T = [1.2, 1.8, 2.4, 3.0]
 last_level = 2          # 上次回撤等级（防止同一等级重复触发）
 #force_level = None
@@ -115,7 +115,7 @@ def calc_ES_weights():
     # 计算当前权重（基于实际持仓和最新价格）
     total_value = 0
     current_prices = {}
-    for code in stocks:
+    for code in ACTUAL_POSITIONS:
         price = get_last_price(code)
         current_prices[code] = price
         if price:
@@ -125,8 +125,9 @@ def calc_ES_weights():
     print(f"\n{'='*60}")
     print(f"目标权重 vs 当前权重")
     print(f"{'='*60}")
-    print(f"  {'代码':<14s} {'名称':<12s} {'目标权重':>8s} {'当前权重':>8s}")
-    print(f"  {'-'*14} {'-'*12}         {'-'*8}     {'-'*8}")
+    print(f" 总资产 {total_asset:.1f}")
+    print(f"  {'代码':<14s} {'名称':<15s} {'市值':<10s}   {'目标权重':<12s} {'当前权重':<12s}")
+    print(f"  {'-'*80}")
     for code in stocks:
         name = get_stock_name(code)
         target_wt = weights[code] * 100
@@ -134,8 +135,8 @@ def calc_ES_weights():
         cur_price = current_prices.get(code)
         cur_value = cur_shares * cur_price if cur_price else 0
         cur_wt = cur_value / total_asset * 100 if total_asset > 0 else 0
-        print(f"  {code:<14s} {name:<12s}   {target_wt:7.2f}%     {cur_wt:7.2f}%")
-    print(f"  {'':>28s}     {'现金':>8s}    {AVAILABLE_CASH/total_asset*100:7.2f}%")
+        print(f"  {code:<14s} {name:<15s} {cur_value:<10.1f} {target_wt:>12.2f}% {cur_wt:>12.2f}%")
+    print(f"{'现金':>60s}    {AVAILABLE_CASH/total_asset*100:7.2f}%")
     print()
 
 
@@ -402,9 +403,9 @@ def print_position_table(prices, total_asset, use_weights):
 
         target_val = total_asset * w
         diff = target_val - current_value
-        if diff > 500 and abs(diff) / target_val > rebalance_tolerance:
+        if diff > 500 and (target_val == 0 or abs(diff) / target_val > rebalance_tolerance):
             action = f"<<< 买入 {diff/price/100:.2f}手"
-        elif diff < -500 and abs(diff) / target_val > rebalance_tolerance:
+        elif diff < -500 and (target_val == 0 or abs(diff) / target_val > rebalance_tolerance):
             action = f">>> 卖出 {-diff/price/100:.2f}手"
         else:
             action = "-"
@@ -483,6 +484,7 @@ def take_profit_check(prices):
         srt = df['daily_return'].sort_values()
         last_close = df['close'].iloc[-2]
         price = prices.get(code)
+        #print(srt[-6:])
         if price is None:
             continue
 
