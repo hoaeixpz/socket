@@ -7,11 +7,11 @@ from datetime import datetime, timedelta
 import math
 import sys
 import subprocess
-import psutil
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 import signal
 import re
+import os
 
 DEBUG_DAILY_MODE = False
 #DEBUG_DAILY_MODE = True
@@ -130,12 +130,27 @@ def sleep_mins(minutes):
 def sleep_hours(hours):
 	time.sleep(3600 * hours)
 
+def get_userdata_mini_path():
+	"""检查多个可能的userdata_mini路径，返回第一个存在的"""
+	candidates = [
+		'C:\\QMT\\国金证券QMT交易端\\userdata_mini',
+		'D:\\国金证券QMT交易端\\userdata_mini',
+		'C:\\QMT\\userdata_mini',
+	]
+	for p in candidates:
+		if os.path.exists(p):
+			print(f'QMT路径: {p}')
+			return p
+	print('未找到userdata_mini路径，使用默认路径')
+	return candidates[0]
+
 def init():
 	print("init")
 	# path为mini qmt客户端安装目录下userdata_mini路径
 	#path = 'C:\\QMT\\国金证券QMT交易端\\userdata_mini'
 	#path = 'D:\\国金证券QMT交易端\\userdata_mini'
-	path = 'C:\\QMT\\userdata_mini'
+	#path = 'C:\\QMT\\userdata_mini'
+	path = get_userdata_mini_path()
 	session_id = int(time.time())
 	g.xt_trader = XtQuantTrader(path, session_id)
 	g.callback = MyXtQuantTraderCallback()
@@ -225,7 +240,7 @@ def reconnect():
 
 
 def kill_process_by_name(name):
-	"""终止所有名称包含 name 的进程 (使用psutil)"""
+	"""终止所有名称包含 name 的进程"""
 	try:
 		subprocess.run(['taskkill', '/f', '/im', name], capture_output=True,text=True,check=True)
 		print(f"close {name} success")

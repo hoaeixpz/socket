@@ -514,6 +514,41 @@ def run_strategy():
 MOM_IDX = 0   # 动量策略索引
 SC_IDX = 1    # 小市值策略索引
 
+def get_tick_size(stock):
+	#获取5挡盘口
+	tick_data = xtdata.get_full_tick([stock])
+	size = 0
+	if stock in tick_data:
+		sell_price = tick_data[stock]['askPrice']
+		if sell_price[0] > 0:
+			size = abs(sell_price[1] - sell_price[0])
+		else:
+			buy_price = tick_data[stock]['bidPrice']
+			if buy_price[0] > 0:
+				size = abs(buy_price[0] - buy_price[1])
+			
+		if size:
+			if size < 0.009:
+				return 0.001
+			else:
+				return 0.01
+	else:
+		print(f"{stock} 获取五档价格失败，返回默认值0.01")
+
+	return 0.01
+
+def calc_commission(value):
+	#手续费，按万二算，不满5元按5元算
+	commission = value * 2 / 10000
+	if commission < 5:
+		return 5
+	return commission
+
+def calc_sell_tax(value):
+	#卖出印花税，按万五算
+	tax = value * 5 / 10000
+	return tax
+
 def sell_target_value(stock, target_value, strat_idx=None):
 	if DEBUG_DAILY_MODE:
 		return
@@ -546,7 +581,8 @@ def sell_target_value(stock, target_value, strat_idx=None):
 					print(f"{stock} {get_stock_name(stock)} 现价{current_price:.2f} 期望持仓 {target_value:.2f}元,")
 					print(f"现有持仓 {pos.market_value:.2f}元，相差 {volume:.2f}元，需要卖出股数 {volume / current_price:.2f}不足100股，放弃交易")
 				else:
-					sell_price = current_price - 0.1
+					tick_size = get_tick_size(stock)
+					sell_price = current_price - tick_size * 10
 					async_seq = g.xt_trader.order_stock_async(g.account, 
 															stock,							#stock_code
 															xtconstant.STOCK_SELL,			#order_type
@@ -565,13 +601,16 @@ def sell_target_value(stock, target_value, strat_idx=None):
 
 	if async_seq != -1 and async_seq is not None and strat_idx is not None:
 		# 卖出成功，现金回血
+		commission = calc_commission(pos.market_value - target_value)
+		tax = calc_sell_tax(pos.market_value - target_value)
+		cash_incr = pos.market_value - target_value - commission - tax
+		g.cash_reserved[strat_idx] += cash_incr
+		print(f"卖出 {stock} 手续费 {commission}，印花税 {tax}")
 		if target_value == 0:
-			g.cash_reserved[strat_idx] += pos.market_value
 			g.positions[strat_idx].discard(stock)
-			print(f"成功清仓 {stock} 后，策略{strat_idx} 增加资金{pos.market_value:.2f}, 现有资金为 {g.cash_reserved[strat_idx]:.2f}")
+			print(f"成功清仓 {stock} 后，策略{strat_idx} 增加资金{cash_incr:.2f}, 现有资金为 {g.cash_reserved[strat_idx]:.2f}")
 		else:
-			g.cash_reserved[strat_idx] += pos.market_value - target_value
-			print(f"成功卖出 {stock} 后，策略{strat_idx} 增加资金{pos.market_value:.2f} - {target_value:.2f}, 现有资金为 {g.cash_reserved[strat_idx]:.2f}")
+			print(f"成功卖出 {stock} 后，策略{strat_idx} 增加资金{cash_incr:.2f}, 现有资金为 {g.cash_reserved[strat_idx]:.2f}")
 
 def buy_target_value(stock, target_value, strat_idx=None):
 	if DEBUG_DAILY_MODE:
@@ -592,7 +631,8 @@ def buy_target_value(stock, target_value, strat_idx=None):
 			print(f"{stock} {get_stock_name(stock)} 现价{current_price:.2f} 期望持仓 {target_value:.2f}元,")
 			print(f"现有持仓 {current_value:.2f}元，相差 {volume:.2f}元，需要买入股数 {volume / current_price:.2f}不足100股，放弃交易")
 		else:
-			buy_price = current_price + 0.1
+			tick_size = get_tick_size(stock)
+			buy_price = current_price + tick_size * 10
 			async_seq = g.xt_trader.order_stock_async(g.account, 
 													stock,								#stock_code
 													xtconstant.STOCK_BUY,				#order_type
@@ -605,9 +645,11 @@ def buy_target_value(stock, target_value, strat_idx=None):
 
 			print(f"buy {stock} passorder target value {target_value:.2f} current {current_value:.2f} amount {amount} @{buy_price:.2f}")
 			if async_seq != -1 and async_seq is not None and strat_idx is not None:
-				g.cash_reserved[strat_idx] -= amount * buy_price
+				estimate_cash = amount * (current_price + tick_size)
+				commission = calc_commission(estimate_cash)
+				g.cash_reserved[strat_idx] -= (estimate_cash + commission)
 				g.positions[strat_idx].add(stock)
-				print(f"成功买入 {stock} 后，策略{strat_idx} 减少资金{amount * buy_price:.2f}, 现有资金为 {g.cash_reserved[strat_idx]:.2f}")
+				print(f"成功买入 {stock} 后，策略{strat_idx} 减少资金{estimate_cash:.2f}, 再扣除佣金{commission:.1f}, 现有资金为 {g.cash_reserved[strat_idx]:.2f}")
 
 	print("async_seq ", async_seq)
 	if async_seq == -1 or async_seq is None:
@@ -621,7 +663,8 @@ def buy_target_shares(stock, amount, strat_idx=None):
 	if not current_price:
 		return
 
-	buy_price = current_price + 0.1
+	tick_size = get_tick_size(stock)
+	buy_price = current_price + tick_size * 10
 	async_seq = g.xt_trader.order_stock_async(g.account, 
 											stock,								#stock_code
 											xtconstant.STOCK_BUY,               #order_type
@@ -636,9 +679,11 @@ def buy_target_shares(stock, amount, strat_idx=None):
 	if async_seq == -1:
 		print(f"buy_target_shares failed {stock} {get_stock_name(stock)}")
 	if async_seq != -1 and async_seq is not None and strat_idx is not None:
-		g.cash_reserved[strat_idx] -= amount * current_price
+		estimate_cash = amount * (current_price + tick_size)
+		commission = calc_commission(estimate_cash)
+		g.cash_reserved[strat_idx] -= (estimate_cash + commission)
 		g.positions[strat_idx].add(stock)
-		print(f"成功买入 {stock} 后，策略{strat_idx} 减少资金{amount * current_price:.2f}, 现有资金为 {g.cash_reserved[strat_idx]:.2f}")
+		print(f"成功买入 {stock} 后，策略{strat_idx} 减少资金{estimate_cash:.2f}, 再扣除佣金{commission:.1f}, 现有资金为 {g.cash_reserved[strat_idx]:.2f}")
 
 
 # ================================================================
@@ -1609,7 +1654,7 @@ def sc_info_position():
 				print(f"资金差额为{cash_diff:.2f}")
 				for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
 					print(f'  [{name}策略] 上一交易日现金记录{g.cash_record[idx]:,.2f}')
-					
+
 				if abs(cash_diff / available_cash) > 0.3:
 					print("资金差额较大，可能代码有问题，请调试")
 				else:
