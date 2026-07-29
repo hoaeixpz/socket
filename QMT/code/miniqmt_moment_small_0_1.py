@@ -1648,12 +1648,12 @@ def sc_info_position():
 				print(f'    持仓: (空)')
 		print()
 
-		if current_date.hour == 15:
+		if current_date.hour >= 15:
 			cash = 0
 			for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
 				cash += g.cash_reserved[idx]
 
-			if available_cash == cash:
+			if abs(available_cash - cash) < 0.001:
 				print(f"  各策略的资金总和与账面资金吻合\n")
 			else:
 				print(f"  策略资金总和为{cash:.2f}，账面资金为{available_cash:.2f}\n")
@@ -1665,11 +1665,11 @@ def sc_info_position():
 				if abs(cash_diff / available_cash) > 0.3:
 					print("资金差额较大，可能代码有问题，请调试")
 				else:
-					if g.cash_reserved[MOM_IDX] == g.cash_record[MOM_IDX]:
+					if abs(g.cash_reserved[MOM_IDX] - g.cash_record[MOM_IDX]) < 0.001:
 						print("动量策略资金与上一交易日持平，更新小市值策略资金")
 						g.cash_reserved[SC_IDX] = abs(available_cash - g.cash_record[MOM_IDX])
 						g.cash_record[SC_IDX] = g.cash_reserved[SC_IDX]
-					elif g.cash_reserved[SC_IDX] == g.cash_record[SC_IDX]:
+					elif abs(g.cash_reserved[SC_IDX] - g.cash_record[SC_IDX]) < 0.001:
 						print("小市值策略资金与上一交易日持平，更新动量策略资金")
 						g.cash_reserved[MOM_IDX] = abs(available_cash - g.cash_record[SC_IDX])
 						g.cash_record[MOM_IDX] = g.cash_reserved[MOM_IDX]
