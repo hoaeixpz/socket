@@ -25,7 +25,7 @@ ACTUAL_POSITIONS = {
     "518880.SH": 2200,      # 黄金ETF
 }
 
-AVAILABLE_CASH = 17994.53   # 账户可用资金（元）
+AVAILABLE_CASH = 17940.83   # 账户可用资金（元）
 
 # ======================== 策略参数 ========================
 
@@ -490,7 +490,7 @@ def take_profit_check(prices):
 
         pct = (price - last_close) / last_close * 100
         last_3th = srt.iloc[-3]
-        idx_30 = -30 if len(df) >= 30 else 0
+        idx_30 = -31 if len(df) >= 31 else 0
         pct_30 = (price - df['close'].iloc[idx_30]) / df['close'].iloc[idx_30] * 100
         
         if pct >= last_3th:    
