@@ -187,12 +187,15 @@ All MiniQMT strategies share the same architecture:
 
 The combined file `miniqmt_moment_small_0_1.py` runs two independent strategies sharing one QMT connection:
 
-**Capital isolation**:
+**Capital isolation** (refactored 2026-07-26):
 - `g.portfolio_value_proportion = [0.25, 0.75]` — 动量25%, 小市值75% of total asset
-- `g.capital = {0: ..., 1: ...}` — each strategy's budget ceiling, initialized as `total_asset * proportion`
-- `g.positions = {0: {}, 1: {}}` — per-strategy position tracking
-- `get_strategy_available_cash(idx)` — returns `g.capital[idx] - current_holdings_value(idx)`, the actual remaining budget
-- `sell_target_value`/`buy_target_value`/`buy_target_shares` accept `strat_idx` parameter; after trade, `g.capital[strat_idx]` is updated (sells add back, buys deduct)
+- `g.cash_reserved = {MOM_IDX: ..., SC_IDX: ...}` — each strategy's reserved cash, initialized as `info.cash * proportion`. Updated on buy (`-= amount`) and sell (`+= amount`). Always ≥ 0.
+- `g.positions = {MOM_IDX: set(), SC_IDX: set()}` — per-strategy position tracking (sets of stock codes). Initialized at startup by scanning existing positions and categorizing by ETF_POOL membership. Updated on buy (`.add()`) and full sell (`.discard()`).
+- `get_strategy_available_cash(idx)` — returns `g.cash_reserved[idx]` directly (the reserved cash IS the available cash)
+- `get_strategy_total(idx)` — returns `g.cash_reserved[idx] + sum(market_value of stocks in g.positions[idx])`, the strategy's real-time total asset (fluctuates with market prices)
+- `sell_target_value`/`buy_target_value`/`buy_target_shares` accept `strat_idx` parameter; after trade, update `g.cash_reserved[strat_idx]` and `g.positions[strat_idx]`
+- **Model**: cash_reserved ⇌ positions — buy converts cash to positions, sell converts positions back to cash. Strategy total = cash_reserved + holdings_value (market-price-driven).
+- **Cross-strategy isolation**: `get_current_holding_stocks()` filters out `g.positions[MOM_IDX]` at source for SC callers; `sc_stop_loss()` filters `current_positions` dict to exclude momentum stocks; `sc_calc_position()` and `buy_stocks()` skip momentum positions via `g.positions[MOM_IDX]` membership check; `mom_rebalance()` iterates `g.positions[MOM_IDX]` directly instead of scanning all positions with ETF_POOL membership checks.
 
 **Momentum strategy** (MOM_IDX=0):
 - ETF pool: 9 ETFs across 境外/商品/债券/国内
@@ -201,12 +204,12 @@ The combined file `miniqmt_moment_small_0_1.py` runs two independent strategies 
 - Dip filter: any 3-day drop >5% disqualifies the ETF
 - If no ETF qualifies, falls back to SAFE_ETF (城投债 511220.SH)
 - Rebalance: daily at 11:00
-- Budget: `g.capital[MOM_IDX]`
+- Budget: `g.cash_reserved[MOM_IDX]`, total via `get_strategy_total(MOM_IDX)`
 
 **Small-cap strategy** (SC_IDX=1):
 - Same logic as `miniqmt_small_cap_0_1.py` with all stock filtering, industry diversification, stop-loss, Jan/Apr all-weather
-- Key adaptation: position calculation uses `strategy_total = total_asset * 0.75` instead of full portfolio value
-- Buy cash capped by `get_strategy_available_cash(SC_IDX)`
+- Key adaptation: position calculation uses `get_strategy_total(SC_IDX)` for real-time strategy asset
+- Buy cash capped by `get_strategy_available_cash(SC_IDX)` (returns `g.cash_reserved[SC_IDX]`)
 
 **Scheduling**:
 - Momentum: daily 11:00
