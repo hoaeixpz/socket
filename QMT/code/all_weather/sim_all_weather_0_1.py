@@ -17,13 +17,13 @@ from datetime import datetime, timedelta
 
 ACTUAL_POSITIONS = {
     "518880.SH": 3000,      # 黄金ETF — 填你的实际持仓股数
-    "159985.SZ": 8100,      # 豆粕ETF
-    "513100.SH": 8300,      # 纳指ETF
-    "601288.SH": 3100,      # 农业银行
+    "513100.SH": 9700,      # 纳指ETF
+    "601288.SH": 2700,      # 农业银行
+    "159985.SZ": 8700,      # 豆粕ETF
     "600900.SH": 400,      # 长江电力
 }
 
-AVAILABLE_CASH = 420 + 11586   # 账户可用资金（元）
+AVAILABLE_CASH = 28     # 账户可用资金（元）
 
 # ======================== 策略参数（与母版一致） ========================
 
@@ -33,9 +33,9 @@ stocks = [
     "513100.SH",  # 纳指ETF
     "601288.SH",  # 农业银行
     "600900.SH",  # 长江电力
-    "601225.SH",  # 陕西煤业
-    '000429.SZ',  # 粤高速A
-    '601899.SH'   # 紫金矿业
+    #"601088.SH",  # 中国神华
+    #'000429.SZ',  # 粤高速A
+    #'601899.SH'   # 紫金矿业
 ]
 
 base_days = 120
@@ -255,7 +255,7 @@ def calc_trades():
             name = get_stock_name(code)
             diff_value = current - target
             sell_amount = int(diff_value / price / 100) * 100
-            print(f"  卖出 {code} {name}: \033[31m{sell_amount}\033[0m股 × {price:.2f}元 = {sell_amount*price:,.0f}元")
+            print(f"  卖出 {code} {name}: \033[32m{sell_amount}\033[0m股 × {price:.2f}元 = {sell_amount*price:,.0f}元")
             print(f"    当前市值 {current:,.0f} → 目标市值 {target:,.0f}")
 
     # 买入清单

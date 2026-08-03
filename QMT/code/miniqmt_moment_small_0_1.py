@@ -441,9 +441,7 @@ def reconnect():
 		return
 	print("reconnect")
 	# path为mini qmt客户端安装目录下userdata_mini路径
-	path = 'C:\\QMT\\国金证券QMT交易端\\userdata_mini'
-	#path = 'D:\\国金证券QMT交易端\\userdata_mini'
-	#path = 'C:\\QMT\\userdata_mini'
+	path = get_userdata_mini_path()
 	session_id = int(time.time())
 	g.xt_trader = XtQuantTrader(path, session_id)
 	print("new g.xt_trader")

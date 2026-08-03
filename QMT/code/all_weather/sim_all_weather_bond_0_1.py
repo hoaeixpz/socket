@@ -16,16 +16,16 @@ from datetime import datetime, timedelta
 # ======================== 手动输入你的实际持仓 ========================
 
 ACTUAL_POSITIONS = {
-    "511270.SH": 400,      # 十年地方债
-    "511220.SH": 3400,      # 城投债ETF（由 buy_bond/sell_bond 管理，不参与权重计算）
-    "513100.SH": 14900,      # 纳指ETF
-    "159985.SZ": 11200,      # 豆粕ETF
-    "601288.SH": 3300,      # 农业银行
-    "600900.SH": 700,      # 长江电力
-    "518880.SH": 2200,      # 黄金ETF
+    "511270.SH": 500,       # 十年地方债
+    "600900.SH": 1300,      # 长江电力
+    "513100.SH": 16900,     # 纳指ETF
+    "518880.SH": 3000,      # 黄金ETF
+    "601288.SH": 3100,      # 农业银行
+    "159985.SZ": 9000,      # 豆粕ETF
+    "511220.SH": 1800,      # 城投债ETF（由 buy_bond/sell_bond 管理，不参与权重计算）
 }
 
-AVAILABLE_CASH = 17940.83   # 账户可用资金（元）
+AVAILABLE_CASH = 111        # 账户可用资金（元）
 
 # ======================== 策略参数 ========================
 
@@ -49,8 +49,8 @@ weights = {}
 record_max = 219202
 max_down_T = [1.1, 1.7, 2.4, 3.2]
 last_level = 2          # 上次回撤等级（防止同一等级重复触发）
-#force_level = None
-force_level = 2         # 不计算，直接设置level为force_level
+force_level = None
+#force_level = 2         # 不计算，直接设置level为force_level
 
 
 # ======================== 数据获取 ========================
@@ -445,7 +445,7 @@ def print_trade_list(prices, total_asset, use_weights):
         elif diff < -500 and abs(diff) / target_value > rebalance_tolerance:
             amount = int(-diff / price / 100) * 100
             if amount >= 100:
-                print(f"  [卖出] {code} {get_stock_name(code)}: \033[31m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元")
+                print(f"  [卖出] {code} {get_stock_name(code)}: \033[32m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元")
                 has_trades = True
 
     # 债券交易
@@ -453,7 +453,7 @@ def print_trade_list(prices, total_asset, use_weights):
     bond_sells, bond_buys = calc_bond_trades(bond_target, prices, {})
 
     for code, amount, price, reason in bond_sells:
-        print(f"  [卖出] {code} {get_stock_name(code)}: \033[31m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元 ({reason})")
+        print(f"  [卖出] {code} {get_stock_name(code)}: \033[32m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元 ({reason})")
         has_trades = True
     for code, amount, price, reason in bond_buys:
         print(f"  [买入] {code} {get_stock_name(code)}: \033[31m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元 ({reason})")
@@ -547,11 +547,12 @@ if __name__ == "__main__":
         if force_level:
             print(f"强制设置回撤等级为 {force_level} ， 以该等级设置权重")
             use_weights = calc_force_drawndown_weights(force_level)
+        elif last_level:
+            print(f"  回撤等级 {drawdown_level}，但未跨级（last_level={last_level}），沿用之前的权重")
+            use_weights = calc_force_drawndown_weights(last_level)
         else:
             # 无回撤触发：使用常规权重
             use_weights = weights
-            if drawdown_level > 0:
-                print(f"  回撤等级 {drawdown_level}，但未跨级（last_level={last_level}），沿用常规权重")
 
     # 5. 打印持仓对比和交易清单
     print(f"\n{'='*60}")
