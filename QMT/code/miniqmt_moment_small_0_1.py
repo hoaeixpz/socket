@@ -355,15 +355,15 @@ def init():
 	info = g.xt_trader.query_stock_asset(g.account)
 
 	# 多策略配置
-	g.portfolio_value_proportion = [0.95, 0.05]
+	g.portfolio_value_proportion = [0.65, 0.35]
 	# 每个策略的预留现金（买卖驱动），互相隔离
 	g.cash_reserved = {MOM_IDX: g.portfolio_value_proportion[MOM_IDX] * info.cash,
 					   SC_IDX: g.portfolio_value_proportion[SC_IDX] * info.cash}
 	#记录上一交易日现金
-	g.cash_record = g.cash_reserved
+	g.cash_record = g.cash_reserved.copy()
 	# 各策略持仓股票集合，初始化时扫描已有持仓归入对应策略
 	g.positions = {MOM_IDX: set(), SC_IDX: set()}
-	g.positions[MOM_IDX].add('513130.SH')
+	g.positions[MOM_IDX].add('501018.SH')
 	g.positions[MOM_IDX].add('513520.SH')
 
 	g.positions[SC_IDX].add('002188.SZ')
@@ -374,7 +374,7 @@ def init():
 	g.positions[SC_IDX].add('002743.SZ')
 	g.positions[SC_IDX].add('002820.SZ')
 	g.positions[SC_IDX].add('002910.SZ')
-	g.positions[SC_IDX].add('003003.SZ')
+	g.positions[SC_IDX].add('002760.SZ')
 
 	# ===== 小市值全局变量 =====
 	g.stock_pool = []
@@ -699,6 +699,7 @@ ETF_POOL = [
 	"513100.SH", "513520.SH", "513030.SH",  # 境外: 纳指, 日经, 德国
 	"518880.SH", "159980.SZ", "159985.SZ",  # 商品: 黄金, 有色, 豆粕
 	"501018.SH", "511090.SH", "513130.SH",  # 原油, 30年国债, 恒生科技
+	"515980.SH"                             # 人工智能
 ]
 SAFE_ETF = '511220.SH'  # 城投债
 
