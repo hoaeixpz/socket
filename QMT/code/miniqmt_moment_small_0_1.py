@@ -717,31 +717,61 @@ def get_strategy_total(strat_idx):
 	return g.cash_reserved[strat_idx] + holdings_value
 
 def calc_momentum_score(etf, days):
+	"""计算单只ETF的动量得分。返回 (annualized_return, r2, score)。
+
+	参数:
+		etf: ETF代码
+		days: 回看窗口天数
+	"""
+	# 获取历史数据
 	xtdata.download_history_data(etf, period='1d', incrementally=True)
-	history_data = xtdata.get_market_data_ex(['close', 'high'], [etf], period='1d', start_time='', count=days)
+	history_data = xtdata.get_market_data_ex(['close', 'high'],
+											 [etf],
+											 period='1d',
+											 start_time='',
+											 count=days)
 	if etf not in history_data or history_data[etf].empty:
 		return 0, 0, 0, 0
+
 	close_prices = history_data[etf]['close'].values
+
+	# 追加今日最新价
 	current_price = get_last_price(etf)
 	if not current_price:
 		return 0, 0, 0, 0
 	prices = np.append(close_prices, current_price)
+
+	# 对数价格加权线性回归
 	y = np.log(prices)
 	x = np.arange(len(y))
 	weights = np.linspace(1, 2, len(y))
+
 	slope, intercept = np.polyfit(x, y, 1, w=weights)
+
+	# 年化收益率
 	annualized_return = math.exp(slope * 250) - 1
+
+	# 加权R²
 	ss_res = np.sum(weights * (y - (slope * x + intercept)) ** 2)
 	ss_tot = np.sum(weights * (y - np.mean(y)) ** 2)
 	r2 = 1 - ss_res / ss_tot if ss_tot else 0
+
+	# 得分
 	score = annualized_return * r2
+
+	# 近3日急跌
 	if len(prices) >= 4:
 		recent_ratios = [prices[-1] / prices[-2], prices[-2] / prices[-3], prices[-3] / prices[-4]]
+
 	return annualized_return, r2, score, min(recent_ratios)
 
 def select_etf():
+	"""双动量选股：短期(25天) + 长期(250天)。
+
+	返回: ETF代码列表（1只或2只）
+	"""
 	def filter_etf(max_score, days, label):
-		print(f"\n========== [{label}] 开始 (窗口={days}天, 上限={max_score}) ==========")
+		print(f"\n========== [{label}] 开始 (窗口={days}天, 得分上限={max_score}) ==========")
 		results = {}
 		for etf in ETF_POOL:
 			ann_ret, r2, score, recent_ratio = calc_momentum_score(etf, days)
@@ -751,16 +781,20 @@ def select_etf():
 			print(f"  {name}({etf}): 年化={ann_ret:.4%} R²={r2:.4f} 近3日最大跌幅 {down_ratio:.2f}% 得分={score:.4f}{' [淘汰]' if bad else ''}")
 			if not bad: results[etf] = score
 		if not results:
-			print(f"  无符合条件ETF → 选用{get_stock_name(SAFE_ETF)}({SAFE_ETF})")
+			print(f"  无符合条件的ETF → 选用{get_stock_name(SAFE_ETF)}({SAFE_ETF})")
 			return SAFE_ETF
+
 		selected = max(results, key=results.get)
 		print(f"  >>> {label}最终选出: {get_stock_name(selected)}({selected})")
 		return selected
 
 	etf1 = filter_etf(6, 25, "短期动量")
 	etf2 = filter_etf(0.5, 250, "长期动量")
+
 	print(f"\n========== 选股汇总 ==========")
-	print(f"  短期: {get_stock_name(etf1)}({etf1})  长期: {get_stock_name(etf2)}({etf2})")
+	print(f"  短期动量选出: {get_stock_name(etf1)}({etf1})")
+	print(f"  长期动量选出: {get_stock_name(etf2)}({etf2})")
+
 	if etf1 != etf2:
 		print(f"  两者不同 → 各配50%")
 		return [etf1, etf2]
@@ -770,10 +804,14 @@ def select_etf():
 def mom_rebalance():
 	if not is_trading_day():
 		return
+
 	print(f'\n{green_c}✅========== [动量策略] 日度调仓 {datetime.now().strftime("%Y-%m-%d")} ==========\033[0m')
 
+	# 选股
 	targets = select_etf()
 	weights = {etf: 1.0 / len(targets) for etf in targets}
+
+	# 获取总资产
 	asset = g.xt_trader.query_stock_asset(g.account)
 	strategy_budget = get_strategy_total(MOM_IDX)
 	print(f"  总资产: {asset.total_asset:,.2f}, 动量总资产: {strategy_budget:,.2f}")
@@ -787,6 +825,7 @@ def mom_rebalance():
 			print("sleep 30s")
 			sleep_sec(30)
 
+	# 卖出超配
 	for stock, weight in weights.items():
 		target = strategy_budget * weight
 		current_val = all_positions[stock].market_value if stock in all_positions else 0
@@ -799,6 +838,7 @@ def mom_rebalance():
 		else:
 			print(f"  [与目标差异太小，不减仓] {get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f}")
 
+	# 买入低配
 	for stock, weight in weights.items():
 		target = strategy_budget * weight
 		current_val = all_positions[stock].market_value if stock in all_positions else 0
