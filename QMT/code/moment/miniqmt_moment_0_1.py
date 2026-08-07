@@ -13,7 +13,9 @@ import math
 import sys
 import re
 import numpy as np
+import pandas as pd
 from apscheduler.schedulers.background import BackgroundScheduler
+import os
 import signal
 
 #DEBUG_DAILY_MODE = False
@@ -43,7 +45,7 @@ class Tee:
 	def close(self):
 		self.log.close()
 
-if not DEBUG_DAILY_MODE:
+if DEBUG_DAILY_MODE:
 	log_name = datetime.now().strftime('%Y%m%d')
 	tee = Tee(f"logfiles/{log_name}.log")
 	sys.stdout = tee
@@ -125,44 +127,24 @@ def is_trading_day():
 	last_trading_day = date[-1]
 	return today == last_trading_day
 
-def is_weekday_job(weekday):
-	"""检查今天是否是指定星期几（含节假日顺延）"""
-	if DEBUG_DAILY_MODE:
-		return True
-	current_date = datetime.now()
-	dt_str = current_date.strftime('%Y%m%d')
-	today_weekday = current_date.weekday()
-	if today_weekday == weekday:
-		return True
-	# 检查是否因节假日顺延：往回找到最近交易日
-	for days_back in range(1, weekday + 1):
-		check_date = current_date - timedelta(days=days_back)
-		check_str = check_date.strftime('%Y%m%d')
-		dates = get_trading_dates('399101.SZ', check_str)
-		if dates and len(dates) >= 1:
-			last_td = dates[-1]
-			if last_td == dt_str:
-				return True
-	return False
-
 def get_last_price(stock):
-	"""获取股票最新价"""
-	try:
-		tick = xtdata.get_full_tick([stock])
-		if stock in tick and tick[stock]:
-			return tick[stock]['lastPrice']
-	except:
-		pass
+	full_tick_dict = xtdata.get_full_tick([stock])
+	for key, price in full_tick_dict.items():
+		if key == stock and price:
+			if price['lastPrice'] == 0:
+				print(stock, " 获取当前价格异常,股价为0")
+			return price['lastPrice']
+	print(stock, " 获取当前价格异常")
 	return None
 
 def get_positions():
-	"""获取当前持仓dict: {stock_code: position_object}"""
-	positions = g.xt_trader.query_stock_positions(g.account)
-	result = {}
-	for pos in positions:
-		if pos.volume > 0:
-			result[pos.stock_code] = pos
-	return result
+	positions = {}
+	objlist = g.xt_trader.query_stock_positions(g.account)
+	for obj in objlist:
+		stock = obj.stock_code
+		positions[stock] = obj
+
+	return positions
 
 def is_limit_up(stock):
 	"""判断是否涨停"""
@@ -184,10 +166,47 @@ def is_limit_down(stock):
 		pass
 	return False
 
+def get_userdata_mini_path():
+	"""检查多个可能的userdata_mini路径，返回第一个存在的"""
+	candidates = [
+		'C:\\QMT\\国金证券QMT交易端\\userdata_mini',
+		'D:\\国金证券QMT交易端\\userdata_mini',
+		'C:\\QMT\\userdata_mini',
+	]
+	for p in candidates:
+		if os.path.exists(p):
+			print(f'QMT路径: {p}')
+			return p
+	print('未找到userdata_mini路径，使用默认路径')
+	return candidates[0]
+
 
 # ================================================================
 # 下单函数
 # ================================================================
+
+def get_tick_size(stock):
+	#获取5挡盘口
+	tick_data = xtdata.get_full_tick([stock])
+	size = 0
+	if stock in tick_data:
+		sell_price = tick_data[stock]['askPrice']
+		if sell_price[0] > 0:
+			size = abs(sell_price[1] - sell_price[0])
+		else:
+			buy_price = tick_data[stock]['bidPrice']
+			if buy_price[0] > 0:
+				size = abs(buy_price[0] - buy_price[1])
+			
+		if size:
+			if size < 0.009:
+				return 0.001
+			else:
+				return 0.01
+	else:
+		print(f"{stock} 获取五档价格失败，返回默认值0.01")
+
+	return 0.01
 
 def sell_target_value(stock, target_value):
 	"""卖出至目标市值"""
@@ -203,7 +222,8 @@ def sell_target_value(stock, target_value):
 			break
 		if target_value == 0 and not is_limit_down(stock):
 			async_seq = g.xt_trader.order_stock_async(g.account,
-				stock, xtconstant.STOCK_SELL, pos.volume,
+				stock,
+                xtconstant.STOCK_SELL, pos.volume,
 				xtconstant.MARKET_PEER_PRICE_FIRST, 0, '',
 				f'清仓{stock} ')
 		else:
@@ -243,9 +263,15 @@ def buy_target_value(stock, target_value):
 		else:
 			buy_price = current_price + 0.1
 			async_seq = g.xt_trader.order_stock_async(g.account,
-				stock, xtconstant.STOCK_BUY, amount,
-				xtconstant.FIX_PRICE, buy_price, '',
-				f'Buy {stock} Tgt {target_value}元 ')
+				                                stock, 
+                                                xtconstant.STOCK_BUY, 
+                                                amount,
+				                                xtconstant.FIX_PRICE, 
+                                                buy_price, 
+                                                '',
+				                                f'Buy {stock} Tgt {target_value}元 '
+            )
+
 			print(f"buy {stock} target {target_value:.2f} current {current_value:.2f} amount {amount}")
 	if async_seq == -1 or async_seq is None:
 		print(f"buy_target_value failed {stock} {get_stock_name(stock)}")
@@ -265,9 +291,48 @@ ETF_POOL = [
 	"501018.SH",  # 南方原油
 	"511090.SH",  # 30年国债ETF
 	"513130.SH",  # 恒生科技
+	"515980.SH"   # 人工智能
 ]
 
 SAFE_ETF = '511880.SH'  # 银华日利（货币ETF，空仓避险用）
+
+# 每只ETF的得分上限（基于2020-2026历史数据的P95分位，避免动量过热）
+ETF_SHORT_MAX = {  # 短期(25天)上限
+    "513100.SH": 3,  # 纳指ETF
+    "513520.SH": 3,  # 日经ETF
+    "513030.SH": 3,  # 德国ETF
+    "518880.SH": 3,  # 黄金ETF
+    "159980.SZ": 3,  # 有色ETF
+    "159985.SZ": 3,  # 豆粕ETF
+    "501018.SH": 6,  # 南方原油
+    "511090.SH": 1,  # 30年国债ETF
+    "513130.SH": 6,  # 恒生科技
+    "515980.SH": 9,  # 人工智能
+}
+ETF_LONG_MAX = {  # 长期(250天)上限
+    "513100.SH": 0.5,  # 纳指ETF
+    "513520.SH": 0.5,  # 日经ETF
+    "513030.SH": 0.5,  # 德国ETF
+    "518880.SH": 0.5,  # 黄金ETF
+    "159980.SZ": 0.5,  # 有色ETF
+    "159985.SZ": 0.5,  # 豆粕ETF
+    "501018.SH": 0.7,  # 南方原油
+    "511090.SH": 0.2,  # 30年国债ETF
+    "513130.SH": 0.5,  # 恒生科技
+    "515980.SH": 0.9,  # 人工智能
+}
+ETF_DIP_MIN = {  # 近3日单日急跌过滤阈值（ratio = 1 - 跌幅%），按各ETF历史波动特征设定
+    "513100.SH": 0.95,  # 纳指ETF — 5%
+    "513520.SH": 0.95,  # 日经ETF — 5%
+    "513030.SH": 0.95,  # 德国ETF — 5%
+    "518880.SH": 0.95,  # 黄金ETF — 5%
+    "159980.SZ": 0.95,  # 有色ETF — 5%
+    "159985.SZ": 0.97,  # 豆粕ETF — 4%（历史最大跌仅5.9%，5%太松）
+    "511090.SH": 0.98,  # 30年国债 — 2%（历史从未跌超3%，5%永不触发）
+    "501018.SH": 0.94,  # 南方原油 — 6%（波动大，5%触发太频繁）
+    "513130.SH": 0.94,  # 恒生科技 — 6%
+    "515980.SH": 0.94,  # 人工智能 — 6%
+}
 
 
 def calc_momentum_score(etf, days):
@@ -283,22 +348,26 @@ def calc_momentum_score(etf, days):
 											 [etf],
 											 period='1d',
 											 start_time='',
+											 dividend_type='front',
 											 count=days)
 	if etf not in history_data or history_data[etf].empty:
-		return 0, 0, 0
+		return 0, 0, 0, 0
 
 	close_prices = history_data[etf]['close'].values
+	if etf == "501018.SH":
+		print(history_data[etf][:6])
+		print(history_data[etf][-6:])
 
-	# 追加今日最新价
-	current_price = get_last_price(etf)
-	if current_price is None:
-		return 0, 0, 0
-	prices = np.append(close_prices, current_price)
+	prices = close_prices
+	if etf == "501018.SH":
+		print(prices)
 
 	# 对数价格加权线性回归
 	y = np.log(prices)
 	x = np.arange(len(y))
-	weights = np.linspace(1, 2, len(y))
+	weights = np.linspace(1, 1, len(y))
+	#weights = np.linspace(1, 2, len(y))
+	#print(weights)
 
 	slope, intercept = np.polyfit(x, y, 1, w=weights)
 
@@ -306,35 +375,36 @@ def calc_momentum_score(etf, days):
 	annualized_return = math.exp(slope * 250) - 1
 
 	# 加权R²
+	weighted_mean_y = np.average(y, weights=weights)
 	ss_res = np.sum(weights * (y - (slope * x + intercept)) ** 2)
-	ss_tot = np.sum(weights * (y - np.mean(y)) ** 2)
+	ss_tot = np.sum(weights * (y - weighted_mean_y) ** 2)
 	r2 = 1 - ss_res / ss_tot if ss_tot else 0
 
 	# 得分
 	score = annualized_return * r2
 
-	# 近3日急跌过滤（任意一天跌幅>5%则得分归零）
+	# 近3日急跌
 	if len(prices) >= 4:
 		recent_ratios = [prices[-1] / prices[-2], prices[-2] / prices[-3], prices[-3] / prices[-4]]
-		if min(recent_ratios) < 0.95:
-			score = 0
 
-	return annualized_return, r2, score
-
+	return annualized_return, r2, score, min(recent_ratios)
 
 def select_etf():
 	"""双动量选股：短期(25天) + 长期(250天)。
 
 	返回: ETF代码列表（1只或2只）
 	"""
-	def filter_etf(max_score, days, label):
-		print(f"\n========== [{label}] 开始 (窗口={days}天, 得分上限={max_score}) ==========")
+	def filter_etf(max_score_map, days, label):
+		print(f"\n========== [{label}] 开始 (窗口={days}天, 上限=各ETF自用P95) ==========")
 		results = {}
 		for etf in ETF_POOL:
-			ann_ret, r2, score = calc_momentum_score(etf, days)
+			ann_ret, r2, score, recent_ratio = calc_momentum_score(etf, days)
 			name = get_stock_name(etf) or etf
-			is_filtered = (score <= 0 or score >= max_score)
-			print(f"  {name}({etf}): 年化={ann_ret:.4%} R²={r2:.4f} 得分={score:.4f}{' [淘汰]' if is_filtered else ''}")
+			etf_max = max_score_map.get(etf, 999)
+			dip_min = ETF_DIP_MIN.get(etf, 0.95)
+			is_filtered = (score <= 0 or score >= etf_max) or recent_ratio < dip_min
+			down_ratio = (1 - recent_ratio) * 100
+			print(f"  {name}({etf}): 年化={ann_ret:.4%} R²={r2:.4f} 近3日最大跌幅 {down_ratio:.2f}% 得分={score:.4f} (上限={etf_max:.2f} 跌限={100-dip_min*100:.0f}%){' [淘汰]' if is_filtered else ''}")
 			if not is_filtered:
 				results[etf] = score
 
@@ -346,8 +416,8 @@ def select_etf():
 		print(f"  >>> {label}最终选出: {get_stock_name(selected)}({selected})")
 		return selected
 
-	etf1 = filter_etf(6, 25, "短期动量")
-	etf2 = filter_etf(0.5, 250, "长期动量")
+	etf1 = filter_etf(ETF_SHORT_MAX, 25, "短期动量")
+	etf2 = filter_etf(ETF_LONG_MAX, 250, "长期动量")
 
 	print(f"\n========== 选股汇总 ==========")
 	print(f"  短期动量选出: {get_stock_name(etf1)}({etf1})")
@@ -366,7 +436,7 @@ def select_etf():
 # ================================================================
 
 def rebalance():
-	"""周一调仓"""
+	"""每日调仓"""
 	if not is_trading_day():
 		print(f"{red_c}⭕ 今天不是交易日\033[0m")
 		return
@@ -424,8 +494,7 @@ def rebalance():
 
 def init():
 	print("init")
-	path = 'C:\\QMT\\国金证券QMT交易端\\userdata_mini'
-	#path = 'C:\\QMT\\userdata_mini'
+	path = get_userdata_mini_path()
 	session_id = int(time.time())
 	g.xt_trader = XtQuantTrader(path, session_id)
 	g.callback = MyXtQuantTraderCallback()
