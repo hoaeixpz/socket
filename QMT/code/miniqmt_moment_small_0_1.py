@@ -549,8 +549,12 @@ def calc_commission(value):
 		return 5
 	return commission
 
-def calc_sell_tax(value):
+def calc_sell_tax(value, stock):
 	#卖出印花税，按万五算
+	if stock in ETF_POOL:
+		#ETF 卖出不收印花税
+		return 0
+		
 	tax = value * 5 / 10000
 	return tax
 
@@ -607,7 +611,7 @@ def sell_target_value(stock, target_value, strat_idx=None):
 	if async_seq != -1 and async_seq is not None and strat_idx is not None:
 		# 卖出成功，现金回血
 		commission = calc_commission(pos.market_value - target_value)
-		tax = calc_sell_tax(pos.market_value - target_value)
+		tax = calc_sell_tax(pos.market_value - target_value, stock)
 		cash_incr = pos.market_value - target_value - commission - tax
 		g.cash_reserved[strat_idx] += cash_incr
 		print(f"卖出 {stock} 手续费 {commission}，印花税 {tax}")
