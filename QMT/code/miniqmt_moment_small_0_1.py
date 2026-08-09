@@ -703,6 +703,44 @@ ETF_POOL = [
 ]
 SAFE_ETF = '511220.SH'  # 城投债
 
+# 每只ETF的得分上限（基于2020-2026历史数据的P97分位，避免动量过热）
+ETF_SHORT_MAX = {  # 短期(25天)上限
+    "513100.XSHG": 3,  # 纳指ETF
+    "513520.XSHG": 3,  # 日经ETF
+    "513030.XSHG": 2,  # 德国ETF
+    "518880.XSHG": 2,  # 黄金ETF
+    "159980.XSHE": 2,  # 有色ETF
+    "159985.XSHE": 3,  # 豆粕ETF
+    "501018.XSHG": 9,  # 南方原油
+    "511090.XSHG": 1,  # 30年国债ETF
+    "513130.XSHG": 8,  # 恒生科技
+    "515980.XSHG": 10,  # 人工智能
+}
+ETF_LONG_MAX = {  # 长期(250天)上限
+    "513100.XSHG": 0.45,  # 纳指ETF
+    "513520.XSHG": 0.45,  # 日经ETF
+    "513030.XSHG": 0.45,  # 德国ETF
+    "518880.XSHG": 0.5,  # 黄金ETF
+    "159980.XSHE": 0.45,  # 有色ETF
+    "159985.XSHE": 0.4,  # 豆粕ETF
+    "501018.XSHG": 0.7,  # 南方原油
+    "511090.XSHG": 0.2,  # 30年国债ETF
+    "513130.XSHG": 0.5,  # 恒生科技
+    "515980.XSHG": 0.8,  # 人工智能
+}
+ETF_DIP_MIN = {  # 近3日单日急跌过滤阈值（ratio = 1 - 跌幅%），按各ETF历史波动特征设定
+    "513100.XSHG": 0.95,  # 纳指ETF — 5%
+    "513520.XSHG": 0.95,  # 日经ETF — 5%
+    "513030.XSHG": 0.95,  # 德国ETF — 5%
+    "518880.XSHG": 0.96,  # 黄金ETF — 4%
+    "159980.XSHE": 0.95,  # 有色ETF — 5%
+    "159985.XSHE": 0.97,  # 豆粕ETF — 3%（历史最大跌仅5.9%，5%太松）
+    "511090.XSHG": 0.98,  # 30年国债 — 2%（历史从未跌超3%，5%永不触发）
+    "501018.XSHG": 0.94,  # 南方原油 — 6%（波动大，5%触发太频繁）
+    "513130.XSHG": 0.94,  # 恒生科技 — 6%
+    "515980.XSHG": 0.94,  # 人工智能 — 6%
+}
+
 def get_strategy_available_cash(strat_idx):
 	"""策略剩余可用现金（直接返回预留现金）"""
 	return max(0, g.cash_reserved[strat_idx])
@@ -725,12 +763,12 @@ def calc_momentum_score(etf, days):
 	"""
 	# 获取历史数据
 	xtdata.download_history_data(etf, period='1d', incrementally=True)
-	history_data = xtdata.get_market_data_ex(['close', 'high'],
+	history_data = xtdata.get_market_data_ex(['close'],
 											 [etf],
 											 period='1d',
 											 start_time='',
 											 dividend_type='front',
-											 count=days)
+											 count=days+1)
 	if etf not in history_data or history_data[etf].empty:
 		return 0, 0, 0, 0
 
@@ -768,14 +806,22 @@ def select_etf():
 
 	返回: ETF代码列表（1只或2只）
 	"""
-	def filter_etf(max_score, days, label):
+	def filter_etf(max_score_map, days, label):
 		print(f"\n========== [{label}] 开始 (窗口={days}天, 得分上限={max_score}) ==========")
 		results = {}
 		for etf in ETF_POOL:
 			ann_ret, r2, score, recent_ratio = calc_momentum_score(etf, days)
 			name = get_stock_name(etf) or etf
-			bad = (score <= 0 or score >= max_score) or recent_ratio < 0.95
+			max_score = max_score_map.get(etf)
+			dip_min = ETF_DIP_MIN.get(etf, 0.95)
+			bad = (score <= 0 or score >= max_score) or recent_ratio < dip_min
 			down_ratio = (1 - recent_ratio) * 100
+			if bad:
+				if score >= max_score:
+					print(f" {score} > {max_score},分数超出阈值，淘汰")
+				if recent_ratio < dip_min:
+					print(f" 跌幅{down_ratio}% > {(1 - dip_min) * 100:.0f}% 超出阈值，淘汰")
+
 			print(f"  {name}({etf}): 年化={ann_ret:.4%} R²={r2:.4f} 近3日最大跌幅 {down_ratio:.2f}% 得分={score:.4f}{' [淘汰]' if bad else ''}")
 			if not bad: results[etf] = score
 		if not results:
@@ -786,8 +832,8 @@ def select_etf():
 		print(f"  >>> {label}最终选出: {get_stock_name(selected)}({selected})")
 		return selected
 
-	etf1 = filter_etf(6, 25, "短期动量")
-	etf2 = filter_etf(0.5, 250, "长期动量")
+	etf1 = filter_etf(ETF_SHORT_MAX, 25, "短期动量")
+	etf2 = filter_etf(ETF_SHORT_MIN, 250, "长期动量")
 
 	print(f"\n========== 选股汇总 ==========")
 	print(f"  短期动量选出: {get_stock_name(etf1)}({etf1})")
