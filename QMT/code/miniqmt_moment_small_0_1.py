@@ -821,13 +821,15 @@ def select_etf():
 			dip_min = ETF_DIP_MIN.get(etf, 0.95)
 			bad = (score <= 0 or score >= max_score) or recent_ratio < dip_min
 			down_ratio = (1 - recent_ratio) * 100
+			reason = ''
 			if bad:
+				reason += ' -> [淘汰]'
 				if score >= max_score:
-					print(f" {score} > {max_score},分数超出阈值，淘汰")
+					reason += (f" 分数超出阈值{max_score}")
 				if recent_ratio < dip_min:
-					print(f" 跌幅{down_ratio}% > {(1 - dip_min) * 100:.0f}% 超出阈值，淘汰")
+					reason += (f" 跌幅超出阈值 {(1 - dip_min) * 100:.0f}%")
 
-			print(f"  {name}({etf}): 年化={ann_ret:.4%} R²={r2:.4f} 近3日最大跌幅 {down_ratio:.2f}% 得分={score:.4f}{' [淘汰]' if bad else ''}")
+			print(f"  {name}({etf}): 年化={ann_ret:.4%} R²={r2:.4f} 近3日最大跌幅 {down_ratio:.2f}% 得分={score:.4f}{reason}")
 			if not bad: results[etf] = score
 		if not results:
 			print(f"  无符合条件的ETF → 选用{get_stock_name(SAFE_ETF)}({SAFE_ETF})")
