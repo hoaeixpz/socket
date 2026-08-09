@@ -355,7 +355,7 @@ def init():
 	info = g.xt_trader.query_stock_asset(g.account)
 
 	# 多策略配置
-	g.portfolio_value_proportion = [0.65, 0.35]
+	g.portfolio_value_proportion = [0.35, 0.65]
 	# 每个策略的预留现金（买卖驱动），互相隔离
 	g.cash_reserved = {MOM_IDX: g.portfolio_value_proportion[MOM_IDX] * info.cash,
 					   SC_IDX: g.portfolio_value_proportion[SC_IDX] * info.cash}
