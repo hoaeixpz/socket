@@ -729,17 +729,14 @@ def calc_momentum_score(etf, days):
 											 [etf],
 											 period='1d',
 											 start_time='',
+											 dividend_type='front',
 											 count=days)
 	if etf not in history_data or history_data[etf].empty:
 		return 0, 0, 0, 0
 
 	close_prices = history_data[etf]['close'].values
 
-	# 追加今日最新价
-	current_price = get_last_price(etf)
-	if not current_price:
-		return 0, 0, 0, 0
-	prices = np.append(close_prices, current_price)
+	prices = close_prices
 
 	# 对数价格加权线性回归
 	y = np.log(prices)
@@ -752,8 +749,9 @@ def calc_momentum_score(etf, days):
 	annualized_return = math.exp(slope * 250) - 1
 
 	# 加权R²
+	weighted_mean_y = np.average(y, weights=weights)
 	ss_res = np.sum(weights * (y - (slope * x + intercept)) ** 2)
-	ss_tot = np.sum(weights * (y - np.mean(y)) ** 2)
+	ss_tot = np.sum(weights * (y - weighted_mean_y) ** 2)
 	r2 = 1 - ss_res / ss_tot if ss_tot else 0
 
 	# 得分
@@ -821,6 +819,12 @@ def mom_rebalance():
 	for stock in list(g.positions[MOM_IDX]):
 		if stock not in weights:
 			print(f"  [调出] {get_stock_name(stock)}({stock}) → 清仓")
+			if is_limit_up(stock):
+				printf(f"  {get_stock_name(stock)}({stock}) 涨停，跳过")
+				continue
+			if is_limit_down(stock):
+				printf(f"  {get_stock_name(stock)}({stock}) 跌停，跳过")
+				continue
 			sell_target_value(stock, 0, MOM_IDX)
 			print("sleep 30s")
 			sleep_sec(30)
@@ -832,6 +836,12 @@ def mom_rebalance():
 		price = get_last_price(stock)
 		if current_val - target > max(3000, price * 100 if price else 10000):
 			print(f"  [减仓] {get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f}")
+			if is_limit_up(stock):
+				printf(f"  {get_stock_name(stock)}({stock}) 涨停，跳过")
+				continue
+			if is_limit_down(stock):
+				printf(f"  {get_stock_name(stock)}({stock}) 跌停，跳过")
+				continue
 			sell_target_value(stock, target, MOM_IDX)
 			print("sleep 30s")
 			sleep_sec(30)
@@ -846,6 +856,12 @@ def mom_rebalance():
 		stra_avi_cash = get_strategy_available_cash(MOM_IDX)
 		if min(target - current_val, stra_avi_cash) > max(3000, price * 100 if price else 10000):
 			print(f"  [加仓] {get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f}")
+			if is_limit_up(stock):
+				printf(f"  {get_stock_name(stock)}({stock}) 涨停，跳过")
+				continue
+			if is_limit_down(stock):
+				printf(f"  {get_stock_name(stock)}({stock}) 跌停，跳过")
+				continue
 			buy_target_value(stock, target, MOM_IDX)
 		else:
 			print(f"  [与目标差异太小，不加仓] {get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f} 策略资金{stra_avi_cash:,.2f}")
@@ -1742,7 +1758,7 @@ if __name__ == '__main__':
 	#judge_date()
 	#prepare_stock_list()
 	#exec_all_weather()
-	#info_position()
+	#sc_info_position()
 
 	'''
 	init()

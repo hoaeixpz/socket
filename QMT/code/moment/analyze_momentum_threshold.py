@@ -45,8 +45,8 @@ START_DATE = '20200101'  # 分析起点
 CURRENT_SHORT_MAX = 6.0
 CURRENT_LONG_MAX = 0.5
 
-# 尖峰检测阈值：得分超过此值视为"异常突起"（默认各ETF自用P95）
-SPIKE_THRESHOLD = None  # None = 每只ETF用各自的 P95
+# 尖峰检测阈值：得分超过此值视为"异常突起"（默认各ETF自用P97）
+SPIKE_THRESHOLD = None  # None = 每只ETF用各自的 P97
 
 # 输出目录
 OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -95,13 +95,14 @@ def calc_score_from_prices(prices):
 
     y = np.log(prices)
     x = np.arange(len(y))
-    weights = np.linspace(1, 1, len(y))
+    weights = np.linspace(1, 2, len(y))
 
     slope, intercept = np.polyfit(x, y, 1, w=weights)
 
     annualized_return = math.exp(slope * 250) - 1
 
     weighted_mean_y = np.average(y, weights=weights)
+    #weighted_mean_y = y.mean()
     ss_res = np.sum(weights * (y - (slope * x + intercept)) ** 2)
     ss_tot = np.sum(weights * (y - weighted_mean_y) ** 2)
     r2 = 1 - ss_res / ss_tot if ss_tot != 0 else 0
@@ -591,9 +592,9 @@ def detect_spikes(df, spike_threshold, score_col='short_score'):
         if len(sub) == 0:
             continue
 
-        # 每只ETF用自己的 P95 作为阈值，或使用全局统一阈值
+        # 每只ETF用自己的 P97 作为阈值，或使用全局统一阈值
         if spike_threshold is None:
-            etf_threshold = np.percentile(sub[score_col].dropna(), 95)
+            etf_threshold = np.percentile(sub[score_col].dropna(), 97)
         else:
             etf_threshold = spike_threshold
 
@@ -681,7 +682,7 @@ def compute_post_spike_returns(df, all_data, spikes, score_label='短期'):
         print("  无有效的卖出后收益数据")
         return spikes_df
 
-    threshold_label = "各ETF自用P95" if SPIKE_THRESHOLD is None else f"{SPIKE_THRESHOLD_EFFECTIVE:.4f}"
+    threshold_label = "各ETF自用P97" if SPIKE_THRESHOLD is None else f"{SPIKE_THRESHOLD_EFFECTIVE:.4f}"
     print(f"\n  检测到 {len(spikes_df)} 次{score_label}尖峰事件")
     print(f"  阈值策略: {threshold_label}")
     print(f"  收益基准: start_date（得分首超阈值日卖出）→ N日后")
@@ -732,7 +733,7 @@ def plot_spikes(spikes_df, score_label='短期'):
         return
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 9))
-    threshold_label = "各ETF自用P95" if SPIKE_THRESHOLD is None else f"{SPIKE_THRESHOLD:.2f}"
+    threshold_label = "各ETF自用P97" if SPIKE_THRESHOLD is None else f"{SPIKE_THRESHOLD:.2f}"
     fig.suptitle(f'{score_label}动量尖峰卖出后收益分布 (阈值={threshold_label}, 基准=start_date)',
                  fontsize=14, fontweight='bold')
 
@@ -833,11 +834,6 @@ def main():
     # 2. 计算得分
     df = compute_all_scores(all_data)
 
-    # 保存原始数据（方便后续再分析）
-    csv_path = os.path.join(OUTPUT_DIR, 'momentum_scores_history.csv')
-    df.to_csv(csv_path, index=False, encoding='utf-8-sig')
-    print(f"  原始数据已保存: {csv_path}")
-
     # 3. 统计
     analyze(df)
 
@@ -851,7 +847,7 @@ def main():
     analyze_daily_returns(all_data)
     plot_daily_return_dist(all_data)
 
-    # 5. 尖峰检测 & 卖出后收益分析（None = 每只ETF用各自的P95）
+    # 5. 尖峰检测 & 卖出后收益分析（None = 每只ETF用各自的P97）
     # 短期 + 长期各跑一遍
     global SPIKE_THRESHOLD_EFFECTIVE
     SPIKE_THRESHOLD_EFFECTIVE = SPIKE_THRESHOLD
