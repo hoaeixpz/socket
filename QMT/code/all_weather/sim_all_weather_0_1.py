@@ -10,6 +10,7 @@
 """
 from xtquant import xtdata
 import math
+import numpy as np
 import unicodedata
 from datetime import datetime, timedelta
 
@@ -23,7 +24,7 @@ ACTUAL_POSITIONS = {
     "600900.SH": 400,      # 长江电力
 }
 
-AVAILABLE_CASH = 28     # 账户可用资金（元）
+AVAILABLE_CASH = 11473    # 账户可用资金（元）
 
 # ======================== 策略参数（与母版一致） ========================
 
@@ -33,9 +34,9 @@ stocks = [
     "513100.SH",  # 纳指ETF
     "601288.SH",  # 农业银行
     "600900.SH",  # 长江电力
-    #"601088.SH",  # 中国神华
-    #'000429.SZ',  # 粤高速A
-    #'601899.SH'   # 紫金矿业
+    "601088.SH",  # 中国神华
+    '000429.SZ',  # 粤高速A
+    '601899.SH'   # 紫金矿业
 ]
 
 base_days = 120
@@ -153,6 +154,7 @@ def calc_ES_weights():
         for code in stocks:
             weights[code] /= total
 
+def diff_weight():
     # 计算当前权重（基于实际持仓和最新价格）
     total_value = 0
     current_prices = {}
@@ -169,6 +171,8 @@ def calc_ES_weights():
     print(f"  {'代码':<14s} {'名称':<12s} {'目标权重':>8s} {'当前权重':>8s}")
     print(f"  {'-'*14} {'-'*12}         {'-'*8}     {'-'*8}")
     for code in stocks:
+        if code == "518880.SH":
+            continue
         name = get_stock_name(code)
         target_wt = weights[code] * 100
         cur_shares = ACTUAL_POSITIONS.get(code, 0)
@@ -179,6 +183,75 @@ def calc_ES_weights():
     print(f"  {'':>28s}     {'现金':>8s}    {AVAILABLE_CASH/total_asset*100:7.2f}%")
     print()
 
+def calc_R2_weights():
+    for s in stocks:
+        xtdata.download_history_data(s, period='1d', incrementally=True)
+
+    price_data = xtdata.get_market_data_ex(['close'],
+                                           stocks,
+                                           period='1d',
+                                           end_time='20260806',
+                                           count=base_days,
+                                           fill_data=False,
+                                           dividend_type='front')
+
+    for code in stocks:
+        if code == "518880.SH":
+            continue
+        df = price_data.get(code)
+        if df is None or len(df) < base_days:
+            weights[code] = 0
+            print(f"{code} {get_stock_name(code)} 数据不足，权重=0")
+        else:
+            df = df.dropna(subset=['close'])
+            prices = df['close']
+
+            y = np.log(prices)
+            x = np.arange(len(y))
+            w = np.linspace(1, 2, len(y))
+            slope, intercept = np.polyfit(x, y, 1, w=w)
+            ar = math.exp(slope * 250) - 1
+            
+            weighted_mean_y = np.average(y, weights=w)
+            ss_res = np.sum(w * (y - (slope * x + intercept)) ** 2)
+            ss_tot = np.sum(w * (y - weighted_mean_y) ** 2)
+            R2 = 1 - ss_res / ss_tot if ss_tot else 0
+            R2 = abs(R2)
+            
+            score = ar * R2
+            
+            prices_short = df['close'][-30:]
+            ys = np.log(prices_short)
+            xs = np.arange(len(ys))
+            ws = np.linspace(1, 2, len(ys))
+            slope, intercept = np.polyfit(xs, ys, 1, w=ws)
+            ar_s = math.exp(slope * 250) - 1
+            
+            weighted_mean_y = np.average(ys, weights=ws)
+            ss_res = np.sum(ws * (ys - (slope * xs + intercept)) ** 2)
+            ss_tot = np.sum(ws * (ys - weighted_mean_y) ** 2)
+            R2_s = 1 - ss_res / ss_tot if ss_tot else 0
+            R2_s = abs(R2_s)
+            score_short = ar_s * R2_s
+            
+            S = score * 0.8 + score_short * 0.2
+
+            print(f"{code} {get_stock_name(code)}")
+            #print(df['close'][-6:])
+            print(f"长期 AR * R2: {ar:.4f} * {R2:.4f} = {score:.4f} ")
+            print(f"短期 AR * R2: {ar_s:.4f} * {R2_s:.4f} = {score_short:.4f} ")
+            print(f"总分 {S}")
+
+            weight = 1 / (1 + math.exp(-S * 5))
+            weights[code] = weight
+
+    # 归一化
+    total = sum(weights.values())
+    if total > 0:
+        for code in stocks:
+            if code == "518880.SH":
+                continue
+            weights[code] /= total
 
 # ======================== 调仓计算 ========================
 
@@ -228,10 +301,10 @@ def calc_trades():
         diff = target_value - current_value
 
         action = ""
-        if diff > 500 and abs(diff) / target_value > rebalance_tolerance:
+        if diff > 500 and (target_value == 0 or abs(diff) / target_value > rebalance_tolerance):
             action = f"<<< 买入 {(diff/price/100):.2f}手"
             buys.append((code, target_value, current_value, price))
-        elif diff < -500 and abs(diff) / target_value > rebalance_tolerance:
+        elif diff < -500 and (target_value == 0 or abs(diff) / target_value > rebalance_tolerance):
             action = f">>> 卖出 {(-diff/price/100):.2f}手"
             sells.append((code, target_value, current_value, price))
         else:
@@ -288,8 +361,8 @@ def take_profit_check(prices):
 
     for code in stocks:
         shares = ACTUAL_POSITIONS.get(code, 0)
-        if shares <= 0:
-            continue
+        #if shares <= 0:
+        #    continue
         df = price_data.get(code)
         if df is None or len(df) < base_days:
             continue
@@ -330,7 +403,9 @@ if __name__ == "__main__":
     print(f"全天候 ETF 策略 — 模拟计算")
     print(f"{'='*60}\n")
 
-    calc_ES_weights()
+    #calc_ES_weights()
+    calc_R2_weights()
+    diff_weight()
     calc_trades()
 
     print(f"\n{'='*60}")
