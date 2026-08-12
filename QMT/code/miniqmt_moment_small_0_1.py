@@ -168,24 +168,27 @@ def is_trading_day():
 	dates = get_trading_dates('399101.SZ', today)
 	return today == dates[-1]
 
-def is_weekday_job():
+def is_weekday_job(target_weekday):
 	if DEBUG_DAILY_MODE:
 		return True
 
 	current_date = datetime.now()
 	dt_str = current_date.strftime('%Y%m%d')
 	date = get_trading_dates('399101.SZ', dt_str)
-	for day in range(1, g.weekday + 1):
+	#print(f"last 7 days:\n{date}")
+	for day in range(1, target_weekday + 1):
 		yesterday = current_date - timedelta(days=day)
 		dt_str = yesterday.strftime('%Y%m%d')
 		last_date = date[-(day+1)]
-		if day < g.weekday:
+		#print(f"last_date {last_date}   yesterday {dt_str}")
+		if day < target_weekday:
 			if last_date != dt_str:
 				return False
 		else:
 			if last_date != dt_str:
-				if (current_date.weekday() + 1) != g.weekday:
+				if (current_date.weekday() + 1) != target_weekday:
 					print(f'{current_date} 是周{current_date.weekday() + 1}')
+				#print("return True")
 				return True
 	return False
 
@@ -355,7 +358,7 @@ def init():
 	info = g.xt_trader.query_stock_asset(g.account)
 
 	# 多策略配置
-	g.portfolio_value_proportion = [0.35, 0.65]
+	g.portfolio_value_proportion = [0.5, 0.5]
 	# 每个策略的预留现金（买卖驱动），互相隔离
 	g.cash_reserved = {MOM_IDX: g.portfolio_value_proportion[MOM_IDX] * info.cash,
 					   SC_IDX: g.portfolio_value_proportion[SC_IDX] * info.cash}
@@ -363,8 +366,8 @@ def init():
 	g.cash_record = g.cash_reserved.copy()
 	# 各策略持仓股票集合，初始化时扫描已有持仓归入对应策略
 	g.positions = {MOM_IDX: set(), SC_IDX: set()}
-	g.positions[MOM_IDX].add('501018.SH')
-	g.positions[MOM_IDX].add('513520.SH')
+	g.positions[MOM_IDX].add('513030.SH')
+	g.positions[MOM_IDX].add('515980.SH')
 
 	g.positions[SC_IDX].add('002188.SZ')
 	g.positions[SC_IDX].add('002316.SZ')
@@ -856,7 +859,17 @@ def mom_rebalance():
 	if not is_trading_day():
 		return
 
-	print(f'\n{green_c}✅========== [动量策略] 日度调仓 {datetime.now().strftime("%Y-%m-%d")} ==========\033[0m')
+	weekdays = [1, 3, 5]
+	is_week_day_job = False
+	for day in weekdays:
+		if is_weekday_job(day):
+			is_week_day_job = True;
+			break
+
+	if not is_week_day_job:
+		return
+
+	print(f'\n{green_c}✅========== [动量策略] 周{day}调仓 {datetime.now().strftime("%Y-%m-%d")} ==========\033[0m')
 
 	# 选股
 	targets = select_etf()
@@ -1174,7 +1187,7 @@ def exec_all_weather():
 			print(f"{stock} {get_stock_name(stock)} 未买入, 目标市值{target_value:.2f}, 股价 {current_price}元, amount {target_value / current_price:.2f}")
 
 def sc_rebalance_sell():
-	if not is_weekday_job():
+	if not is_weekday_job(g.weekday):
 		return
 	if g.trade is False:
 		return
@@ -1226,7 +1239,7 @@ def sc_rebalance_sell():
 
 def sc_rebalance_buy():
 	#卖出股票后才有钱买入
-	if not is_weekday_job():
+	if not is_weekday_job(g.weekday):
 		return
 	if not g.sell_done:                     #卖出股票后才有钱买入
 		return
@@ -1812,6 +1825,7 @@ if __name__ == '__main__':
 	#prepare_stock_list()
 	#exec_all_weather()
 	#sc_info_position()
+	#is_weekday_job(3)
 
 	'''
 	init()
