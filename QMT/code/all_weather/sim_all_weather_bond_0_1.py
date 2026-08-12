@@ -50,7 +50,7 @@ record_max = 219202
 max_down_T = [1.1, 1.7, 2.4, 3.2]
 last_level = 2          # 上次回撤等级（防止同一等级重复触发）
 force_level = None
-#force_level = 2         # 不计算，直接设置level为force_level
+force_level = 2         # 不计算，直接设置level为force_level
 
 
 # ======================== 数据获取 ========================

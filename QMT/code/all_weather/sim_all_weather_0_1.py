@@ -190,7 +190,7 @@ def calc_R2_weights():
     price_data = xtdata.get_market_data_ex(['close'],
                                            stocks,
                                            period='1d',
-                                           end_time='20260806',
+                                           end_time='',
                                            count=base_days,
                                            fill_data=False,
                                            dividend_type='front')
@@ -237,7 +237,7 @@ def calc_R2_weights():
             S = score * 0.8 + score_short * 0.2
 
             print(f"{code} {get_stock_name(code)}")
-            #print(df['close'][-6:])
+            print(df['close'][-6:])
             print(f"长期 AR * R2: {ar:.4f} * {R2:.4f} = {score:.4f} ")
             print(f"短期 AR * R2: {ar_s:.4f} * {R2_s:.4f} = {score_short:.4f} ")
             print(f"总分 {S}")
