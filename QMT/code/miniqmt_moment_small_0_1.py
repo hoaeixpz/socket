@@ -358,7 +358,7 @@ def init():
 	info = g.xt_trader.query_stock_asset(g.account)
 
 	# 多策略配置
-	g.portfolio_value_proportion = [0.5, 0.5]
+	g.portfolio_value_proportion = [0.01, 0.99]
 	# 每个策略的预留现金（买卖驱动），互相隔离
 	g.cash_reserved = {MOM_IDX: g.portfolio_value_proportion[MOM_IDX] * info.cash,
 					   SC_IDX: g.portfolio_value_proportion[SC_IDX] * info.cash}
@@ -366,8 +366,7 @@ def init():
 	g.cash_record = g.cash_reserved.copy()
 	# 各策略持仓股票集合，初始化时扫描已有持仓归入对应策略
 	g.positions = {MOM_IDX: set(), SC_IDX: set()}
-	g.positions[MOM_IDX].add('513030.SH')
-	g.positions[MOM_IDX].add('515980.SH')
+	g.positions[MOM_IDX].add('518880.SH')
 
 	g.positions[SC_IDX].add('002188.SZ')
 	g.positions[SC_IDX].add('002316.SZ')
@@ -849,6 +848,11 @@ def select_etf():
 	print(f"  短期动量选出: {get_stock_name(etf1)}({etf1})")
 	print(f"  长期动量选出: {get_stock_name(etf2)}({etf2})")
 
+	print("-----------")
+	print("  只买短期")
+	print("-----------")
+	return [etf1]
+
 	if etf1 != etf2:
 		print(f"  两者不同 → 各配50%")
 		return [etf1, etf2]
@@ -859,17 +863,7 @@ def mom_rebalance():
 	if not is_trading_day():
 		return
 
-	weekdays = [1, 3, 5]
-	is_week_day_job = False
-	for day in weekdays:
-		if is_weekday_job(day):
-			is_week_day_job = True;
-			break
-
-	if not is_week_day_job:
-		return
-
-	print(f'\n{green_c}✅========== [动量策略] 周{day}调仓 {datetime.now().strftime("%Y-%m-%d")} ==========\033[0m')
+	print(f'\n{green_c}✅========== [动量策略] 每日调仓 {datetime.now().strftime("%Y-%m-%d")} ==========\033[0m')
 
 	# 选股
 	targets = select_etf()
@@ -894,6 +888,8 @@ def mom_rebalance():
 			sell_target_value(stock, 0, MOM_IDX)
 			print("sleep 30s")
 			sleep_sec(30)
+			strategy_budget = get_strategy_total(MOM_IDX)
+			print(f"  动量总资产更新: {strategy_budget:,.2f}")
 
 	# 卖出超配
 	for stock, weight in weights.items():
@@ -911,6 +907,8 @@ def mom_rebalance():
 			sell_target_value(stock, target, MOM_IDX)
 			print("sleep 30s")
 			sleep_sec(30)
+			strategy_budget = get_strategy_total(MOM_IDX)
+			print(f"  动量总资产更新: {strategy_budget:,.2f}")
 		else:
 			print(f"  [与目标差异太小，不减仓] {get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f}")
 
