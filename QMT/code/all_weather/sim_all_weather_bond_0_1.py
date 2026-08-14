@@ -18,14 +18,14 @@ from datetime import datetime, timedelta
 ACTUAL_POSITIONS = {
     "511270.SH": 500,       # 十年地方债
     "600900.SH": 1300,      # 长江电力
-    "513100.SH": 16900,     # 纳指ETF
-    "518880.SH": 3000,      # 黄金ETF
-    "601288.SH": 3100,      # 农业银行
-    "159985.SZ": 9000,      # 豆粕ETF
     "511220.SH": 1800,      # 城投债ETF（由 buy_bond/sell_bond 管理，不参与权重计算）
+    "518880.SH": 3300,      # 黄金ETF
+    "601288.SH": 3600,      # 农业银行
+    "513100.SH": 16900,     # 纳指ETF
+    "159985.SZ": 10900,      # 豆粕ETF
 }
 
-AVAILABLE_CASH = 111        # 账户可用资金（元）
+AVAILABLE_CASH = 1.7        # 账户可用资金（元）
 
 # ======================== 策略参数 ========================
 
@@ -126,17 +126,19 @@ def calc_ES_weights():
     print(f"目标权重 vs 当前权重")
     print(f"{'='*60}")
     print(f" 总资产 {total_asset:.1f}")
-    print(f"  {'代码':<14s} {'名称':<15s} {'市值':<10s}   {'目标权重':<12s} {'当前权重':<12s}")
-    print(f"  {'-'*80}")
-    for code in stocks:
+    print(f"  {'代码':<14s} {'名称':<15s} {'持仓':<10s} {'市值':<10s}   {'目标权重':<12s} {'当前权重':<12s}")
+    print(f"  {'-'*100}")
+    actual_stocks = stocks.copy()
+    actual_stocks.append("511220.SH")
+    for code in actual_stocks:
         name = get_stock_name(code)
-        target_wt = weights[code] * 100
+        target_wt = weights.get(code,0) * 100
         cur_shares = ACTUAL_POSITIONS.get(code, 0)
         cur_price = current_prices.get(code)
         cur_value = cur_shares * cur_price if cur_price else 0
         cur_wt = cur_value / total_asset * 100 if total_asset > 0 else 0
-        print(f"  {code:<14s} {name:<15s} {cur_value:<10.1f} {target_wt:>12.2f}% {cur_wt:>12.2f}%")
-    print(f"{'现金':>60s}    {AVAILABLE_CASH/total_asset*100:7.2f}%")
+        print(f"  {code:<14s} {name:<15s} {cur_shares:<10.0f} {cur_value:<10.1f} {target_wt:>12.2f}% {cur_wt:>12.2f}%")
+    print(f"{'现金':>70s}    {AVAILABLE_CASH/total_asset*100:7.2f}%")
     print()
 
 
