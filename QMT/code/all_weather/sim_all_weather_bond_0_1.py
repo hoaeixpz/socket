@@ -126,17 +126,19 @@ def calc_ES_weights():
     print(f"目标权重 vs 当前权重")
     print(f"{'='*60}")
     print(f" 总资产 {total_asset:.1f}")
-    print(f"  {'代码':<14s} {'名称':<15s} {'市值':<10s}   {'目标权重':<12s} {'当前权重':<12s}")
-    print(f"  {'-'*80}")
-    for code in stocks:
+    print(f"  {'代码':<14s} {'名称':<15s} {'持仓':<10s} {'市值':<10s}   {'目标权重':<12s} {'当前权重':<12s}")
+    print(f"  {'-'*100}")
+    actual_stocks = stocks.copy()
+    actual_stocks.append("511220.SH")
+    for code in actual_stocks:
         name = get_stock_name(code)
-        target_wt = weights[code] * 100
+        target_wt = weights.get(code,0) * 100
         cur_shares = ACTUAL_POSITIONS.get(code, 0)
         cur_price = current_prices.get(code)
         cur_value = cur_shares * cur_price if cur_price else 0
         cur_wt = cur_value / total_asset * 100 if total_asset > 0 else 0
-        print(f"  {code:<14s} {name:<15s} {cur_value:<10.1f} {target_wt:>12.2f}% {cur_wt:>12.2f}%")
-    print(f"{'现金':>60s}    {AVAILABLE_CASH/total_asset*100:7.2f}%")
+        print(f"  {code:<14s} {name:<15s} {cur_shares:<10.0f} {cur_value:<10.1f} {target_wt:>12.2f}% {cur_wt:>12.2f}%")
+    print(f"{'现金':>70s}    {AVAILABLE_CASH/total_asset*100:7.2f}%")
     print()
 
 
