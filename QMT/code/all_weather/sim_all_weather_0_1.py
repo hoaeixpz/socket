@@ -171,7 +171,7 @@ def diff_weight():
     print(f"  {'代码':<14s} {'名称':<12s} {'目标权重':>8s} {'当前权重':>8s}")
     print(f"  {'-'*14} {'-'*12}         {'-'*8}     {'-'*8}")
     for code in stocks:
-        if code == "518880.SH":
+        if code == "518880.SH" or code == "600900.SH":
             continue
         name = get_stock_name(code)
         target_wt = weights[code] * 100
@@ -196,7 +196,7 @@ def calc_R2_weights():
                                            dividend_type='front')
 
     for code in stocks:
-        if code == "518880.SH":
+        if code == "518880.SH" or code == "600900.SH":
             continue
         df = price_data.get(code)
         if df is None or len(df) < base_days:
@@ -249,7 +249,7 @@ def calc_R2_weights():
     total = sum(weights.values())
     if total > 0:
         for code in stocks:
-            if code == "518880.SH":
+            if code == "518880.SH" or code == "600900.SH":
                 continue
             weights[code] /= total
 

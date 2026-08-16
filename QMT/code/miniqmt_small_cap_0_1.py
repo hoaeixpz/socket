@@ -14,7 +14,7 @@ import re
 import os
 
 DEBUG_DAILY_MODE = False
-#DEBUG_DAILY_MODE = True
+DEBUG_DAILY_MODE = True
 
 ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
@@ -1085,23 +1085,20 @@ def get_last_price(stock):
 	return None
 
 def get_market(stock_list):
-	guben = {}
+	market = {}
+	query_date = datetime.now()
+	yesterday = query_date - timedelta(days=1)
+	query_date = yesterday.replace(hour=15, minute=0, second=0, microsecond=0)
+	#price_data = xtdata.get_full_tick(stock_list)
 	for stock in stock_list:
 		#xtdata.download_history_data(stock,period='1d',incrementally=True)
 		TotalVolume = xtdata.get_instrument_detail(stock)['TotalVolume'] # 总股本
 		#print(stock, " 市值 ", TotalVolume)
-		guben[stock] = TotalVolume
-
-	price_data = xtdata.get_full_tick(stock_list)
-	#print(price_data)
-	market = {}
-	for key, price in price_data.items():
-		gb = guben[key]
-		value = price['lastPrice']
-		#print(gb, " ", value)
-		if gb is None or math.isnan(gb) or math.isnan(value):
+		#current_price = price_data[stock]['lastPrice']
+		prev_price = get_specified_date_price(stock, query_date, 'front')
+		if math.isnan(TotalVolume) or math.isnan(prev_price):
 			continue
-		market[key] = gb * value
+		market[stock] = TotalVolume * prev_price
 
 	return market
 
@@ -1533,8 +1530,8 @@ if __name__ == "__main__":
 	#=============================
 	#DEBUG_DAILY_MODE == False
 	#=============================
-	init()
-	run_strategy()
+	#init()
+	#run_strategy()
 
 	#=============================
 	#DEBUG_DAILY_MODE == True
@@ -1544,7 +1541,7 @@ if __name__ == "__main__":
 	#exec_all_weather()
 	#info_position()
 
-	'''
+	#'''
 	init()
 	judge_date()
 	prepare_stock_list()
@@ -1555,5 +1552,5 @@ if __name__ == "__main__":
 	check_limit_up()
 	check_remain_amount()
 	info_position()
-	'''
+	#'''
 	#debug()
