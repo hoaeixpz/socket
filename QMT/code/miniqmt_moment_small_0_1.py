@@ -800,7 +800,7 @@ def calc_momentum_score(etf, days):
 	r2 = 1 - ss_res / ss_tot if ss_tot else 0
 
 	# 得分
-	score = annualized_return * r2
+	score = annualized_return * abs(r2)
 
 	# 近3日急跌
 	if len(prices) >= 4:
@@ -1068,6 +1068,7 @@ def sc_prepare_stock_list():
 	current_date = datetime.now()
 	yesterday = current_date - timedelta(days=1)
 	g.yesterday_HL_list = []
+	g.today_HL_list = []
 
 	for stock in g.hold_list:
 		dt_str = yesterday.strftime('%Y%m%d')
@@ -1096,12 +1097,12 @@ def collect_sell_buy_stocks():
 	g.stocks_to_buy = []
 	current_holdings = get_current_holding_stocks()
 	for stock in current_holdings:
-		if (stock not in g.selected_stocks) and (stock not in g.yesterday_HL_list):
-			if not is_limit_up(stock):
+		if not is_limit_up(stock):
+			if (stock not in g.selected_stocks) and (stock not in g.yesterday_HL_list):
 				g.stocks_to_sell.append(stock)
-			else:
-				print(f"{red_c}⭕\033[0m {stock} {get_stock_name(stock)} 转为涨停股，今日不卖出。")
-				g.today_HL_list.append(stock)
+		else:
+			print(f"{red_c}⭕\033[0m {stock} {get_stock_name(stock)} 转为涨停股，今日不卖出。")
+			g.today_HL_list.append(stock)
 			
 	for stock in g.selected_stocks:
 		if (stock not in current_holdings) and (stock not in g.yesterday_HL_list):
@@ -1277,7 +1278,7 @@ def sc_calc_position():
 	holding_num = len(current_holdings) + len(g.stocks_to_buy)
 
 	if  holding_num != len(g.selected_stocks):
-		print(f'{red_c}❌❌\033[0m 股票数量异常，期望最终持仓{holding_num}只，实际选中{len(g.selected_stocks)}只')
+		print(f'{red_c}❌❌\033[0m 股票数量异常，可能最终持仓{holding_num}只，实际选中{len(g.selected_stocks)}只')
 		
 	positions = get_positions()
 	fail_pos = 0
