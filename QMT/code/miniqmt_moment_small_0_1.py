@@ -593,7 +593,9 @@ def sell_target_value(stock, target_value, strat_idx=None):
 					print(f"现有持仓 {pos.market_value:.2f}元，相差 {volume:.2f}元，需要卖出股数 {volume / current_price:.2f}不足100股，放弃交易")
 				else:
 					tick_size = get_tick_size(stock)
-					sell_price = current_price - tick_size * 10
+					detail = xtdata.get_instrument_detail(stock)
+					limit_down_price = detail['DownStopPrice']
+					sell_price = max(current_price - tick_size * 10, limit_down_price)
 					async_seq = g.xt_trader.order_stock_async(g.account, 
 															stock,							#stock_code
 															xtconstant.STOCK_SELL,			#order_type
@@ -610,7 +612,7 @@ def sell_target_value(stock, target_value, strat_idx=None):
 	if async_seq == -1 or async_seq is None:
 		print(f"sell_target_value failed {stock} {get_stock_name(stock)}")
 
-	if async_seq != -1 and async_seq is not None and strat_idx is not None:
+	if async_seq != -1 and async_seq is not None and strat_idx is not None and not is_limit_down(stock):
 		# 卖出成功，现金回血
 		commission = calc_commission(pos.market_value - target_value)
 		tax = calc_sell_tax(pos.market_value - target_value, stock)
