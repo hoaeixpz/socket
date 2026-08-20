@@ -17,23 +17,22 @@ from datetime import datetime, timedelta
 # ======================== 手动输入你的实际持仓 ========================
 
 ACTUAL_POSITIONS = {
-    "518880.SH": 3000,      # 黄金ETF — 填你的实际持仓股数
+    "601088.SH": 300,       # 中国神华 — 填你的实际持仓股数
+    "601899.SH": 700,       # 紫金矿业 
+    "000429.SZ": 1600,      # 粤高速A
+    "601288.SH": 2000,      # 农业银行
     "513100.SH": 9700,      # 纳指ETF
-    "601288.SH": 2700,      # 农业银行
-    "159985.SZ": 8700,      # 豆粕ETF
-    "600900.SH": 400,      # 长江电力
+    "159985.SZ": 6200,      # 豆粕ETF
 }
 
-AVAILABLE_CASH = 11473    # 账户可用资金（元）
+AVAILABLE_CASH = 1341      # 账户可用资金（元）
 
 # ======================== 策略参数（与母版一致） ========================
 
 stocks = [
-    "518880.SH",  # 黄金ETF
     "159985.SZ",  # 豆粕ETF
     "513100.SH",  # 纳指ETF
     "601288.SH",  # 农业银行
-    "600900.SH",  # 长江电力
     "601088.SH",  # 中国神华
     '000429.SZ',  # 粤高速A
     '601899.SH'   # 紫金矿业
@@ -171,8 +170,6 @@ def diff_weight():
     print(f"  {'代码':<14s} {'名称':<12s} {'目标权重':>8s} {'当前权重':>8s}")
     print(f"  {'-'*14} {'-'*12}         {'-'*8}     {'-'*8}")
     for code in stocks:
-        if code == "518880.SH" or code == "600900.SH":
-            continue
         name = get_stock_name(code)
         target_wt = weights[code] * 100
         cur_shares = ACTUAL_POSITIONS.get(code, 0)
@@ -196,8 +193,6 @@ def calc_R2_weights():
                                            dividend_type='front')
 
     for code in stocks:
-        if code == "518880.SH" or code == "600900.SH":
-            continue
         df = price_data.get(code)
         if df is None or len(df) < base_days:
             weights[code] = 0
@@ -249,8 +244,6 @@ def calc_R2_weights():
     total = sum(weights.values())
     if total > 0:
         for code in stocks:
-            if code == "518880.SH" or code == "600900.SH":
-                continue
             weights[code] /= total
 
 # ======================== 调仓计算 ========================
