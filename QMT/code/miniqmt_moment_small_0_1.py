@@ -18,6 +18,15 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import os
 import signal
 
+ETF_POOL = [
+	"513100.SH", "513520.SH", "513030.SH",  # 境外: 纳指, 日经, 德国
+	"518880.SH", "159980.SZ", "159985.SZ",  # 商品: 黄金, 有色, 豆粕
+	"501018.SH", "511090.SH", "513130.SH",  # 原油, 30年国债, 恒生科技
+	"515980.SH"                             # 人工智能
+]
+SAFE_ETF = '511220.SH'  # 城投债
+
+
 DEBUG_DAILY_MODE = False
 #DEBUG_DAILY_MODE = True
 
@@ -366,17 +375,12 @@ def init():
 	g.cash_record = g.cash_reserved.copy()
 	# 各策略持仓股票集合，初始化时扫描已有持仓归入对应策略
 	g.positions = {MOM_IDX: set(), SC_IDX: set()}
-	g.positions[MOM_IDX].add('518880.SH')
-
-	g.positions[SC_IDX].add('002188.SZ')
-	g.positions[SC_IDX].add('002316.SZ')
-	g.positions[SC_IDX].add('002494.SZ')
-	g.positions[SC_IDX].add('002529.SZ')
-	g.positions[SC_IDX].add('002591.SZ')
-	g.positions[SC_IDX].add('002743.SZ')
-	g.positions[SC_IDX].add('002820.SZ')
-	g.positions[SC_IDX].add('002910.SZ')
-	g.positions[SC_IDX].add('002760.SZ')
+	positions = g.xt_trader.query_stock_positions(g.account)
+	for pos in positions:
+		if pos.stock_code in ETF_POOL:
+			g.positions[MOM_IDX].add(pos.stock_code)
+		else:
+			g.positions[SC_IDX].add(pos.stock_code)
 
 	# ===== 小市值全局变量 =====
 	g.stock_pool = []
@@ -702,14 +706,6 @@ def buy_target_shares(stock, amount, strat_idx=None):
 # ================================================================
 # 动量策略
 # ================================================================
-
-ETF_POOL = [
-	"513100.SH", "513520.SH", "513030.SH",  # 境外: 纳指, 日经, 德国
-	"518880.SH", "159980.SZ", "159985.SZ",  # 商品: 黄金, 有色, 豆粕
-	"501018.SH", "511090.SH", "513130.SH",  # 原油, 30年国债, 恒生科技
-	"515980.SH"                             # 人工智能
-]
-SAFE_ETF = '511220.SH'  # 城投债
 
 # 每只ETF的得分上限（基于2020-2026历史数据的P97分位，避免动量过热）
 ETF_SHORT_MAX = {  # 短期(25天)上限
@@ -1512,10 +1508,10 @@ def sc_check_remain_amount():
 			for stock_code in g.limitup_stocks:
 				stock_name = get_stock_name(stock_code)
 				print(f'  {stock_name} {stock_code}')
+				
 			# 计算需要买入的股票数量
 			prev_date = datetime.now() - timedelta(days=1)
-			query_date = prev_date
-			g.selected_stocks = get_small_cap_stocks(g.stock_pool, query_date, g.stock_num)
+			g.selected_stocks = get_small_cap_stocks(g.stock_pool, prev_date, g.stock_num)
 			for stock in g.limitup_stocks:
 				if stock in g.selected_stocks:
 					g.selected_stocks.remove(stock)
@@ -1535,7 +1531,8 @@ def sc_check_remain_amount():
 				for stock in g.stocks_to_buy:
 					print("待买入 ", get_stock_name(stock))
 
-			print('有余额可用'+str(round((available_cash),2))+'元。买入'+ str(g.stocks_to_buy))
+			avi_cash = get_strategy_available_cash(SC_IDX)
+			print('有余额可用'+str(round((avi_cash),2))+'元。买入'+ str(g.stocks_to_buy))
 			sc_info_position()
 			sc_calc_position()
 			buy_stocks()
@@ -1833,6 +1830,7 @@ if __name__ == '__main__':
 	if g.portfolio_value_proportion[SC_IDX] > 0:
 		sc_judge_date()
 		sc_prepare_stock_list()
+		g.yesterday_HL_list = ['002743.SZ']
 		#sc_trade_etf()
 		sc_rebalance_sell()
 		sc_stop_loss()
