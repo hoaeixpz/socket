@@ -1499,7 +1499,7 @@ def sc_check_remain_amount():
 	#判断提前售出原因，如果是涨停售出则次日再次交易，如果是止损售出则不交易
 	if g.reason_to_sell == 'limitup':
 		g.hold_list = get_current_holding_stocks()
-		if len(g.hold_list) < g.stock_num:
+		if True:
 			print(f'现有持仓:')
 			for stock_code in g.hold_list:
 				stock_name = get_stock_name(stock_code)
@@ -1519,7 +1519,7 @@ def sc_check_remain_amount():
 			for stock in list(g.stoploss_map.keys()):
 				if stock in g.selected_stocks:
 					g.selected_stocks.remove(stock)
-					print(f"{stock} {get_stock_name(stock)} 前{3 - g.stoploss_map[stock_code]}日止损卖出，3日内不再买入")
+					print(f"{stock} {get_stock_name(stock)} 前{3 - g.stoploss_map[stock]}日止损卖出，3日内不再买入")
 			current_holdings = get_current_holding_stocks()
 			if len(current_holdings) > 3:
 				print("已有持仓数量大于3，不再买入其他较小市值股票。")
@@ -1541,6 +1541,7 @@ def sc_check_remain_amount():
 	elif g.reason_to_sell in ('stoploss', 'takeprofit'):
 		avi_cash = get_strategy_available_cash(SC_IDX)
 		print(f'止盈止损后余额{avi_cash:.2f}元，买入{g.etf}')
+		g.stocks_to_buy = [g.etf]
 		buy_stocks()
 		g.reason_to_sell = ''
 		g.refresh_hold = True

@@ -226,9 +226,7 @@ def reconnect():
 		return
 	print("reconnect")
 	# path为mini qmt客户端安装目录下userdata_mini路径
-	#path = 'C:\\QMT\\国金证券QMT交易端\\userdata_mini'
-	#path = 'D:\\国金证券QMT交易端\\userdata_mini'
-	path = 'C:\\QMT\\userdata_mini'
+	path = get_userdata_mini_path()
 	session_id = int(time.time())
 	g.xt_trader = XtQuantTrader(path, session_id)
 	print("new g.xt_trader")
@@ -925,9 +923,13 @@ def stop_loss():
 			for stock in current_positions.keys():
 				if current_positions[stock].volume == 0:
 					continue
+				if stock in g.all_weather_list or stock == g.etf:
+					continue
 
 				price = get_last_price(stock)
 				avg_cost = current_positions[stock].avg_price
+				if avg_cost <= 0:
+					continue
 				# 个股盈利止盈
 				if price >= avg_cost * 2:
 					#order_target_value(stock, 0, 'BUY1', ContextInfo, ContextInfo.account)
