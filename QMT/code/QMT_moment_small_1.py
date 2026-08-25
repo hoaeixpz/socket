@@ -7,6 +7,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict
 import math
+import numpy as np
 
 ORDER_TYPE_MAP: Dict[int, str] = {
 	0: "常规", # OTP_ORDINARY
@@ -307,6 +308,59 @@ class G():
 	pass
 g = G() #创建空的类的实例 用来保存委托状态
 
+# 动量策略索引 / 小市值策略索引
+MOM_IDX = 0
+SC_IDX = 1
+
+# ================================================================
+# 动量策略常量
+# ================================================================
+ETF_POOL = [
+	"513100.SH", "513520.SH", "513030.SH",  # 境外: 纳指, 日经, 德国
+	"518880.SH", "159980.SZ", "159985.SZ",  # 商品: 黄金, 有色, 豆粕
+	"501018.SH", "511090.SH", "513130.SH",  # 原油, 30年国债, 恒生科技
+	"515980.SH"                             # 人工智能
+]
+SAFE_ETF = '511220.SH'  # 城投债
+
+# 每只ETF的得分上限（基于2020-2026历史数据的P97分位，避免动量过热）
+ETF_SHORT_MAX = {  # 短期(25天)上限
+	"513100.SH": 3,  # 纳指ETF
+	"513520.SH": 3,  # 日经ETF
+	"513030.SH": 2,  # 德国ETF
+	"518880.SH": 2,  # 黄金ETF
+	"159980.SZ": 2,  # 有色ETF
+	"159985.SZ": 3,  # 豆粕ETF
+	"501018.SH": 9,  # 南方原油
+	"511090.SH": 1,  # 30年国债ETF
+	"513130.SH": 8,  # 恒生科技
+	"515980.SH": 10,  # 人工智能
+}
+ETF_LONG_MAX = {  # 长期(250天)上限
+	"513100.SH": 0.45,  # 纳指ETF
+	"513520.SH": 0.45,  # 日经ETF
+	"513030.SH": 0.45,  # 德国ETF
+	"518880.SH": 0.5,  # 黄金ETF
+	"159980.SZ": 0.45,  # 有色ETF
+	"159985.SZ": 0.4,  # 豆粕ETF
+	"501018.SH": 0.6,  # 南方原油
+	"511090.SH": 0.2,  # 30年国债ETF
+	"513130.SH": 0.5,  # 恒生科技
+	"515980.SH": 0.8,  # 人工智能
+}
+ETF_DIP_MIN = {  # 近3日单日急跌过滤阈值（ratio = 1 - 跌幅%）
+	"513100.SH": 0.95,  # 纳指ETF — 5%
+	"513520.SH": 0.95,  # 日经ETF — 5%
+	"513030.SH": 0.95,  # 德国ETF — 5%
+	"518880.SH": 0.96,  # 黄金ETF — 4%
+	"159980.SZ": 0.95,  # 有色ETF — 5%
+	"159985.SZ": 0.97,  # 豆粕ETF — 3%
+	"511090.SH": 0.98,  # 30年国债 — 2%
+	"501018.SH": 0.94,  # 南方原油 — 6%
+	"513130.SH": 0.94,  # 恒生科技 — 6%
+	"515980.SH": 0.94,  # 人工智能 — 6%
+}
+
 def init(ContextInfo):
 	print("策略启动")
 	period = ContextInfo.period
@@ -315,6 +369,22 @@ def init(ContextInfo):
 	ContextInfo.set_account(ContextInfo.account)
 	account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
 	available_cash = account_info[0].m_dAvailable
+
+	# ===== 多策略配置 =====
+	g.portfolio_value_proportion = [0.001, 0.999]
+	# 每个策略的预留现金（买卖驱动），互相隔离
+	g.cash_reserved = {MOM_IDX: g.portfolio_value_proportion[MOM_IDX] * available_cash,
+					   SC_IDX: g.portfolio_value_proportion[SC_IDX] * available_cash}
+	g.cash_record = g.cash_reserved.copy()
+	# 各策略持仓股票集合，初始化时扫描已有持仓归入对应策略
+	g.positions = {MOM_IDX: set(), SC_IDX: set()}
+	objlist = get_trade_detail_data(ContextInfo.account, 'STOCK', 'POSITION')
+	for obj in objlist:
+		stock = obj.m_strInstrumentID + '.' + obj.m_strExchangeID
+		if stock in ETF_POOL:
+			g.positions[MOM_IDX].add(stock)
+		else:
+			g.positions[SC_IDX].add(stock)
 
 	# 设置全局变量
 	g.stock_pool = []
@@ -339,6 +409,7 @@ def init(ContextInfo):
 	g.each_cash = available_cash / g.stock_num
 	g.sell_done = False
 	g.last_month = None
+	g.last_pos_value = account_info[0].m_dBalance
 	g.run_stoploss = True
 	g.stoploss_strategy = 3  # 1为止损线止损，2为市场趋势止损, 3为联合1、2策略
 	g.stoploss_limit = 0.1  # 止损线
@@ -410,6 +481,9 @@ def handlebar(ContextInfo):
 			rebalance_buy(ContextInfo)
 		else:
 			print(f"今日({dt})非调仓日，不执行操作")
+
+	if dt.hour == 11 and dt.minute == 0:
+		mom_rebalance(ContextInfo)
 
 
 	if dt.hour == 14 and dt.minute == 0:
@@ -547,9 +621,7 @@ def exec_all_weather(ContextInfo):
 	for stock, w in fin_weights.items():
 		print(f'{stock} {ContextInfo.get_stock_name(stock)} 权重{100*w:.2f}%')
 
-	account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
-	info = account_info[0]
-	available_cash = info.m_dAvailable
+	available_cash = get_strategy_available_cash(SC_IDX)
 	print('available_cash: ', available_cash)
 	for stock in g.all_weather_list:
 		current_price = get_last_price(ContextInfo, stock)
@@ -561,7 +633,7 @@ def exec_all_weather(ContextInfo):
 		if amount > 0:
 			print('<<<<<<<<<<<<<<<<<买入<<<<<<<<<<<<<<<<<')
 			print(f'{stock} {ContextInfo.get_stock_name(stock)} 目标市值{target_value:.2f}, 买入{amount}股 * {current_price}元')
-			buy_target_shares(ContextInfo, stock, amount)
+			buy_target_shares(ContextInfo, stock, amount, SC_IDX)
 			g.refresh_hold = True
 
 def rebalance_sell(ContextInfo):
@@ -644,8 +716,7 @@ def rebalance_buy(ContextInfo):
 	print('rebalance_buy count ',g.count)
 
 def calc_position(ContextInfo):
-	account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
-	total_value = account_info[0].m_dBalance
+	total_value = get_strategy_total(ContextInfo, SC_IDX)
 	current_holdings = get_current_holding_stocks(ContextInfo)
 	holding_num = len(current_holdings) + len(g.stocks_to_buy)
 	'''
@@ -701,6 +772,8 @@ def calc_position(ContextInfo):
 	position_sum = 0
 	#计算已有持仓的股票占比
 	for stock, pos in positions.items():
+		if stock in g.positions[MOM_IDX]:
+			continue  # 跳过动量策略的ETF持仓
 		current_price = get_last_price(ContextInfo, stock)
 		if current_price is None or current_price == 0:
 			continue
@@ -752,7 +825,7 @@ def calc_position(ContextInfo):
 					if positions[stock]['canuse_amount'] < 100:
 						continue
 
-					sell_target_value(ContextInfo, stock, exce_pos*total_value)
+					sell_target_value(ContextInfo, stock, exce_pos*total_value, SC_IDX)
 					cash -= diff_pos*total_value
 					print(f'调整{stock_name}市值，卖出{abs(diff_pos) * total_value:.2f}元')
 					#update_stock_price(stock, order_info.m_dPrice, -order_info.m_nVolume)
@@ -801,8 +874,7 @@ def calc_position(ContextInfo):
 			'''
 		elif avai_cash < 0 and cash == 0 and len(g.stocks_to_buy) > 0:
 			print(f'未重新分配资金，调整买入仓位比重')
-			account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
-			available_cash = account_info[0].m_dAvailable
+			available_cash = get_strategy_available_cash(SC_IDX)
 			for stock in g.stocks_to_buy:
 				g.excepted_position[stock] = available_cash / len(g.stocks_to_buy) / total_value
 				print(f'期望持仓: {ContextInfo.get_stock_name(stock)}({stock})，占比{g.excepted_position[stock] * 100:.2f}%')
@@ -879,7 +951,7 @@ def check_limit_up(ContextInfo):
 			limit_up_price = info['UpStopPrice']
 			if current_price < limit_up_price:
 				print(f"{stock} {ContextInfo.get_stock_name(stock)}涨停打开，卖出")
-				sell_target_value(ContextInfo, stock, 0)
+				sell_target_value(ContextInfo, stock, 0, SC_IDX)
 				#order_target_value(stock, 0, 'BUY1', ContextInfo, ContextInfo.account)
 				g.reason_to_sell = 'limitup'
 				g.limitup_stocks.append(stock)
@@ -957,6 +1029,8 @@ def stop_loss(ContextInfo):
 	show_info = False
 	if g.run_stoploss:
 		current_positions = get_positions(ContextInfo)
+		# 过滤掉动量策略的持仓，只保留小市值策略的股票
+		current_positions = {k: v for k, v in current_positions.items() if k not in g.positions[MOM_IDX]}
 
 		if g.stoploss_strategy == 1 or g.stoploss_strategy == 3:
 			for stock in current_positions.keys():
@@ -976,7 +1050,7 @@ def stop_loss(ContextInfo):
 					print("⭕ 收益100%止盈,卖出{}".format(stock))
 				# 个股止损
 				elif price < avg_cost * (1 - g.stoploss_limit):
-					sell_target_value(ContextInfo, stock, 0)
+					sell_target_value(ContextInfo, stock, 0, SC_IDX)
 					g.stoploss_map[stock] = g.stoploss_map.setdefault(stock, 3)
 					print(f"⭕ 收益止损,卖出{stock},跌幅 { (1 - price / avg_cost) * 100:.2f}%")
 					#if order_info != None:
@@ -1012,7 +1086,7 @@ def stop_loss(ContextInfo):
 					if stock in g.yesterday_HL_list or is_limit_up(ContextInfo, stock):
 						continue
 					print(f'⭕ 清仓{stock} {ContextInfo.get_stock_name(stock)}')
-					sell_target_value(ContextInfo, stock, 0)
+					sell_target_value(ContextInfo, stock, 0, SC_IDX)
 					#if order_info != None:
 					#	print(f'卖出 {order_info.m_nVolume}股 * {order_info.m_dPrice:.2f}元')
 					show_info = True
@@ -1227,6 +1301,8 @@ def get_current_holding_stocks(ContextInfo):
 			continue
 
 		stock = obj.m_strInstrumentID + '.' + obj.m_strExchangeID
+		if stock in g.positions[MOM_IDX]:
+			continue
 		current_holdings.append(stock)
 
 	return current_holdings
@@ -1237,7 +1313,7 @@ def sell_stocks(ContextInfo):
 	for stock in g.stocks_to_sell:
 		print('GGG>>>>>>>>>>>>')
 		print('GGG卖出: ',ContextInfo.get_stock_name(stock))
-		sell_target_value(ContextInfo, stock, 0)
+		sell_target_value(ContextInfo, stock, 0, SC_IDX)
 		is_paused = ContextInfo.is_suspended_stock(stock)
 		is_dieting = is_limit_down(ContextInfo, stock)
 		if is_paused or is_dieting:
@@ -1249,12 +1325,13 @@ def sell_stocks(ContextInfo):
 def buy_stocks(ContextInfo):
 	if len(g.stocks_to_buy) > 0:
 		dt = get_current_date(ContextInfo)
-		account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
-		info = account_info[0]
-		available_cash = info.m_dAvailable
-		position_value = info.m_dInstrumentValue
-		#total_cash = context.portfolio.cash
-		total_value = info.m_dBalance
+		available_cash = get_strategy_available_cash(SC_IDX)
+		positions = get_positions(ContextInfo)
+		position_value = 0
+		for stock, pos in positions.items():
+			if stock not in g.positions[MOM_IDX]:
+				position_value += pos['value']
+		total_value = get_strategy_total(ContextInfo, SC_IDX)
 		g.each_cash = available_cash / len(g.stocks_to_buy)
 		#if g.stocks_to_buy != [g.etf]:
 		#    g.each_cash = min(g.each_cash, total_value * 1.5 / g.stock_num)
@@ -1270,14 +1347,14 @@ def buy_stocks(ContextInfo):
 			if current_price is None or current_price == 0:
 				continue
 
-			account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
-			print(f'===可用资金 {account_info[0].m_dAvailable}===')
+			available_cash = get_strategy_available_cash(SC_IDX)
+			print(f'===可用资金 {available_cash}===')
 
 			if stock == g.etf:
 				raw_amount = target_value_per_stock / current_price
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
 				#order_shares(stock, amount, ContextInfo, ContextInfo.account)
-				buy_target_shares(ContextInfo, stock, amount)
+				buy_target_shares(ContextInfo, stock, amount, SC_IDX)
 			else:
 				if g.excepted_position.get(stock) is not None:
 					target_value_per_stock = g.excepted_position[stock] * total_value
@@ -1290,9 +1367,41 @@ def buy_stocks(ContextInfo):
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
 				print(f'委托买入: {ContextInfo.get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'
 					f'\n预计买入{amount}股，每股{current_price:.2f}元，合计:{amount * current_price:.2f}')
-				buy_target_value(ContextInfo, stock, target_value_per_stock, current_price)
+				buy_target_value(ContextInfo, stock, target_value_per_stock, current_price, SC_IDX)
 
-def sell_target_value(ContextInfo, stock, target_value):
+# ================================================================
+# 资金隔离（双策略）
+# ================================================================
+
+def calc_commission(value):
+	"""手续费，按万二算，不满5元按5元算"""
+	commission = value * 2 / 10000
+	if commission < 5:
+		return 5
+	return commission
+
+def calc_sell_tax(value, stock):
+	"""卖出印花税，按万五算"""
+	if stock in ETF_POOL:
+		#ETF 卖出不收印花税
+		return 0
+	tax = value * 5 / 10000
+	return tax
+
+def get_strategy_available_cash(strat_idx):
+	"""策略剩余可用现金（直接返回预留现金）"""
+	return max(0, g.cash_reserved[strat_idx])
+
+def get_strategy_total(ContextInfo, strat_idx):
+	"""策略当前实际总资产 = 预留现金 + 持仓市值（随市价波动）"""
+	positions = get_positions(ContextInfo)
+	holdings_value = 0
+	for stock in g.positions[strat_idx]:
+		if stock in positions:
+			holdings_value += positions[stock]['value']
+	return g.cash_reserved[strat_idx] + holdings_value
+
+def sell_target_value(ContextInfo, stock, target_value, strat_idx=None):
 	# passorder(opType, orderType, accountid, orderCode, prType, modelprice, volume
 	# opType    : 23 买入 ，24 卖出
 	# orderType : 1102 按价格买卖
@@ -1314,10 +1423,21 @@ def sell_target_value(ContextInfo, stock, target_value):
 			volume = pos['value'] - target_value
 			passorder(24, 1102, ContextInfo.account, stock, 6, -1, volume, 2, ContextInfo)
 			print(f"sell passorder target value {target_value:.2f} current {pos['value']:.2f} volume {volume:.2f}")
+		if strat_idx is not None and not is_limit_down(ContextInfo, stock):
+			commission = calc_commission(pos['value'] - target_value)
+			tax = calc_sell_tax(pos['value'] - target_value, stock)
+			cash_incr = pos['value'] - target_value - commission - tax
+			g.cash_reserved[strat_idx] += cash_incr
+			print(f"卖出 {stock} 手续费 {commission:.2f}，印花税 {tax:.2f}")
+			if target_value == 0:
+				g.positions[strat_idx].discard(stock)
+				print(f"成功清仓 {stock}，策略{strat_idx} 现有资金 {g.cash_reserved[strat_idx]:.2f}")
+			else:
+				print(f"成功卖出 {stock}，策略{strat_idx} 现有资金 {g.cash_reserved[strat_idx]:.2f}")
 
 	#order_target_value(stock, target_value, 'BUY1', ContextInfo, ContextInfo.account)
 
-def buy_target_value(ContextInfo, stock, target_value, current_price):
+def buy_target_value(ContextInfo, stock, target_value, current_price, strat_idx=None):
 	# passorder(opType, orderType, accountid, orderCode, prType, modelprice, volume
 	# opType    : 23 买入 ，24 卖出
 	# orderType : 1102 按价格买卖
@@ -1335,11 +1455,19 @@ def buy_target_value(ContextInfo, stock, target_value, current_price):
 		current_value = pos['value']
 
 	volume = target_value - current_value
+	# 策略账面资金限额
+	if strat_idx is not None:
+		volume = min(volume, get_strategy_available_cash(strat_idx))
 	passorder(23, 1102, ContextInfo.account, stock, 4, -1, volume, 2, ContextInfo)
 	print(f"buy passorder target value {target_value:.2f} current {current_value:.2f} volume {volume:.2f}")
+	if strat_idx is not None and volume > 0:
+		commission = calc_commission(volume)
+		g.cash_reserved[strat_idx] -= (volume + commission)
+		g.positions[strat_idx].add(stock)
+		print(f"成功买入 {stock}，策略{strat_idx} 现有资金 {g.cash_reserved[strat_idx]:.2f}")
 	#order_target_value(stock, target_value + current_price * 10, 'SALE1', ContextInfo, ContextInfo.account)
 
-def buy_target_shares(ContextInfo, stock, target_share):
+def buy_target_shares(ContextInfo, stock, target_share, strat_idx=None):
 	# passorder(opType, orderType, accountid, orderCode, prType, modelprice, volume
 	# opType    : 23 买入 ，24 卖出
 	# orderType : 1101 按股数买卖
@@ -1350,6 +1478,14 @@ def buy_target_shares(ContextInfo, stock, target_share):
 	# volume    : 根据orderType最后一位判断 为1，按股数买卖 、 为2，按价值买卖 、 为3，按百分比买卖
 	# quickTrade: 可选项， 为2 表明立刻下单，不用等待bar数据填充完整
 	passorder(23, 1101, ContextInfo.account, stock, 6, -1, target_share, 2, ContextInfo)
+	if strat_idx is not None:
+		current_price = get_last_price(ContextInfo, stock)
+		if current_price:
+			estimate_cash = target_share * current_price
+			commission = calc_commission(estimate_cash)
+			g.cash_reserved[strat_idx] -= (estimate_cash + commission)
+			g.positions[strat_idx].add(stock)
+			print(f"成功买入 {stock}，策略{strat_idx} 现有资金 {g.cash_reserved[strat_idx]:.2f}")
 
 
 def order_callback(ContextInfo, orderInfo):
@@ -1423,23 +1559,235 @@ def info_position(ContextInfo):
 
 		print(f'GGG*******************总资产 {total_value:.2f}  剩余可用金额 {available_cash:.2f}元*******************\n\n')
 
+		# 打印各策略资金隔离状况
+		for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
+			cash = g.cash_reserved[idx]
+			stock_set = g.positions[idx]
+			holdings_val = 0
+			stock_names = []
+			for stock, pos in positions.items():
+				if stock in stock_set:
+					holdings_val += pos['value']
+					stock_names.append(ContextInfo.get_stock_name(stock))
+			total = cash + holdings_val
+			print(f'  [{name}策略] 预留现金: {cash:,.2f} | 持仓市值: {holdings_val:,.2f} | 总资产: {total:,.2f}')
+			if stock_names:
+				print(f'    持仓: {", ".join(stock_names)}')
+			else:
+				print(f'    持仓: (空)')
+		print()
+
+# ================================================================
+# 动量策略
+# ================================================================
+
+def calc_momentum_score(ContextInfo, etf, days):
+	"""计算单只ETF的动量得分。返回 (annualized_return, r2, score, min_recent_ratio)"""
+	dt_str = get_current_date(ContextInfo).strftime('%Y%m%d')
+	price_data = ContextInfo.get_market_data_ex(['close'], [etf], start_time='', end_time=dt_str, period='1d', dividend_type='front', count=days+1)
+	for key, df in price_data.items():
+		if key != etf or df.empty:
+			continue
+		close_prices = df['close'].values
+		prices = close_prices
+
+		y = np.log(prices)
+		x = np.arange(len(y))
+		weights = np.linspace(1, 2, len(y))
+
+		slope, intercept = np.polyfit(x, y, 1, w=weights)
+
+		annualized_return = math.exp(slope * 250) - 1
+
+		weighted_mean_y = np.average(y, weights=weights)
+		ss_res = np.sum(weights * (y - (slope * x + intercept)) ** 2)
+		ss_tot = np.sum(weights * (y - weighted_mean_y) ** 2)
+		r2 = 1 - ss_res / ss_tot if ss_tot else 0
+
+		score = annualized_return * abs(r2)
+
+		recent_ratio = 1.0
+		if len(prices) >= 4:
+			recent_ratio = min(prices[-1] / prices[-2], prices[-2] / prices[-3], prices[-3] / prices[-4])
+
+		return annualized_return, r2, score, recent_ratio
+
+	return 0, 0, 0, 0
+
+def select_etf(ContextInfo):
+	"""双动量选股：短期(25天) + 长期(250天)。返回 ETF 代码列表"""
+	def filter_etf(max_score_map, days, label):
+		print(f"\n========== [{label}] 开始 (窗口={days}天) ==========")
+		results = {}
+		for etf in ETF_POOL:
+			ann_ret, r2, score, recent_ratio = calc_momentum_score(ContextInfo, etf, days)
+			name = ContextInfo.get_stock_name(etf) or etf
+			max_score = max_score_map.get(etf)
+			dip_min = ETF_DIP_MIN.get(etf, 0.95)
+			bad = (score <= 0 or score >= max_score) or recent_ratio < dip_min
+			down_ratio = (1 - recent_ratio) * 100
+			reason = ''
+			if bad:
+				reason += ' -> [淘汰]'
+				if score >= max_score:
+					reason += (f" 分数超出阈值{max_score}")
+				if recent_ratio < dip_min:
+					reason += (f" 跌幅超出阈值 {(1 - dip_min) * 100:.0f}%")
+			print(f"  {name}({etf}): 年化={ann_ret:.4%} R²={r2:.4f} 近3日最大跌幅 {down_ratio:.2f}% 得分={score:.4f}{reason}")
+			if not bad: results[etf] = score
+		if not results:
+			print(f"  无符合条件的ETF → 选用{ContextInfo.get_stock_name(SAFE_ETF)}({SAFE_ETF})")
+			return SAFE_ETF
+		selected = max(results, key=results.get)
+		print(f"  >>> {label}最终选出: {ContextInfo.get_stock_name(selected)}({selected})")
+		return selected
+
+	etf1 = filter_etf(ETF_SHORT_MAX, 25, "短期动量")
+	etf2 = filter_etf(ETF_LONG_MAX, 250, "长期动量")
+
+	print(f"\n========== 选股汇总 ==========")
+	print(f"  短期动量选出: {ContextInfo.get_stock_name(etf1)}({etf1})")
+	print(f"  长期动量选出: {ContextInfo.get_stock_name(etf2)}({etf2})")
+
+	print("-----------")
+	print("  只买短期")
+	print("-----------")
+	return [etf1]
+
+def mom_rebalance(ContextInfo):
+	print(f'\n========== [动量策略] 每日调仓 {get_current_date(ContextInfo)} ==========')
+
+	# 选股
+	targets = select_etf(ContextInfo)
+	weights = {etf: 1.0 / len(targets) for etf in targets}
+
+	# 获取总资产
+	strategy_budget = get_strategy_total(ContextInfo, MOM_IDX)
+	print(f"  动量总资产: {strategy_budget:,.2f}")
+
+	all_positions = get_positions(ContextInfo)
+	# 只清仓策略持仓中不在目标里的ETF
+	for stock in list(g.positions[MOM_IDX]):
+		if stock not in weights:
+			print(f"  [调出] {ContextInfo.get_stock_name(stock)}({stock}) → 清仓")
+			if is_limit_up(ContextInfo, stock):
+				print(f"  {ContextInfo.get_stock_name(stock)}({stock}) 涨停，跳过")
+				continue
+			if is_limit_down(ContextInfo, stock):
+				print(f"  {ContextInfo.get_stock_name(stock)}({stock}) 跌停，跳过")
+				continue
+			sell_target_value(ContextInfo, stock, 0, MOM_IDX)
+			print("sleep 30s")
+			time.sleep(30)
+			strategy_budget = get_strategy_total(ContextInfo, MOM_IDX)
+			print(f"  动量总资产更新: {strategy_budget:,.2f}")
+
+	# 卖出超配
+	for stock, weight in weights.items():
+		target = strategy_budget * weight
+		current_val = all_positions[stock]['value'] if stock in all_positions else 0
+		price = get_last_price(ContextInfo, stock)
+		if current_val - target > max(3000, price * 100 if price else 10000):
+			print(f"  [减仓] {ContextInfo.get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f}")
+			if is_limit_up(ContextInfo, stock):
+				print(f"  {ContextInfo.get_stock_name(stock)}({stock}) 涨停，跳过")
+				continue
+			if is_limit_down(ContextInfo, stock):
+				print(f"  {ContextInfo.get_stock_name(stock)}({stock}) 跌停，跳过")
+				continue
+			sell_target_value(ContextInfo, stock, target, MOM_IDX)
+			print("sleep 30s")
+			time.sleep(30)
+			strategy_budget = get_strategy_total(ContextInfo, MOM_IDX)
+			print(f"  动量总资产更新: {strategy_budget:,.2f}")
+		else:
+			print(f"  [与目标差异太小，不减仓] {ContextInfo.get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f}")
+
+	# 买入低配
+	for stock, weight in weights.items():
+		target = strategy_budget * weight
+		current_val = all_positions[stock]['value'] if stock in all_positions else 0
+		price = get_last_price(ContextInfo, stock)
+		stra_avi_cash = get_strategy_available_cash(MOM_IDX)
+		if min(target - current_val, stra_avi_cash) > max(3000, price * 100 if price else 10000):
+			print(f"  [加仓] {ContextInfo.get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f}")
+			if is_limit_up(ContextInfo, stock):
+				print(f"  {ContextInfo.get_stock_name(stock)}({stock}) 涨停，跳过")
+				continue
+			if is_limit_down(ContextInfo, stock):
+				print(f"  {ContextInfo.get_stock_name(stock)}({stock}) 跌停，跳过")
+				continue
+			buy_target_value(ContextInfo, stock, target, price, MOM_IDX)
+		else:
+			print(f"  [与目标差异太小，不加仓] {ContextInfo.get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f} 策略资金{stra_avi_cash:,.2f}")
+
+	print(f'========== [动量策略] 调仓结束 ==========\n')
+
+
 # 可选：每日盘后记录函数（非必需）
 def after_trading_end(ContextInfo):
 	current_date = get_current_date(ContextInfo)
+	positions = get_positions(ContextInfo)
+
+	# 收盘后资金对账（每日执行，校正 cash_reserved 漂移）
+	account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
+	info = account_info[0]
+	available_cash = info.m_dAvailable
+	position_value = info.m_dInstrumentValue
+	total_value = info.m_dBalance
+
+	cash = 0
+	for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
+		cash += g.cash_reserved[idx]
+
+	if abs(available_cash - cash) < 0.001:
+		print("  各策略的资金总和与账面资金吻合\n")
+		g.cash_record[SC_IDX] = g.cash_reserved[SC_IDX]
+		g.cash_record[MOM_IDX] = g.cash_reserved[MOM_IDX]
+	else:
+		print(f"  策略资金总和为{cash:.2f}，账面资金为{available_cash:.2f}\n")
+		cash_diff = available_cash - cash
+		print(f"资金差额为{cash_diff:.2f}")
+		for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
+			print(f'  [{name}策略] 上一交易日现金记录{g.cash_record[idx]:,.2f}')
+
+		if available_cash > 0 and abs(cash_diff / available_cash) > 0.3:
+			print("资金差额较大，可能代码有问题，请调试")
+		else:
+			if abs(g.cash_reserved[MOM_IDX] - g.cash_record[MOM_IDX]) < 0.001:
+				print("动量策略资金与上一交易日持平，更新小市值策略资金")
+				g.cash_reserved[SC_IDX] = abs(available_cash - g.cash_record[MOM_IDX])
+				g.cash_record[SC_IDX] = g.cash_reserved[SC_IDX]
+			elif abs(g.cash_reserved[SC_IDX] - g.cash_record[SC_IDX]) < 0.001:
+				print("小市值策略资金与上一交易日持平，更新动量策略资金")
+				g.cash_reserved[MOM_IDX] = abs(available_cash - g.cash_record[SC_IDX])
+				g.cash_record[MOM_IDX] = g.cash_reserved[MOM_IDX]
+			else:
+				print("资金差额较小，可能是手续费或者分红导致。现决定2个策略各分走一半差额资金")
+				for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
+					g.cash_reserved[idx] += cash_diff / 2
+					g.cash_record[idx] = g.cash_reserved[idx]
+
+			for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
+				print(f'  [{name}策略] 预留现金: {g.cash_reserved[idx]:,.2f}, 现金记录更新{g.cash_record[idx]:,.2f}')
+
+	daily_return = total_value - g.last_pos_value
+	if g.last_pos_value != 0:
+		rate_of_return = daily_return / g.last_pos_value * 100
+	else:
+		rate_of_return = 0
+	print('==============================')
+	print(f'今日股票收益: {daily_return:.2f} 元')
+	print(f'收益率:       {rate_of_return:.2f} %')
+	print('==============================\n\n')
+	g.last_pos_value = total_value
+
+	# 每日收盘后记录当日持仓情况（仅在当日有交易时打印明细）
 	if not g.trade_day and g.refresh_hold == False:
 		return
 	g.refresh_hold = False
-	#每日收盘后运行，记录当日持仓情况
-	# 获取当前持仓
-	positions = get_positions(ContextInfo)
 
 	if len(positions) > 0:
-		account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
-		info = account_info[0]
-		available_cash = info.m_dAvailable
-		position_value = info.m_dInstrumentValue
-		total_value = info.m_dBalance
-
 		print(f'GGG*******************当日{current_date}(周{current_date.weekday()+1})持仓市值: {position_value:.2f}元*******************')
 		#sorted_pos = dict(sorted(positions.items(), key=lambda x: x[0]))
 		for stock, pos in positions.items():
@@ -1452,7 +1800,7 @@ def after_trading_end(ContextInfo):
 			ratio = (price / pos['avg_cost'] - 1) * 100
 			diff_price = price - pos['avg_cost']
 			print(f"GGG持仓: {stock_name}({stock}), 占比 {pos['value'] / total_value * 100:.1f}%, 涨跌幅: {ratio:.1f}% ({diff_price * pos['total_amount']:.1f}), 数量: {pos['total_amount']}, 市值: {pos['value']:.1f}元")
-		
+
 		for stock, pos in positions.items():
 			stock_name = ContextInfo.get_stock_name(stock)
 			if pos['total_amount'] == 0:
