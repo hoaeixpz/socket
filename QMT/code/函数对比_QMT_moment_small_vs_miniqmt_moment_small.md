@@ -31,7 +31,7 @@ selected_stocks = small_cap_get_stock_industry(list(sorted_market)[:100], n)
 miniqt 版通过 `get_sw2_industry()` + `small_cap_get_stock_industry()` 实现「每个申万二级行业只取 1 只」的分散，QMT 版没有该功能。这是两版本最核心的差异。
 
 ### 🔴 2. 止损 3 日禁买（`g.stoploss_map`）
-
+--先修复
 QMT 版完全没有该机制。miniqmt 版：
 
 - `sc_stop_loss:1583` —— 止损卖出时 `g.stoploss_map[stock] = g.stoploss_map.setdefault(stock, 3)`
@@ -39,7 +39,7 @@ QMT 版完全没有该机制。miniqmt 版：
 - `sc_rebalance_sell:1201-1204` / `sc_check_remain_amount:1519-1522` —— 从选中池剔除被禁股票
 
 ### 🟠 3. 当日涨停跟踪（`g.today_HL_list`）
-
+--先修复
 miniqmt 版新增 `g.today_HL_list`（今日上午涨停股票），用于：
 
 - `collect_sell_buy_stocks` —— 当日涨停的持仓不卖
@@ -52,7 +52,7 @@ QMT 版只有 `g.yesterday_HL_list`，无此概念。
 ## 二、miniqmt 版修复的 bug（QMT 版仍存在）
 
 ### 🔴 4. `is` 误用（`check_remain_amount`）
-
+--先修复
 ```python
 # QMT:887 / 929 —— 字符串用 is 判断身份，依赖 interning，不可靠
 if g.reason_to_sell is 'limitup':
@@ -64,7 +64,7 @@ elif g.reason_to_sell in ('stoploss', 'takeprofit'):
 ```
 
 ### 🟠 5. `g.stocks_fail_sell` 不重置（`sell_stocks`）
-
+--先修复
 ```python
 # QMT:1228 —— 只在 init 初始化一次，跨调仓周期累积
 def sell_stocks(ContextInfo):
@@ -79,7 +79,7 @@ def sell_stocks():
 ```
 
 ### 🟠 6. `stop_loss` 策略1 缺少跳过条件
-
+--先修复
 ```python
 # QMT:947-969 —— 策略1（个股止损）对 ETF/全天候标的一并做止损判断，且无除零保护
 for stock in current_positions.keys():
@@ -104,7 +104,7 @@ for stock in list(current_positions.keys()):
 ```
 
 ### 🟠 7. `judge_date` 里 `weekday` 少括号（TypeError）
-
+--先修复
 ```python
 # QMT:441 —— 5 - 方法对象 + 日 → 运行到 3月底/12月底 分支时抛 TypeError
 if 5 - current_date.weekday + current_date.day > 31:   # 应为 weekday()
@@ -148,7 +148,7 @@ for stock in list(g.stoploss_map.keys()):
 ## 四、行为改变（需确认是否有意）
 
 ### 🟡 10. `judge_date` 月末预清仓分支被删
-
+--先修复
 ```python
 # QMT:440-444 —— 3月底/12月底 提前清仓，保证 1/4 月开盘已空仓
 elif (current_month == 12 or current_month == 3) and current_date.day > 27:
@@ -167,7 +167,7 @@ else:
 ```
 
 ### 🟡 11. `stop_loss` 大盘上涨时 reason 改变
-
+--先修复
 ```python
 # QMT:983 —— 大跌大涨统一设 'stoploss'
 if abs(down_ratio) >= g.stoploss_market:
@@ -188,7 +188,7 @@ if abs(down_ratio) >= g.stoploss_market:
 下游影响：`sc_rebalance_buy` 遇到 `'takeprofit'` 会跳过买入（QMT 版无此分支，`'stoploss'` 仍会继续买入）。
 
 ### 🟡 12. `stop_loss` 大盘分支的跳过条件
-
+--先修复
 ```python
 # QMT:987-998 —— 大跌分支：只跳 etf + 全天候，不跳昨日涨停
 if down_ratio < 0:
@@ -213,7 +213,7 @@ for stock in list(current_positions.keys()):
 ```
 
 ### 🟡 13. `collect_sell_buy_stocks` 加涨停判断
-
+--先修复
 ```python
 # QMT:486-488 —— 无涨停判断
 for stock in current_holdings:
@@ -231,7 +231,7 @@ for stock in current_holdings:
 ```
 
 ### 🟡 14. `buy_stocks` 的买入上限
-
+--先修复
 ```python
 # QMT:1275-1277 —— 上限 = 可用资金
 if g.excepted_position.get(stock) is not None:
@@ -250,7 +250,7 @@ miniqmt 把现有持仓市值计入上限，现金不足时可凭已有持仓补
 ### 🟡 15. `calc_position` 两处
 
 **15a. 倾斜项被删**
-
+--先修复
 ```python
 # QMT:685 —— 有 position_step 倾斜项
 g.excepted_position[stock] = p + ((holding_num - 1) / 2 - i) * g.position_step
@@ -262,7 +262,7 @@ g.excepted_position[stock] = p
 因 `g.position_step = 0.00`，目前两版结果相同，但 QMT 版保留了倾斜机制，miniqmt 版结构上删掉了。
 
 **15b. 手数微调精度不同**
-
+--先修复
 ```python
 # QMT:835
 if abs(round(diff_v,2)) <= abs(round(diff_value,2)):
@@ -340,7 +340,7 @@ if detail['InstrumentStatus'] < 0:
 ```
 
 ### 🟡 20. 下单函数逻辑差异
-
+--先修复
 ```python
 # QMT:1300-1301 —— 清仓前不检查跌停
 if target_value == 0:
