@@ -367,7 +367,7 @@ def init():
 	info = g.xt_trader.query_stock_asset(g.account)
 
 	# 多策略配置
-	g.portfolio_value_proportion = [0.01, 0.99]
+	g.portfolio_value_proportion = [0.001, 0.999]
 	# 每个策略的预留现金（买卖驱动），互相隔离
 	g.cash_reserved = {MOM_IDX: g.portfolio_value_proportion[MOM_IDX] * info.cash,
 					   SC_IDX: g.portfolio_value_proportion[SC_IDX] * info.cash}
@@ -1775,6 +1775,8 @@ def sc_info_position():
 
 			if abs(available_cash - cash) < 0.001:
 				print(f"  各策略的资金总和与账面资金吻合\n")
+                g.cash_record[SC_IDX] = g.cash_reserved[SC_IDX]
+                g.cash_record[MOM_IDX] = g.cash_reserved[MOM_IDX]
 			else:
 				print(f"  策略资金总和为{cash:.2f}，账面资金为{available_cash:.2f}\n")
 				cash_diff = available_cash - cash
