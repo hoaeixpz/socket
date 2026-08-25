@@ -114,21 +114,20 @@ if 5 - current_date.weekday + current_date.day > 31:   # 应为 weekday()
 
 ## 三、miniqmt 版引入的疑似 bug / 回退（QMT 版是对的）
 
-### 🔴 8. `check_remain_amount` 止盈止损分支丢失 `g.stocks_to_buy = [g.etf]`
+### ⚪ 8. ~~`check_remain_amount` 止盈止损分支丢失 `g.stocks_to_buy = [g.etf]`~~（撤回 — 复核不成立）
+
+经复核，miniqmt 版第 1544 行**确有** `g.stocks_to_buy = [g.etf]` 赋值，与 QMT 版一致，此项**不构成逻辑差异**：
 
 ```python
-# QMT:930-932 —— 正确
-elif g.reason_to_sell is 'stoploss':
-    print('止盈止损后，有余额可用' + str(round((available_cash),2)) + '元。买入' + str(g.etf))
-    g.stocks_to_buy = [g.etf]
-    buy_stocks()
-
-# miniqmt:1541-1545 —— 少了赋值，会买上一轮 collect 留下的旧清单
+# miniqmt:1541-1545 —— 赋值实际存在
 elif g.reason_to_sell in ('stoploss', 'takeprofit'):
     avi_cash = get_strategy_available_cash(SC_IDX)
     print(f'止盈止损后余额{avi_cash:.2f}元，买入{g.etf}')
-    buy_stocks()   # g.stocks_to_buy 仍是上次 collect_sell_buy_stocks 留下的旧值
+    g.stocks_to_buy = [g.etf]   # ← 赋值存在
+    buy_stocks()
 ```
+
+该分支与 QMT 版的真实差异仅为：① `is 'stoploss'` → `in ('stoploss', 'takeprofit')`（见第 4、11 项）；② 可用资金变量名 `available_cash` vs `avi_cash`（忽略项）。
 
 ### 🔴 9. `check_remain_amount` 循环变量残留（NameError 风险）
 
@@ -376,7 +375,7 @@ TotalVolume = xtdata.get_instrument_detail(stock)['TotalVolume']
 
 ## 五、优先级建议
 
-1. **修 miniqmt 版 bug**（第 8、9 项）—— `g.stocks_to_buy = [g.etf]` 缺失、`stock_code` 残留变量，都有实际错误/崩溃风险。
+1. **修 miniqmt 版 bug**（第 9 项）—— `stock_code` 残留变量，有 NameError / 打印错误风险。（第 8 项经复核不成立，已撤回。）
 2. **确认第 10 项**（月末预清仓分支删除）—— 是否仍需要「1/4 月开盘前空仓」的效果。
 3. **确认第 11、12 项**（`takeprofit` + 大盘分支跳过条件）—— 止损/止盈语义是否按 miniqmt 版为准。
 4. **确认第 1 项**（行业分散选股）—— 这是你提到的已知功能差异，QMT 版如需对齐需补 `get_sw2_industry` / `small_cap_get_stock_industry`。

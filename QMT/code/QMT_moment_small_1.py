@@ -438,7 +438,7 @@ def judge_date(ContextInfo):
 			print('GGG========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
 	elif (current_month == 12 or current_month == 3) and current_date.day > 27:
-		if 5 - current_date.weekday + current_date.day > 31:
+		if 5 - current_date.weekday() + current_date.day > 31:
 			if g.trade == True:
 				print('GGG========== 一月和四月份清仓，日期：%s ==========' % current_date)
 			g.trade = False
@@ -884,7 +884,7 @@ def check_remain_amount(ContextInfo):
 	g.count += 1
 	account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
 	available_cash = account_info[0].m_dAvailable
-	if g.reason_to_sell is 'limitup': #判断提前售出原因，如果是涨停售出则次日再次交易，如果是止损售出则不交易
+	if g.reason_to_sell == 'limitup': #判断提前售出原因，如果是涨停售出则次日再次交易，如果是止损售出则不交易
 		g.hold_list = get_current_holding_stocks(ContextInfo)
 		flag = True
 		if len(g.hold_list) < g.stock_num or flag:
@@ -926,7 +926,7 @@ def check_remain_amount(ContextInfo):
 			#info_position(ContextInfo)
 			g.refresh_hold = True
 		g.reason_to_sell = ''
-	elif g.reason_to_sell is 'stoploss':
+	elif g.reason_to_sell == 'stoploss':
 		print('止盈止损后，有余额可用'+str(round((available_cash),2))+'元。买入'+ str(g.etf))
 		g.stocks_to_buy = [g.etf]
 		buy_stocks(ContextInfo)
@@ -948,9 +948,13 @@ def stop_loss(ContextInfo):
 			for stock in current_positions.keys():
 				if current_positions[stock]['total_amount'] == 0:
 					continue
+				if stock in g.all_weather_list or stock == g.etf:
+					continue
 
 				price = current_positions[stock]['price']
 				avg_cost = current_positions[stock]['avg_cost']
+				if avg_cost <= 0:
+					continue
 				print(f"{stock} 股价{price:.2f} 成本{avg_cost:.2f}")
 				# 个股盈利止盈
 				if price >= avg_cost * 2:
@@ -1226,6 +1230,7 @@ def get_current_holding_stocks(ContextInfo):
 	return current_holdings
 
 def sell_stocks(ContextInfo):
+	g.stocks_fail_sell = []
 	# 执行卖出
 	for stock in g.stocks_to_sell:
 		print('GGG>>>>>>>>>>>>')

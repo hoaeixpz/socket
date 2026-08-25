@@ -1,5 +1,5 @@
 # 动量得分曲线绘制
-# 目的：计算每只ETF的短期(25天)动量得分，超出阈值的分数归零，并把所有ETF的得分画成曲线汇总到一张图
+# 目的：计算每只ETF的短期(25天)动量得分，超出阈值的分数不参与排序（按0算）但按真实值画，并把所有ETF的得分画成曲线汇总到一张图
 # 用法：python plot_score.py
 
 from xtquant import xtdata
@@ -50,9 +50,23 @@ ETF_SHORT_MAX = {  # 短期(25天)上限，得分 >= 上限即淘汰（归零）
 
 SAFE_ETF = '511880.SH'
 
+# ETF代码 -> 中文名，用于图例显示
+ETF_NAMES = {
+    "513100.SH": "纳指ETF",
+    "513520.SH": "日经ETF",
+    "513030.SH": "德国ETF",
+    "518880.SH": "黄金ETF",
+    "159980.SZ": "有色ETF",
+    "159985.SZ": "豆粕ETF",
+    "501018.SH": "南方原油",
+    "511090.SH": "30年国债ETF",
+    "513130.SH": "恒生科技",
+    "515980.SH": "人工智能",
+}
+
 SHORT_DAYS = 25
 START_DATE = '20200101'  # 分析起点
-END_DATE = '20210101'
+END_DATE = '20260823'
 
 # 未在 ETF_SHORT_MAX 中单独配置的ETF，回退使用该全局阈值
 CURRENT_SHORT_MAX = 6.0
@@ -63,7 +77,7 @@ PLOT_DIR = os.path.join(OUTPUT_DIR, 'plots')
 os.makedirs(PLOT_DIR, exist_ok=True)
 
 # 图片横向密度：每个交易日占多少英寸（值越小图越宽、越不挤）
-FIG_DAYS_PER_INCH = 20
+FIG_DAYS_PER_INCH = 4
 
 
 # ================================================================
@@ -161,27 +175,44 @@ def compute_all_scores(all_data):
         print(f"  {etf}: {len(dates) - SHORT_DAYS} 个有效交易日")
 
     df = pd.DataFrame(rows)
+    # xtdata 的 index 是原始整数时间戳，需转成真正的 datetime，否则画图横轴会显示成 1970
+    df['date'] = pd.to_datetime(df['date'])
     print(f"  总计 {len(df)} 条记录，日期范围 {df['date'].min()} ~ {df['date'].max()}\n")
     return df
 
 
 def apply_threshold(df):
-    """分数超出阈值的归零：每只ETF用各自的 ETF_SHORT_MAX，未配置的回退 CURRENT_SHORT_MAX。
+    """计算排序分数 rank_score：满足淘汰条件的置 0（不参与 topN 排序），否则等于真实分。
 
-    与策略 filter_etf 一致，得分 >= 上限即淘汰（归零）。
+    淘汰条件（二者任一即淘汰）：
+      1. 分数超出阈值（ETF_SHORT_MAX，未配置回退 CURRENT_SHORT_MAX）
+      2. 连续两天下跌：当日 < 昨日 < 前日
+    short_score 保持真实值不变（画图用），rank_score 用于确定 topN（排序用）。
     """
     print("=" * 60)
-    print("Step 3: 分数超出阈值归零...")
+    print("Step 3: 计算排序分数（淘汰条件：超阈值 / 连续两天下跌）...")
     df = df.copy()
+    df['rank_score'] = df['short_score']
+
+    # 条件1：分数超出阈值
     for etf in df['etf'].unique():
         max_score = ETF_SHORT_MAX.get(etf, CURRENT_SHORT_MAX)
         mask = (df['etf'] == etf) & (df['short_score'] >= max_score)
         n_zeroed = int(mask.sum())
         if n_zeroed > 0:
-            df.loc[mask, 'short_score'] = 0.0
-            print(f"  {etf}: 阈值={max_score}, 归零 {n_zeroed} 条")
-        else:
-            print(f"  {etf}: 阈值={max_score}, 无归零")
+            df.loc[mask, 'rank_score'] = 0.0
+            print(f"  {etf}: 阈值={max_score}, 超阈值归零 {n_zeroed} 条")
+
+    # 条件2：连续两天下跌（当日 < 昨日 < 前日）
+    df = df.sort_values(['etf', 'date'])
+    prev1 = df.groupby('etf')['short_score'].shift(1)   # 昨日
+    prev2 = df.groupby('etf')['short_score'].shift(2)   # 前日
+    decline2 = (df['short_score'] < prev1) & (prev1 < prev2)
+    n_decline = int(decline2.sum())
+    if n_decline > 0:
+        df.loc[decline2, 'rank_score'] = 0.0
+        print(f"  连续两天下跌（当日<昨日<前日）归零: {n_decline} 条")
+
     print()
     return df
 
@@ -202,12 +233,17 @@ def plot_scores(df, top_n_list=(1, 2)):
 
     n_rows = len(top_n_list)
 
+    # 全量真实得分宽表（index=日期, columns=ETF, 值=得分），所有ETF每个交易日都有分
+    score_all = df.pivot_table(index='date', columns='etf', values='short_score', aggfunc='first')
+
     # 先按各档位统计每只ETF进入前 N 的天数，并汇总出全局ETF全集与总出现天数
     tops = {}       # top_n -> (该档位的 top 数据, 各ETF进入前 N 的天数 Series)
     all_etfs = set()
     total_days = {}
     for top_n in top_n_list:
-        top = df.sort_values('short_score', ascending=False).groupby('date').head(top_n)
+        top = df.sort_values('rank_score', ascending=False).groupby('date').head(top_n)
+        #print(f"top_n: {top_n}")
+        #print(top)
         appear_days = top.groupby('etf').size()
         tops[top_n] = (top, appear_days)
         all_etfs.update(appear_days.index.tolist())
@@ -229,8 +265,13 @@ def plot_scores(df, top_n_list=(1, 2)):
         top, appear_days = tops[top_n]
         appear_days = appear_days.sort_values(ascending=False)
 
-        # 转成宽表：index=日期, columns=ETF, 值=得分；不在前 top_n 的为 NaN
-        wide = top.pivot_table(index='date', columns='etf', values='short_score', aggfunc='first')
+        # 每天 topN 的成员布尔宽表（True=该ETF当日在前 top_n）
+        member = top.pivot_table(index='date', columns='etf', values='short_score', aggfunc='first').notna()
+        member = member.reindex(score_all.index)
+        # 退出前 top_n 后延迟一天再消失：昨天在前 top_n 的，今天也画（用当日真实得分），
+        # 避免切换ETF时曲线之间出现空隙、看起来断断续续
+        member_ext = member | member.shift(1, fill_value=False)
+        wide = score_all.where(member_ext)
 
         print(f"  [top{top_n}] 各ETF进入前{top_n}的天数:")
         for etf, days in appear_days.items():
@@ -238,8 +279,10 @@ def plot_scores(df, top_n_list=(1, 2)):
         etfs_in_legend = appear_days.index.tolist()
 
         for etf in etfs_in_legend:
+            name = ETF_NAMES.get(etf, '')
+            label = f"{etf} {name}" if name else etf
             ax.plot(wide.index, wide[etf],
-                    label=etf, color=color_map[etf], linewidth=1.6, alpha=0.95)
+                    label=label, color=color_map[etf], linewidth=1.6, alpha=0.95)
 
         ax.axhline(0, color='black', linewidth=0.8, linestyle='-')
         ax.set_title(f'每日排名前{top_n}', fontsize=13)
@@ -253,7 +296,7 @@ def plot_scores(df, top_n_list=(1, 2)):
     for ax in axes:
         plt.setp(ax.get_xticklabels(), rotation=45)
 
-    fig.suptitle('短期动量得分曲线 (25天窗口, 超出阈值已归零)', fontsize=16)
+    fig.suptitle('短期动量得分曲线 (25天窗口, 超出阈值不参与排序、按真实值画)', fontsize=16)
     fig.tight_layout(rect=[0, 0, 1, 0.97])
 
     out_path = os.path.join(PLOT_DIR, 'score_top1_top2_daily.png')
