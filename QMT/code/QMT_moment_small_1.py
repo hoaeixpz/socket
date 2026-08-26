@@ -7,7 +7,43 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict
 import math
+import re
+import os
 import numpy as np
+
+print(f"当前工作目录: {os.getcwd()}")
+import sys
+print(sys.version_info)
+print(sys.version)
+print("=====*************==========================")
+
+ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+class Tee:
+	"""将输出同时写入终端和日志文件"""
+	def __init__(self, log_file_path):
+		#self.terminal = sys.__stdout__      # 保留原始控制台输出流
+		self.log = open(log_file_path, 'a', encoding='utf-8')  # 追加模式
+
+	def write(self, message):
+		#self.terminal.write(message)                  # 打印到控制台
+		clean_message = ansi_escape.sub('', message)  # 去除颜色代码
+		self.log.write(clean_message)                 # 写入日志文件
+		self.log.flush()                              # 实时写入磁盘
+
+	def flush(self):
+		try:
+			#self.terminal.flush()
+			self.log.flush()
+		except ValueError:
+			pass
+
+	def close(self):
+		self.log.close()
+		
+log_name = datetime.now().strftime('%Y%m%d')
+
+tee = Tee(f"D:\\stock\\test_stock\\socket\\QMT\\code\\logfiles\\{log_name}.log")
+sys.stdout = tee
 
 ORDER_TYPE_MAP: Dict[int, str] = {
 	0: "常规", # OTP_ORDINARY
@@ -1168,6 +1204,8 @@ def get_last_price(ContextInfo, stock):
 def get_market(ContextInfo, stock_list, query_date):
 	dt_str = query_date.strftime('%Y%m%d %H:%M:%S')
 	guben = {}
+	#print("get_market")
+	#print(stock_list)
 	for stock in stock_list:
 		info = ContextInfo.get_instrumentdetail(stock)
 		#print("市值 ", info['TotalVolumn'])
@@ -1175,11 +1213,13 @@ def get_market(ContextInfo, stock_list, query_date):
 	
 	dt_str = query_date.strftime('%Y%m%d%H%M%S')
 	price_data = ContextInfo.get_full_tick(stock_list)
+	#price_data=ContextInfo.get_market_data_ex(['close'], stock_list, period='5m', start_time='', end_time=dt_str, count=1,dividend_type='none',fill_data=True,subscribe=True)
 	#print(price_data)
 	market = {}
 	for key, price in price_data.items():
 		gb = guben[key]
 		value = price['lastPrice']
+		#value = price.iloc[0]['close']
 		#print(gb, " ", value)
 		if gb is None or math.isnan(gb) or math.isnan(value):
 			continue
@@ -1199,14 +1239,16 @@ def get_small_cap_stocks(ContextInfo, stock_list, query_date, n=5):
 	if n > 30:
 		print(f"get_small_cap_stocks   {query_date}    head {n}")
 		rank = 0
-		for stock, cap in list(sorted_market.items())[0:10]:
+		for stock, cap in list(sorted_market.items())[0:20]:
 			stock_name = ContextInfo.get_stock_name(stock)
 			cap_in_10k = round(cap/100000000.0, 2)
 			rank = rank + 1
 			marker = '  <== 选中' if rank <= n else ''
-			print(f'    第{rank:>2}名: {stock_name}({stock}), 流通市值: {cap_in_10k} 亿元{marker}')
+			print(f'    第{rank:>2}名: {stock_name}({stock}), 市值: {cap_in_10k} 亿元{marker}')
 
-	selected_stocks = list(sorted_market)[0:n]
+	#selected_stocks = list(sorted_market)[0:n]
+	# 取全局最小的N只股票
+	selected_stocks = small_cap_get_stock_industry(list(sorted_market)[:100], n)
 
 	flag = False
 	for stock_code in selected_stocks:
@@ -1217,14 +1259,49 @@ def get_small_cap_stocks(ContextInfo, stock_list, query_date, n=5):
 	if flag:
 		print(f"get_small_cap_stocks   {query_date}    head {n}")
 		rank = 0
+		str = ''
 		for stock, cap in list(sorted_market.items())[0:20]:
 			stock_name = ContextInfo.get_stock_name(stock)
 			cap_in_10k = round(cap/100000000.0, 2)
+			industry_name = get_industry_name_of_stock('SW', stock)
 			rank = rank + 1
-			marker = '  <== 选中' if rank <= n else ''
-			print(f'    第{rank:>2}名: {stock_name}({stock}), 流通市值: {cap_in_10k} 亿元{marker}')
+			marker = '  <== 选中' if stock in selected_stocks else ''
+			str += f'    第{rank:>2}名: {stock_name}({stock}), 市值: {cap_in_10k} 亿元 {industry_name} {marker}\n'
+		print(str)
 
 	return selected_stocks
+
+def small_cap_get_stock_industry(stock_list, num):
+	return stock_list[:num]
+	"""行业分散选股"""
+	try:
+		selected_stocks = []
+		industry_list = []
+
+		for stock_code in stock_list:
+			industry_name = get_industry_name_of_stock('SW', stock_code)
+			print(stock_code, " ", industry_name)
+			if industry_name != '':
+				if industry_name not in industry_list:
+					industry_list.append(industry_name)
+					selected_stocks.append(stock_code)
+					if len(industry_list) >= num:
+						break
+		return selected_stocks
+	except Exception as e:
+		print(f"行业筛选错误: {e}")
+		return stock_list[:num]
+
+
+def get_sw2_industry(ContextInfo):
+	# 获取股票对应的申万二级行业
+	positions = get_positions(ContextInfo)
+	if len(positions) > 0:
+		for stock, pos in positions.items():
+			stock_name = ContextInfo.get_stock_name(stock)
+			clean_stock = stock[:6]
+			print(clean_stock, " ", stock_name)
+
 
 def is_date_in_range(input_date_str, start_date_str, end_date_str, date_format = '%Y%m%d'):
 	input_date = datetime.strptime(input_date_str, date_format).date()
@@ -1246,7 +1323,7 @@ def get_normal_stocks(ContextInfo, current_time):
 			for stkey, time_period in ST.items():
 				for tp in time_period:
 					if is_date_in_range(current_time, tp[0], tp[1]):
-						print(f"ST {stock}")
+						#print(f"ST {stock}")
 						is_st = True
 						break
 				if is_st:
@@ -1256,7 +1333,7 @@ def get_normal_stocks(ContextInfo, current_time):
 		else:
 			stock_name = ContextInfo.get_stock_name(stock)
 			if "ST" in stock_name:
-				print(f"ST {stock}")
+				#print(f"ST {stock}")
 				continue
 
 		non_st_stocks.append(stock)
