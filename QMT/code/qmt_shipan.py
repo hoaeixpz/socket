@@ -7,6 +7,43 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict
 import math
+import re
+import os
+#import akshare as ak
+
+print(f"当前工作目录: {os.getcwd()}")
+import sys
+print(sys.version_info)
+print(sys.version)
+print("=====*************==========================")
+
+ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+class Tee:
+	"""将输出同时写入终端和日志文件"""
+	def __init__(self, log_file_path):
+		#self.terminal = sys.__stdout__      # 保留原始控制台输出流
+		self.log = open(log_file_path, 'a', encoding='utf-8')  # 追加模式
+
+	def write(self, message):
+		#self.terminal.write(message)                  # 打印到控制台
+		clean_message = ansi_escape.sub('', message)  # 去除颜色代码
+		self.log.write(clean_message)                 # 写入日志文件
+		self.log.flush()                              # 实时写入磁盘
+
+	def flush(self):
+		try:
+			#self.terminal.flush()
+			self.log.flush()
+		except ValueError:
+			pass
+
+	def close(self):
+		self.log.close()
+		
+log_name = datetime.now().strftime('%Y%m%d')
+
+tee = Tee(f"D:\\stock\\test_stock\\socket\\QMT\\code\\logfiles\\{log_name}.log")
+sys.stdout = tee
 
 ORDER_TYPE_MAP: Dict[int, str] = {
 	0: "常规", # OTP_ORDINARY
@@ -421,12 +458,29 @@ def handlebar(ContextInfo):
 			print_hold_stock_info(obj)
 		after_trading_end(ContextInfo)
 
-	'''
+	
 	#TEST
-	if dt.hour == 15 and dt.minute == 0:
-		judge_date(ContextInfo)
-		trade_etf(ContextInfo)
-	'''
+	#if dt.hour == 15 and dt.minute == 6:
+		#get_sw2_industry(ContextInfo)
+		#prepare_stock_list(ContextInfo)
+		#rebalance_sell(ContextInfo)
+		#rebalance_buy(ContextInfo)
+		#stop_loss(ContextInfo)
+		#g.hold_list = get_current_holding_stocks(ContextInfo)
+		#for stock in g.hold_list:
+		#	current_date = get_current_date(ContextInfo)
+		#	yesterday = current_date - timedelta(days=1)
+		#	dt_str = yesterday.strftime('%Y%m%d')
+		#	last_date = ContextInfo.get_trading_dates(stock, '', dt_str, 1, '1d')
+		#	last_date = last_date[0]
+		#	query_date = datetime.strptime(last_date+'150000', '%Y%m%d%H%M%S')
+		#	dt_str = query_date.strftime('%Y%m%d%H%M%S')
+		#	#price_data=ContextInfo.get_market_data_ex(['open', 'close'], ['399101.SZ'], period='1d', start_time='', end_time=dt_str, count=1,dividend_type='none', fill_data=True,subscribe=True)
+		#	price_data=ContextInfo.get_market_data_ex(['close'],         ['399101.SZ'],       period='1d', start_time='', end_time=dt_str, count=1,dividend_type='none', fill_data=True,subscribe=True)
+		#	#p = get_specified_date_price(ContextInfo, stock, query_date, type='none')
+		#	print(stock, " ", price_data)
+		#	#stop_loss(ContextInfo)
+	
 
 
 def judge_date(ContextInfo):
@@ -437,11 +491,6 @@ def judge_date(ContextInfo):
 		if g.trade == True:
 			print('GGG========== 一月和四月份清仓，日期：%s ==========' % current_date)
 		g.trade = False
-	elif (current_month == 12 or current_month == 3) and current_date.day > 27:
-		if 5 - current_date.weekday + current_date.day > 31:
-			if g.trade == True:
-				print('GGG========== 一月和四月份清仓，日期：%s ==========' % current_date)
-			g.trade = False
 	else:
 		g.trade = True
 	print('judge_date count ',g.count)
@@ -1088,18 +1137,22 @@ def get_last_price(ContextInfo, stock):
 def get_market(ContextInfo, stock_list, query_date):
 	dt_str = query_date.strftime('%Y%m%d %H:%M:%S')
 	guben = {}
+	#print("get_market")
+	#print(stock_list)
 	for stock in stock_list:
 		info = ContextInfo.get_instrumentdetail(stock)
 		#print("市值 ", info['TotalVolumn'])
 		guben[stock] = info['TotalVolumn']
 	
 	dt_str = query_date.strftime('%Y%m%d%H%M%S')
-	price_data = ContextInfo.get_full_tick(stock_list)
+	#price_data = ContextInfo.get_full_tick(stock_list)
+	price_data=ContextInfo.get_market_data_ex(['close'], stock_list, period='5m', start_time='', end_time=dt_str, count=1,dividend_type='none',fill_data=True,subscribe=True)
 	#print(price_data)
 	market = {}
 	for key, price in price_data.items():
 		gb = guben[key]
-		value = price['lastPrice']
+		#value = price['lastPrice']
+		value = price.iloc[0]['close']
 		#print(gb, " ", value)
 		if gb is None or math.isnan(gb) or math.isnan(value):
 			continue
@@ -1119,14 +1172,16 @@ def get_small_cap_stocks(ContextInfo, stock_list, query_date, n=5):
 	if n > 30:
 		print(f"get_small_cap_stocks   {query_date}    head {n}")
 		rank = 0
-		for stock, cap in list(sorted_market.items())[0:10]:
+		for stock, cap in list(sorted_market.items())[0:20]:
 			stock_name = ContextInfo.get_stock_name(stock)
 			cap_in_10k = round(cap/100000000.0, 2)
 			rank = rank + 1
 			marker = '  <== 选中' if rank <= n else ''
-			print(f'    第{rank:>2}名: {stock_name}({stock}), 流通市值: {cap_in_10k} 亿元{marker}')
+			print(f'    第{rank:>2}名: {stock_name}({stock}), 市值: {cap_in_10k} 亿元{marker}')
 
-	selected_stocks = list(sorted_market)[0:n]
+	#selected_stocks = list(sorted_market)[0:n]
+	# 取全局最小的N只股票
+	selected_stocks = small_cap_get_stock_industry(list(sorted_market)[:100], n)
 
 	flag = False
 	for stock_code in selected_stocks:
@@ -1137,14 +1192,49 @@ def get_small_cap_stocks(ContextInfo, stock_list, query_date, n=5):
 	if flag:
 		print(f"get_small_cap_stocks   {query_date}    head {n}")
 		rank = 0
+		str = ''
 		for stock, cap in list(sorted_market.items())[0:20]:
 			stock_name = ContextInfo.get_stock_name(stock)
 			cap_in_10k = round(cap/100000000.0, 2)
+			industry_name = get_industry_name_of_stock('SW', stock)
 			rank = rank + 1
-			marker = '  <== 选中' if rank <= n else ''
-			print(f'    第{rank:>2}名: {stock_name}({stock}), 流通市值: {cap_in_10k} 亿元{marker}')
+			marker = '  <== 选中' if stock in selected_stocks else ''
+			str += f'    第{rank:>2}名: {stock_name}({stock}), 市值: {cap_in_10k} 亿元 {industry_name} {marker}\n'
+		print(str)
 
 	return selected_stocks
+
+def small_cap_get_stock_industry(stock_list, num):
+	return stock_list[:num]
+	"""行业分散选股"""
+	try:
+		selected_stocks = []
+		industry_list = []
+
+		for stock_code in stock_list:
+			industry_name = get_industry_name_of_stock('SW', stock_code)
+			print(stock_code, " ", industry_name)
+			if industry_name != '':
+				if industry_name not in industry_list:
+					industry_list.append(industry_name)
+					selected_stocks.append(stock_code)
+					if len(industry_list) >= num:
+						break
+		return selected_stocks
+	except Exception as e:
+		print(f"行业筛选错误: {e}")
+		return stock_list[:num]
+
+
+def get_sw2_industry(ContextInfo):
+	# 获取股票对应的申万二级行业
+	positions = get_positions(ContextInfo)
+	if len(positions) > 0:
+		for stock, pos in positions.items():
+			stock_name = ContextInfo.get_stock_name(stock)
+			clean_stock = stock[:6]
+			print(clean_stock, " ", stock_name)
+
 
 def is_date_in_range(input_date_str, start_date_str, end_date_str, date_format = '%Y%m%d'):
 	input_date = datetime.strptime(input_date_str, date_format).date()
@@ -1161,12 +1251,14 @@ def get_normal_stocks(ContextInfo, current_time):
 	non_st_stocks = []
 	for stock in stocklist:
 		ST = ContextInfo.get_his_st_data(stock)
+		#if stock == '002719.SZ':
+		#	print('ST:', ST)
 		if ST:
 			is_st = False
 			for stkey, time_period in ST.items():
 				for tp in time_period:
 					if is_date_in_range(current_time, tp[0], tp[1]):
-						print(f"ST {stock}")
+						#print(f"ST {stock}")
 						is_st = True
 						break
 				if is_st:
@@ -1176,7 +1268,7 @@ def get_normal_stocks(ContextInfo, current_time):
 		else:
 			stock_name = ContextInfo.get_stock_name(stock)
 			if "ST" in stock_name:
-				print(f"ST {stock}")
+				#print(f"ST {stock}")
 				continue
 
 		non_st_stocks.append(stock)
