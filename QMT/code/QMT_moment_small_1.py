@@ -49,7 +49,7 @@ class Tee:
 	def close(self):
 		self.log.close()
 		
-log_name = datetime.now().strftime('%Y%m%d-%H%M')
+log_name = datetime.now().strftime('%Y%m%d')
 
 tee = Tee(f"D:\\stock\\test_stock\\socket\\QMT\\code\\logfiles\\{log_name}.log")
 sys.stdout = tee
@@ -780,7 +780,7 @@ def mom_rebalance(ContextInfo):
 # ================================================================
 
 def small_cap_get_stock_industry(stock_list, num):
-    #return stock_list[:num]
+	#return stock_list[:num]
 	"""行业分散选股"""
 	try:
 		selected_stocks = []
@@ -789,7 +789,7 @@ def small_cap_get_stock_industry(stock_list, num):
 		for stock_code in stock_list:
 			if stock_code in g.industry_dict:
 				industry_name = g.industry_dict[stock_code]
-			    #print(stock_code, " ", industry_name)
+				#print(stock_code, " ", industry_name)
 				if industry_name not in industry_list:
 					industry_list.append(industry_name)
 					selected_stocks.append(stock_code)
