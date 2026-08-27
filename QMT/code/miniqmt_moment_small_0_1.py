@@ -878,10 +878,10 @@ def mom_rebalance():
 		if stock not in weights:
 			print(f"  [调出] {get_stock_name(stock)}({stock}) → 清仓")
 			if is_limit_up(stock):
-				printf(f"  {get_stock_name(stock)}({stock}) 涨停，跳过")
+				print(f"  {get_stock_name(stock)}({stock}) 涨停，跳过")
 				continue
 			if is_limit_down(stock):
-				printf(f"  {get_stock_name(stock)}({stock}) 跌停，跳过")
+				print(f"  {get_stock_name(stock)}({stock}) 跌停，跳过")
 				continue
 			sell_target_value(stock, 0, MOM_IDX)
 			print("sleep 30s")
@@ -897,10 +897,10 @@ def mom_rebalance():
 		if current_val - target > max(3000, price * 100 if price else 10000):
 			print(f"  [减仓] {get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f}")
 			if is_limit_up(stock):
-				printf(f"  {get_stock_name(stock)}({stock}) 涨停，跳过")
+				print(f"  {get_stock_name(stock)}({stock}) 涨停，跳过")
 				continue
 			if is_limit_down(stock):
-				printf(f"  {get_stock_name(stock)}({stock}) 跌停，跳过")
+				print(f"  {get_stock_name(stock)}({stock}) 跌停，跳过")
 				continue
 			sell_target_value(stock, target, MOM_IDX)
 			print("sleep 30s")
@@ -919,10 +919,10 @@ def mom_rebalance():
 		if min(target - current_val, stra_avi_cash) > max(3000, price * 100 if price else 10000):
 			print(f"  [加仓] {get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f}")
 			if is_limit_up(stock):
-				printf(f"  {get_stock_name(stock)}({stock}) 涨停，跳过")
+				print(f"  {get_stock_name(stock)}({stock}) 涨停，跳过")
 				continue
 			if is_limit_down(stock):
-				printf(f"  {get_stock_name(stock)}({stock}) 跌停，跳过")
+				print(f"  {get_stock_name(stock)}({stock}) 跌停，跳过")
 				continue
 			buy_target_value(stock, target, MOM_IDX)
 		else:
@@ -1774,9 +1774,9 @@ def sc_info_position():
 				cash += g.cash_reserved[idx]
 
 			if abs(available_cash - cash) < 0.001:
-				print(f"  各策略的资金总和与账面资金吻合\n")
-                g.cash_record[SC_IDX] = g.cash_reserved[SC_IDX]
-                g.cash_record[MOM_IDX] = g.cash_reserved[MOM_IDX]
+				print("  各策略的资金总和与账面资金吻合\n")
+				g.cash_record[SC_IDX] = g.cash_reserved[SC_IDX]
+				g.cash_record[MOM_IDX] = g.cash_reserved[MOM_IDX]
 			else:
 				print(f"  策略资金总和为{cash:.2f}，账面资金为{available_cash:.2f}\n")
 				cash_diff = available_cash - cash
