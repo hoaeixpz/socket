@@ -10,6 +10,7 @@ import math
 import re
 import os
 import numpy as np
+from replace_symbol import process_replace
 
 ETF_POOL = [
 	"513100.SH", "513520.SH", "513030.SH",  # 境外: 纳指, 日经, 德国
@@ -258,9 +259,9 @@ def get_log_path():
 	return candidates[0]
 
 def init(ContextInfo):
-	log_path = get_log_path()
+	g.log_path = get_log_path()
 	log_name = datetime.now().strftime('%Y%m%d')
-	tee = Tee(f"{log_path}\\{log_name}.log")
+	tee = Tee(f"{g.log_path}\\{log_name}.log")
 	sys.stdout = tee
 
 	print("init — 双策略合并版")
@@ -382,6 +383,7 @@ def handlebar(ContextInfo):
 		#for obj in objlist:
 		#	print_hold_stock_info(obj)
 		after_trading_end(ContextInfo)
+		process_replace(g.log_path)
 
 	'''
 	#TEST
@@ -1661,6 +1663,8 @@ def info_position(ContextInfo):
 			else:
 				print(f'    持仓: (空)')
 		print()
+
+	process_replace(g.log_path)
 
 def after_trading_end(ContextInfo):
 	current_date = get_current_date(ContextInfo)

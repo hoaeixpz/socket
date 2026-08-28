@@ -1,7 +1,7 @@
 import os
 import glob
 
-def get_latest_txt_file(directory='.'):
+def get_latest_txt_file(directory):
     """获取当前目录下最新的txt文件"""
     txt_files = glob.glob(os.path.join(directory, '*.log'))
     if not txt_files:
@@ -43,26 +43,26 @@ def process_file(file_path, replace_map):
     """处理文件：读取 -> 替换 -> 写回"""
     content, encoding = read_file_content(file_path)
     if content is None:
-        print(f"无法读取文件: {file_path}")
+        print(f"replace_symbol.py: 无法读取文件: {file_path}")
         return
     
     new_content, stats = replace_symbols(content, replace_map)
     
     if not stats:
-        print("文件中没有需要替换的字符")
+        #print("文件中没有需要替换的字符")
         return
     
     write_file_content(file_path, new_content, encoding)
     
     for old_char, count in stats.items():
         new_char = replace_map[old_char]
-        print(f"✅ 替换了 {count} 个 '{old_char}' → '{new_char}'")
+        #print(f"✅ 替换了 {count} 个 '{old_char}' → '{new_char}'")
 
 # 执行
-if __name__ == "__main__":
-    latest = get_latest_txt_file()
+def process_replace(directory='.'):
+    latest = get_latest_txt_file(directory)
     if latest:
-        print(f"处理文件: {latest}")
+        #print(f"处理文件: {latest}")
         # 在这里添加需要替换的符号对
         replace_map = {
             '√': '✅',
@@ -71,4 +71,7 @@ if __name__ == "__main__":
         }
         process_file(latest, replace_map)
     else:
-        print("未找到log文件")
+        print("replace_symbol.py: 未找到log文件")
+
+if __name__ == "__main__":
+    process_replace()
