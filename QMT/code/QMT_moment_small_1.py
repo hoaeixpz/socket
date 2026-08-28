@@ -82,13 +82,12 @@ def get_current_date(ContextInfo):
 	return date
 
 def is_trading_day(ContextInfo):
-
 	today = datetime.now().strftime('%Y%m%d')
-    #dates = get_trading_dates('399101.SZ', today)
+	#dates = get_trading_dates('399101.SZ', today)
 	current_date = get_current_date(ContextInfo)
 	dt_str = current_date.strftime('%Y%m%d')
 	last_date = ContextInfo.get_trading_dates('000300.SH', '', dt_str, 1, '1d')
-	return today == last_date
+	return today == last_date[0]
 
 def is_weekday_job(ContextInfo):
 	current_date = get_current_date(ContextInfo)
