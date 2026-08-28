@@ -49,11 +49,6 @@ class Tee:
 	def close(self):
 		self.log.close()
 		
-log_name = datetime.now().strftime('%Y%m%d')
-
-tee = Tee(f"D:\\stock\\test_stock\\socket\\QMT\\code\\logfiles\\{log_name}.log")
-sys.stdout = tee
-
 
 class G():
 	pass
@@ -249,7 +244,25 @@ def get_market(ContextInfo, stock_list, query_date):
 
 	return market
 
+def get_log_path():
+	"""检查多个可能的logfiles路径，返回第一个存在的"""
+	candidates = [
+		'D:\\stock\\test_stock\\socket\\QMT\\code\\logfiles',
+		'C:\\Users\\Administrator\\Desktop\\socket\\QMT\\code\\logfiles'
+	]
+	for p in candidates:
+		if os.path.exists(p):
+			print(f'logfiles路径: {p}')
+			return p
+	print('未找到logfiles路径，使用默认路径')
+	return candidates[0]
+
 def init(ContextInfo):
+	log_path = get_log_path()
+	log_name = datetime.now().strftime('%Y%m%d')
+	tee = Tee(f"{log_path}\\{log_name}.log")
+	sys.stdout = tee
+
 	print("init — 双策略合并版")
 	period = ContextInfo.period
 	print(period)
@@ -259,7 +272,7 @@ def init(ContextInfo):
 	available_cash = account_info[0].m_dAvailable
 
 	# ===== 多策略配置 =====
-	g.portfolio_value_proportion = [0.001, 0.999]
+	g.portfolio_value_proportion = [0.03, 0.97]
 	# 每个策略的预留现金（买卖驱动），互相隔离
 	g.cash_reserved = {MOM_IDX: g.portfolio_value_proportion[MOM_IDX] * available_cash,
 					   SC_IDX: g.portfolio_value_proportion[SC_IDX] * available_cash}
