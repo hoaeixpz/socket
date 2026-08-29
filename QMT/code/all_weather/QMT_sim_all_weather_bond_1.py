@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#coding:gbk
 """
 全天候 ETF + 债券策略 — 模拟版（无需 QMT 交易连接）
 母版：C:\socket\JoinQuant\全天候策略\all_weather_bond.py
@@ -8,10 +8,57 @@
 
 输出：目标权重、当前持仓 vs 目标、需要买入/卖出的股票和数量（含债券管理）。
 """
-from xtquant import xtdata
 import math
 import unicodedata
 from datetime import datetime, timedelta
+
+class Tee:
+	"""将输出同时写入终端和日志文件"""
+	def __init__(self, log_file_path):
+		#self.terminal = sys.__stdout__      # 保留原始控制台输出流
+		self.log = open(log_file_path, 'a', encoding='utf-8')  # 追加模式
+
+	def write(self, message):
+		#self.terminal.write(message)                 # 打印到控制台
+		self.log.write(message)                 # 写入日志文件
+		self.log.flush()                        # 实时写入磁盘
+
+	def flush(self):
+		try:
+			#self.terminal.flush()
+			self.log.flush()
+		except ValueError:
+			pass
+
+	def close(self):
+		self.log.close()
+		
+		
+class G():
+	pass
+g = G() #创建空的类的实例 用来保存委托状态
+
+
+def get_log_path():
+	"""检查多个可能的logfiles路径，返回第一个存在的"""
+	candidates = [
+		'D:\\stock\\test_stock\\socket\\QMT\\code\\all_weather\\logfiles',
+		'C:\\Users\\Administrator\\Desktop\\socket\\QMT\\code\\all_weather\\logfiles',
+		'C:\\socket\\QMT\\code\\all_weather\\logfiles'
+	]
+	for p in candidates:
+		if os.path.exists(p):
+			print(f'logfiles路径: {p}')
+			return p
+	print('未找到logfiles路径，使用默认路径')
+	return candidates[0]
+
+
+def get_current_date(ContextInfo):
+	current_time = ContextInfo.get_bar_timetag(ContextInfo.barpos)
+	ctstr = timetag_to_datetime(current_time, "%Y-%m-%d %H%M%S")
+	date = datetime.strptime(ctstr, "%Y-%m-%d %H%M%S")
+	return date
 
 # ======================== 手动输入你的实际持仓 ========================
 
@@ -55,52 +102,51 @@ force_level = 2         # 不计算，直接设置level为force_level
 
 # ======================== 数据获取 ========================
 
-def get_stock_name(stock):
-	detail = xtdata.get_instrument_detail(stock)
-	if detail:
-		return detail['InstrumentName']
-	return stock
+def get_last_price(ContextInfo, stock):
+	full_tick_dict = ContextInfo.get_full_tick([stock])
+	for key, price in full_tick_dict.items():
+		if price['lastPrice'] == 0:
+			print(stock, " 获取当前价格异常,股价为0")
+		return price['lastPrice']
 
-
-def get_last_price(stock):
-	try:
-		tick = xtdata.get_full_tick([stock])
-		if stock in tick and tick[stock] and tick[stock]['lastPrice'] > 0:
-			return tick[stock]['lastPrice']
-	except Exception as e:
-		print(f"get_last_price error: {stock} {e}")
-
+	print(stock, " 获取当前价格异常")
 	return None
 
 
 # ======================== 权重计算（与母版完全一致） ========================
 
-def calc_ES_weights():
+def calc_ES_weights(ContextInfo):
 	alpha = 0.05
 	num = int(base_days * alpha)
 	print(f"样本数: {num}（{base_days}天 × {alpha}）")
 
 	for s in stocks:
-		xtdata.download_history_data(s, period='1d', incrementally=True)
+		down_history_data(s, '1d', "", "")
 
-	query_date = datetime.now().strftime('%Y%m%d')
-	price_data = xtdata.get_market_data_ex(['close'], stocks, period='1d',
-										   start_time='', end_time=query_date,
-										   count=base_days, dividend_type='front')
+	dt_str = get_current_date(ContextInfo).strftime('%Y%m%d')
+	price_data = ContextInfo.get_market_data_ex(['close'],
+												stocks,
+												period='1d',
+												start_time='',
+												end_time=dt_str,
+												dividend_type='front',
+												count=base_days)
 
 	raw = {}
 	for code in stocks:
 		df = price_data.get(code)
+		#print(code)
+		#print(df)
 		if df is None or len(df) < base_days:
 			raw[code] = 0
-			print(f"{code} {get_stock_name(code)} 数据不足，权重=0")
+			print(f"{code} {ContextInfo.get_stock_name(code)} 数据不足，权重=0")
 		else:
 			df['daily_return'] = df['close'].pct_change() * 100
 			df = df.iloc[1:].dropna(subset=['daily_return'])
 			srt = df['daily_return'].sort_values()
 			ES = srt.head(num).mean()
 			raw[code] = -1 / ES
-			print(f"{code} {get_stock_name(code)}  ES={ES:.3f}  raw={raw[code]:.4f}")
+			print(f"{code} {ContextInfo.get_stock_name(code)}  ES={ES:.3f}  raw={raw[code]:.4f}")
 
 	# 标准化 + 纳指/黄金加成（与母版一致）
 	total = sum(raw.values())
@@ -116,7 +162,7 @@ def calc_ES_weights():
 	total_value = 0
 	current_prices = {}
 	for code in ACTUAL_POSITIONS:
-		price = get_last_price(code)
+		price = get_last_price(ContextInfo, code)
 		current_prices[code] = price
 		if price:
 			total_value += ACTUAL_POSITIONS.get(code, 0) * price
@@ -131,7 +177,7 @@ def calc_ES_weights():
 	actual_stocks = stocks.copy()
 	actual_stocks.append("511220.SH")
 	for code in actual_stocks:
-		name = get_stock_name(code)
+		name = ContextInfo.get_stock_name(code)
 		target_wt = weights.get(code,0) * 100
 		cur_shares = ACTUAL_POSITIONS.get(code, 0)
 		cur_price = current_prices.get(code)
@@ -254,7 +300,7 @@ def make_header():
 	return make_row('代码', '名称', '股价', '持仓', '当前市值', '目标市值', '差值', '操作')
 
 
-def get_all_prices():
+def get_all_prices(ContextInfo):
 	"""获取所有标的的当前价格和市值"""
 	prices = {}
 	positions_value = {}
@@ -262,7 +308,7 @@ def get_all_prices():
 
 	all_held = set(stocks) | {"511220.SH"}
 	for code in all_held:
-		price = get_last_price(code)
+		price = get_last_price(ContextInfo, code)
 		prices[code] = price
 		shares = ACTUAL_POSITIONS.get(code, 0)
 		value = shares * price if price else 0
@@ -308,7 +354,7 @@ def detect_drawdown(total_asset):
 	return new_level  # 触发！
 
 
-def calc_drawdown_weights(prices, positions_value, total_asset, level):
+def calc_drawdown_weights(ContextInfo, prices, positions_value, total_asset, level):
 	"""回撤触发后：先卖债券，再重算非债券权重
 
 	与母版 rebalance_drawdown 完全一致：
@@ -335,7 +381,7 @@ def calc_drawdown_weights(prices, positions_value, total_asset, level):
 	# 打印债券卖出建议
 	bond_sells, _ = calc_bond_trades(target_bond_value, prices, positions_value)
 	for code, amount, price, reason in bond_sells:
-		print(f"  [卖出] {code} {get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元")
+		print(f"  [卖出] {code} {ContextInfo.get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元")
 
 	# 假设卖出完成后的债券市值
 	new_bond_value = target_bond_value
@@ -351,7 +397,7 @@ def calc_drawdown_weights(prices, positions_value, total_asset, level):
 	new_weights = {}
 	for code, w in stock_weights.items():
 		new_weights[code] = w / total_w * (1 - bond_weight)
-		print(f"    {code} {get_stock_name(code):12s}  {w*100:5.2f}% → {new_weights[code]*100:6.2f}%")
+		print(f"    {code} {ContextInfo.get_stock_name(code):12s}  {w*100:5.2f}% → {new_weights[code]*100:6.2f}%")
 
 	# 债券总权重
 	new_weights["511270.SH"] = bond_weight
@@ -362,7 +408,7 @@ def calc_drawdown_weights(prices, positions_value, total_asset, level):
 
 	return new_weights
 
-def calc_force_drawndown_weights(force_level):
+def calc_force_drawndown_weights(ContextInfo, force_level):
 	bond_weight = weights['511270.SH'] * (4 - force_level) / 4
 	stock_weights = {k: v for k, v in weights.items() if k != "511270.SH"}
 	total_w = sum(stock_weights.values())
@@ -370,7 +416,7 @@ def calc_force_drawndown_weights(force_level):
 	new_weights = {}
 	for code, w in stock_weights.items():
 		new_weights[code] = w / total_w * (1 - bond_weight)
-		print(f"    {code} {get_stock_name(code):12s}  {w*100:5.2f}% → {new_weights[code]*100:6.2f}%")
+		print(f"    {code} {ContextInfo.get_stock_name(code):12s}  {w*100:5.2f}% → {new_weights[code]*100:6.2f}%")
 
 	# 债券总权重
 	new_weights["511270.SH"] = bond_weight
@@ -382,7 +428,7 @@ def calc_force_drawndown_weights(force_level):
 
 # ======================== 打印持仓对比 & 交易清单 ========================
 
-def print_position_table(prices, total_asset, use_weights):
+def print_position_table(ContextInfo, prices, total_asset, use_weights):
 	"""打印持仓对比表和交易清单"""
 	# 表头
 	header = make_header()
@@ -412,7 +458,7 @@ def print_position_table(prices, total_asset, use_weights):
 		else:
 			action = "-"
 
-		name = get_stock_name(code)
+		name = ContextInfo.get_stock_name(code)
 		print(make_row(code, name,
 					   f"{price:.2f}",
 					   str(current_shares),
@@ -421,7 +467,7 @@ def print_position_table(prices, total_asset, use_weights):
 					   f"{total_asset*w - current_value:+.0f}",
 					   action))
 
-def print_trade_list(prices, total_asset, use_weights):
+def print_trade_list(ContextInfo, prices, total_asset, use_weights):
 	"""打印具体买卖股数"""
 	print(f"\n{'='*60}")
 	print(f"【交易清单】")
@@ -442,12 +488,12 @@ def print_trade_list(prices, total_asset, use_weights):
 		if diff > 500 and abs(diff) / target_value > rebalance_tolerance:
 			amount = int(diff / price / 100) * 100
 			if amount >= 100:
-				print(f"  [买入] {code} {get_stock_name(code)}: \033[31m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元")
+				print(f"  [买入] {code} {ContextInfo.get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元")
 				has_trades = True
 		elif diff < -500 and abs(diff) / target_value > rebalance_tolerance:
 			amount = int(-diff / price / 100) * 100
 			if amount >= 100:
-				print(f"  [卖出] {code} {get_stock_name(code)}: \033[32m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元")
+				print(f"  [卖出] {code} {ContextInfo.get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元")
 				has_trades = True
 
 	# 债券交易
@@ -455,10 +501,10 @@ def print_trade_list(prices, total_asset, use_weights):
 	bond_sells, bond_buys = calc_bond_trades(bond_target, prices, {})
 
 	for code, amount, price, reason in bond_sells:
-		print(f"  [卖出] {code} {get_stock_name(code)}: \033[32m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元 ({reason})")
+		print(f"  [卖出] {code} {ContextInfo.get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元 ({reason})")
 		has_trades = True
 	for code, amount, price, reason in bond_buys:
-		print(f"  [买入] {code} {get_stock_name(code)}: \033[31m{amount}\033[0m股 × {price:.2f} = {amount*price:,.0f}元 ({reason})")
+		print(f"  [买入] {code} {ContextInfo.get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元 ({reason})")
 		has_trades = True
 
 	if not has_trades:
@@ -467,11 +513,16 @@ def print_trade_list(prices, total_asset, use_weights):
 
 # ======================== 止盈检查 ========================
 
-def take_profit_check(prices):
+def take_profit_check(ContextInfo, prices):
 	stocks_no_bond = [s for s in stocks if s not in ("511270.SH", "511220.SH")]
-	query_date = datetime.now().strftime('%Y%m%d')
-	price_data = xtdata.get_market_data_ex(['close'], stocks_no_bond, period='1d',
-										   start_time='', end_time=query_date, count=base_days, dividend_type='front')
+	dt_str = get_current_date(ContextInfo).strftime('%Y%m%d')
+	price_data = ContextInfo.get_market_data_ex(['close'],
+												stocks_no_bond,
+												period='',
+												start_time='',
+												end_time=dt_str,
+												dividend_type='front',
+												count=base_days)
 
 	any_triggered = False
 	for code in stocks_no_bond:
@@ -498,15 +549,15 @@ def take_profit_check(prices):
 		if pct >= last_3th:    
 			if pct_30 > 10 and pct < 9.8:
 				sell_amount = int((shares / 2) / 100) * 100
-				print(f"  {code} {get_stock_name(code)}: 触发止盈!")
+				print(f"  {code} {ContextInfo.get_stock_name(code)}: 触发止盈!")
 				print(f"    今日涨幅 {pct:.2f}% > 120天第3高 {last_3th:.2f}%, 30日涨幅 {pct_30:.2f}%")
 				print(f"    建议卖出 1/2 = {sell_amount}股")
 				any_triggered = True
 			else:
-				print(f"  {code} {get_stock_name(code)}: 涨幅达标但未触发({pct_30:.1f}%/30d) < 10%")
+				print(f"  {code} {ContextInfo.get_stock_name(code)}: 涨幅达标但未触发({pct_30:.1f}%/30d) < 10%")
 				print(f"    今日涨幅 {pct:.2f}% > 120天第3高 {last_3th:.2f}%, 30日涨幅 {pct_30:.2f}%")
 		else:
-			print(f"  {code} {get_stock_name(code)}: 涨幅 {pct:.2f}% <= {last_3th:.2f}% , 30日涨幅 {pct_30:.2f}%")
+			print(f"  {code} {ContextInfo.get_stock_name(code)}: 涨幅 {pct:.2f}% <= {last_3th:.2f}% , 30日涨幅 {pct_30:.2f}%")
 
 	if not any_triggered:
 		print(f"  无触发止盈")
@@ -514,16 +565,29 @@ def take_profit_check(prices):
 
 # ======================== 主流程 ========================
 
-if __name__ == "__main__":
+def init(ContextInfo):
+	g.log_path = get_log_path()
+	log_name = datetime.now().strftime('%Y%m%d')
+	tee = Tee(f"{g.log_path}\\{log_name}.log")
+	sys.stdout = tee
+	
 	print(f"{'='*60}")
 	print(f"全天候 ETF + 债券策略 — 模拟计算")
 	print(f"{'='*60}\n")
 
+def handlebar(ContextInfo):
+	if not ContextInfo.is_last_bar():
+		return
+		#pass
+
+	if not ContextInfo.is_new_bar():
+		return
+
 	# 1. 常规 ES 权重计算
-	calc_ES_weights()
+	calc_ES_weights(ContextInfo)
 
 	# 2. 获取价格和总资产
-	prices, positions_value, total_current_value = get_all_prices()
+	prices, positions_value, total_current_value = get_all_prices(ContextInfo)
 	total_asset = total_current_value + AVAILABLE_CASH
 
 	print(f"{'='*60}")
@@ -544,14 +608,14 @@ if __name__ == "__main__":
 	# 4. 根据回撤等级选择权重
 	if level > 0:
 		# 回撤触发：按母版逻辑卖债券 + 重新分配非债券权重
-		use_weights = calc_drawdown_weights(prices, positions_value, total_asset, level)
+		use_weights = calc_drawdown_weights(ContextInfo, prices, positions_value, total_asset, level)
 	else:
 		if force_level:
 			print(f"强制设置回撤等级为 {force_level} ， 以该等级设置权重")
-			use_weights = calc_force_drawndown_weights(force_level)
+			use_weights = calc_force_drawndown_weights(ContextInfo, force_level)
 		elif last_level:
 			print(f"  回撤等级 {drawdown_level}，但未跨级（last_level={last_level}），沿用之前的权重")
-			use_weights = calc_force_drawndown_weights(last_level)
+			use_weights = calc_force_drawndown_weights(ContextInfo, last_level)
 		else:
 			# 无回撤触发：使用常规权重
 			use_weights = weights
@@ -560,14 +624,14 @@ if __name__ == "__main__":
 	print(f"\n{'='*60}")
 	print(f"当前持仓 vs 目标")
 	print(f"{'='*60}")
-	print_position_table(prices, total_asset, use_weights)
-	print_trade_list(prices, total_asset, use_weights)
+	print_position_table(ContextInfo, prices, total_asset, use_weights)
+	print_trade_list(ContextInfo, prices, total_asset, use_weights)
 
 	# 6. 止盈检查
 	print(f"\n{'='*60}")
 	print(f"【止盈检查】（排除债券）")
 	print(f"{'='*60}")
-	take_profit_check(prices)
+	take_profit_check(ContextInfo, prices)
 
 	print(f"\n{'='*60}")
 	print(f"提示：修改文件顶部 ACTUAL_POSITIONS 和 AVAILABLE_CASH 后重新运行即可")

@@ -249,7 +249,8 @@ def get_log_path():
 	"""检查多个可能的logfiles路径，返回第一个存在的"""
 	candidates = [
 		'D:\\stock\\test_stock\\socket\\QMT\\code\\logfiles',
-		'C:\\Users\\Administrator\\Desktop\\socket\\QMT\\code\\logfiles'
+		'C:\\Users\\Administrator\\Desktop\\socket\\QMT\\code\\logfiles',
+		'C:\\socket\\QMT\\code\\logfiles'
 	]
 	for p in candidates:
 		if os.path.exists(p):
