@@ -11,6 +11,7 @@
 import math
 import unicodedata
 from datetime import datetime, timedelta
+from replace_symbol import process_replace
 
 class Tee:
 	"""将输出同时写入终端和日志文件"""
@@ -118,7 +119,7 @@ def get_last_price(ContextInfo, stock):
 def calc_ES_weights(ContextInfo):
 	alpha = 0.05
 	num = int(base_days * alpha)
-	print(f"样本数: {num}（{base_days}天 × {alpha}）")
+	print(f"样本数: {num}（{base_days}天 * {alpha}）")
 
 	for s in stocks:
 		down_history_data(s, '1d', "", "")
@@ -381,7 +382,7 @@ def calc_drawdown_weights(ContextInfo, prices, positions_value, total_asset, lev
 	# 打印债券卖出建议
 	bond_sells, _ = calc_bond_trades(target_bond_value, prices, positions_value)
 	for code, amount, price, reason in bond_sells:
-		print(f"  [卖出] {code} {ContextInfo.get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元")
+		print(f"  [卖出] {code} {ContextInfo.get_stock_name(code)}: {amount}股 * {price:.2f} = {amount*price:,.0f}元")
 
 	# 假设卖出完成后的债券市值
 	new_bond_value = target_bond_value
@@ -390,7 +391,7 @@ def calc_drawdown_weights(ContextInfo, prices, positions_value, total_asset, lev
 
 	# --- 步骤2：复用 calc_ES_weights 结果，去掉 511270 后重分配（与母版一致） ---
 	print(f"\n  --- 重新分配非债券权重 ---")
-	# 用已算好的常规权重，去掉 511270，归一化后 × (1 - bond_weight)
+	# 用已算好的常规权重，去掉 511270，归一化后 * (1 - bond_weight)
 	stock_weights = {k: v for k, v in weights.items() if k != "511270.SH"}
 	total_w = sum(stock_weights.values())
 
@@ -452,9 +453,9 @@ def print_position_table(ContextInfo, prices, total_asset, use_weights):
 		target_val = total_asset * w
 		diff = target_val - current_value
 		if diff > 500 and (target_val == 0 or abs(diff) / target_val > rebalance_tolerance):
-			action = f"<<< 买入 {diff/price/100:.2f}手"
+			action = f"○ 买入 {diff/price/100:.2f}手"
 		elif diff < -500 and (target_val == 0 or abs(diff) / target_val > rebalance_tolerance):
-			action = f">>> 卖出 {-diff/price/100:.2f}手"
+			action = f"√ 卖出 {-diff/price/100:.2f}手"
 		else:
 			action = "-"
 
@@ -488,12 +489,12 @@ def print_trade_list(ContextInfo, prices, total_asset, use_weights):
 		if diff > 500 and abs(diff) / target_value > rebalance_tolerance:
 			amount = int(diff / price / 100) * 100
 			if amount >= 100:
-				print(f"  [买入] {code} {ContextInfo.get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元")
+				print(f"  [买入] {code} {ContextInfo.get_stock_name(code)}: {amount}股 * {price:.2f} = {amount*price:,.0f}元")
 				has_trades = True
 		elif diff < -500 and abs(diff) / target_value > rebalance_tolerance:
 			amount = int(-diff / price / 100) * 100
 			if amount >= 100:
-				print(f"  [卖出] {code} {ContextInfo.get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元")
+				print(f"  [卖出] {code} {ContextInfo.get_stock_name(code)}: {amount}股 * {price:.2f} = {amount*price:,.0f}元")
 				has_trades = True
 
 	# 债券交易
@@ -501,10 +502,10 @@ def print_trade_list(ContextInfo, prices, total_asset, use_weights):
 	bond_sells, bond_buys = calc_bond_trades(bond_target, prices, {})
 
 	for code, amount, price, reason in bond_sells:
-		print(f"  [卖出] {code} {ContextInfo.get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元 ({reason})")
+		print(f"  [卖出] {code} {ContextInfo.get_stock_name(code)}: {amount}股 * {price:.2f} = {amount*price:,.0f}元 ({reason})")
 		has_trades = True
 	for code, amount, price, reason in bond_buys:
-		print(f"  [买入] {code} {ContextInfo.get_stock_name(code)}: {amount}股 × {price:.2f} = {amount*price:,.0f}元 ({reason})")
+		print(f"  [买入] {code} {ContextInfo.get_stock_name(code)}: {amount}股 * {price:.2f} = {amount*price:,.0f}元 ({reason})")
 		has_trades = True
 
 	if not has_trades:
@@ -551,7 +552,7 @@ def take_profit_check(ContextInfo, prices):
 				sell_amount = int((shares / 2) / 100) * 100
 				print(f"  {code} {ContextInfo.get_stock_name(code)}: 触发止盈!")
 				print(f"    今日涨幅 {pct:.2f}% > 120天第3高 {last_3th:.2f}%, 30日涨幅 {pct_30:.2f}%")
-				print(f"    建议卖出 1/2 = {sell_amount}股")
+				print(f"    √ 建议卖出 1/2 = {sell_amount}股")
 				any_triggered = True
 			else:
 				print(f"  {code} {ContextInfo.get_stock_name(code)}: 涨幅达标但未触发({pct_30:.1f}%/30d) < 10%")
@@ -636,3 +637,4 @@ def handlebar(ContextInfo):
 	print(f"\n{'='*60}")
 	print(f"提示：修改文件顶部 ACTUAL_POSITIONS 和 AVAILABLE_CASH 后重新运行即可")
 	print(f"{'='*60}")
+	process_replace(g.log_path)

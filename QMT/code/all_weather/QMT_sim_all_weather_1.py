@@ -11,6 +11,7 @@ import math
 import numpy as np
 import unicodedata
 from datetime import datetime, timedelta
+from replace_symbol import process_replace
 
 class Tee:
 	"""将输出同时写入终端和日志文件"""
@@ -162,7 +163,7 @@ def make_header():
 def calc_ES_weights(ContextInfo):
 	alpha = 0.05
 	num = int(base_days * alpha)
-	print(f"样本数: {num}（{base_days}天 × {alpha}）")
+	print(f"样本数: {num}（{base_days}天 * {alpha}）")
 
 	for s in stocks:
 		down_history_data(s, '1d', "", "")
@@ -341,10 +342,10 @@ def calc_trades(ContextInfo):
 
 		action = ""
 		if diff > 500 and (target_value == 0 or abs(diff) / target_value > rebalance_tolerance):
-			action = f"<<< 买入 {(diff/price/100):.2f}手"
+			action = f"○ 买入 {(diff/price/100):.2f}手"
 			buys.append((code, target_value, current_value, price))
 		elif diff < -500 and (target_value == 0 or abs(diff) / target_value > rebalance_tolerance):
-			action = f">>> 卖出 {(-diff/price/100):.2f}手"
+			action = f"√ 卖出 {(-diff/price/100):.2f}手"
 			sells.append((code, target_value, current_value, price))
 		else:
 			action = "-"
@@ -367,7 +368,7 @@ def calc_trades(ContextInfo):
 			name = ContextInfo.get_stock_name(code)
 			diff_value = current - target
 			sell_amount = int(diff_value / price / 100) * 100
-			print(f"  卖出 {code} {name}: {sell_amount}股 × {price:.2f}元 = {sell_amount*price:,.0f}元")
+			print(f"  卖出 {code} {name}: {sell_amount}股 * {price:.2f}元 = {sell_amount*price:,.0f}元")
 			print(f"    当前市值 {current:,.0f} → 目标市值 {target:,.0f}")
 
 	# 买入清单
@@ -379,7 +380,7 @@ def calc_trades(ContextInfo):
 			name = ContextInfo.get_stock_name(code)
 			diff_value = target - current
 			buy_amount = int(diff_value / price / 100) * 100
-			print(f"  买入 {code} {name}: {buy_amount}股 × {price:.2f}元 = {buy_amount*price:,.0f}元")
+			print(f"  买入 {code} {name}: {buy_amount}股 * {price:.2f}元 = {buy_amount*price:,.0f}元")
 			print(f"    当前市值 {current:,.0f} → 目标市值 {target:,.0f}")
 
 	# 止盈检查
@@ -433,7 +434,7 @@ def take_profit_check(ContextInfo, prices):
 				sell_amount = int((shares / 2) / 100) * 100
 				print(f"  {code} {ContextInfo.get_stock_name(code)}: 触发止盈!")
 				print(f"    今日涨幅 {pct:.2f}% > 120天第3高 {last_3th:.2f}%, 30日涨幅 {pct_30:.2f}%")
-				print(f"    建议卖出 1/2 = {sell_amount}股")
+				print(f"    √ 建议卖出 1/2 = {sell_amount}股")
 			else:
 				print(f"  {code} {ContextInfo.get_stock_name(code)}: 涨幅达标但未触发({pct_30:.1f}%/30d) < {T}%")
 				print(f"    今日涨幅 {pct:.2f}% > 120天第3高 {last_3th:.2f}%, 30日涨幅 {pct_30:.2f}%")
@@ -469,3 +470,4 @@ def handlebar(ContextInfo):
 	print(f"\n{'='*60}")
 	print(f"提示：修改文件顶部 ACTUAL_POSITIONS 和 AVAILABLE_CASH 后重新运行即可")
 	print(f"{'='*60}")
+	process_replace(g.log_path)
