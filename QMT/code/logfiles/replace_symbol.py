@@ -66,7 +66,7 @@ def process_replace(directory='.'):
         # 在这里添加需要替换的符号对
         replace_map = {
             '√': '✅',
-            '○': '⚪',
+            '○': '⭕',
             '×': '❌'
         }
         process_file(latest, replace_map)
