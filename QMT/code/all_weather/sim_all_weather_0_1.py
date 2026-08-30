@@ -13,6 +13,37 @@ import math
 import numpy as np
 import unicodedata
 from datetime import datetime, timedelta
+import sys
+import re
+
+ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+
+class Tee:
+	"""将输出同时写入终端和日志文件"""
+	def __init__(self, log_file_path):
+		self.terminal = sys.__stdout__      # 保留原始控制台输出流
+		self.log = open(log_file_path, 'a', encoding='utf-8')  # 追加模式
+
+	def write(self, message):
+		self.terminal.write(message)					# 打印到控制台
+		clean_message = ansi_escape.sub('', message)	# 去除颜色代码
+		self.log.write(clean_message)					# 写入日志文件
+		self.log.flush()								# 实时写入磁盘
+
+	def flush(self):
+		try:
+			#self.terminal.flush()
+			self.log.flush()
+		except ValueError:
+			pass
+
+	def close(self):
+		self.log.close()
+		
+		
+class G():
+	pass
+g = G() #创建空的类的实例 用来保存委托状态
 
 # ======================== 手动输入你的实际持仓 ========================
 
@@ -392,6 +423,10 @@ def take_profit_check(prices):
 # ======================== 主流程 ========================
 
 if __name__ == "__main__":
+	log_name = datetime.now().strftime('%Y%m%d')
+	tee = Tee(f"logfiles\\{log_name}_all_weather.log")
+	sys.stdout = tee
+
 	print(f"{'='*60}")
 	print(f"全天候 ETF 策略 — 模拟计算")
 	print(f"{'='*60}\n")

@@ -773,3 +773,12 @@ check_remain_amount count  5
 
 
 close XtMiniQmt.exe success
+open QMT success
+reconnect
+QMT路径: C:\QMT\userdata_mini
+new g.xt_trader
+start
+建立交易连接，返回0表示连接成功 -1
+
+收到信号 2，关闭调度器...
+调度器已关闭
