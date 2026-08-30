@@ -569,7 +569,7 @@ def take_profit_check(ContextInfo, prices):
 def init(ContextInfo):
 	g.log_path = get_log_path()
 	log_name = datetime.now().strftime('%Y%m%d')
-	tee = Tee(f"{g.log_path}\\{log_name}.log")
+	tee = Tee(f"{g.log_path}\\{log_name}_all_weather_bond.log")
 	sys.stdout = tee
 	
 	print(f"{'='*60}")
@@ -638,3 +638,4 @@ def handlebar(ContextInfo):
 	print(f"提示：修改文件顶部 ACTUAL_POSITIONS 和 AVAILABLE_CASH 后重新运行即可")
 	print(f"{'='*60}")
 	process_replace(g.log_path)
+	sys.stdout.close()

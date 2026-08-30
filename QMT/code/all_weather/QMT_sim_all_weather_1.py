@@ -49,9 +49,9 @@ def get_log_path():
 	]
 	for p in candidates:
 		if os.path.exists(p):
-			print(f'logfiles路径: {p}')
+			#print(f'logfiles路径: {p}')
 			return p
-	print('未找到logfiles路径，使用默认路径')
+	#print('未找到logfiles路径，使用默认路径')
 	return candidates[0]
 
 
@@ -471,3 +471,4 @@ def handlebar(ContextInfo):
 	print(f"提示：修改文件顶部 ACTUAL_POSITIONS 和 AVAILABLE_CASH 后重新运行即可")
 	print(f"{'='*60}")
 	process_replace(g.log_path)
+	sys.stdout.close()

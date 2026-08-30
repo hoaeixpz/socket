@@ -1184,7 +1184,9 @@ def exec_all_weather():
 			print(f"{stock} {get_stock_name(stock)} 未买入, 目标市值{target_value:.2f}, 股价 {current_price}元, amount {target_value / current_price:.2f}")
 
 def sc_rebalance_sell():
-	if not is_weekday_job(g.weekday):
+	#if not is_weekday_job(g.weekday):
+	#	return
+	if not g.is_trading_day:
 		return
 	if g.trade is False:
 		return
@@ -1236,7 +1238,9 @@ def sc_rebalance_sell():
 
 def sc_rebalance_buy():
 	#卖出股票后才有钱买入
-	if not is_weekday_job(g.weekday):
+	#if not is_weekday_job(g.weekday):
+	#	return
+	if not g.is_trading_day:
 		return
 	if not g.sell_done:                     #卖出股票后才有钱买入
 		return
