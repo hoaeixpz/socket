@@ -104,75 +104,6 @@ def get_last_price(stock):
 	return None
 
 
-# ======================== 权重计算（与母版完全一致） ========================
-
-def calc_ES_weights():
-	alpha = 0.05
-	num = int(base_days * alpha)
-	print(f"样本数: {num}（{base_days}天 × {alpha}）")
-
-	for s in stocks:
-		xtdata.download_history_data(s, period='1d', incrementally=True)
-
-	query_date = datetime.now().strftime('%Y%m%d')
-	price_data = xtdata.get_market_data_ex(['close'], stocks, period='1d',
-										   start_time='', end_time=query_date,
-										   count=base_days, dividend_type='front')
-
-	raw = {}
-	for code in stocks:
-		df = price_data.get(code)
-		if df is None or len(df) < base_days:
-			raw[code] = 0
-			print(f"{code} {get_stock_name(code)} 数据不足，权重=0")
-		else:
-			df['daily_return'] = df['close'].pct_change() * 100
-			df = df.iloc[1:].dropna(subset=['daily_return'])
-			srt = df['daily_return'].sort_values()
-			ES = srt.head(num).mean()
-			raw[code] = -1 / ES
-			print(f"{code} {get_stock_name(code)}  ES={ES:.3f}  raw={raw[code]:.4f}")
-
-	# 标准化 + 纳指/黄金加成（与母版一致）
-	total = sum(raw.values())
-	for code in stocks:
-		w = raw[code] / total * (1 - nazhi_weight - golden_weight)
-		if code == "513100.SH":
-			w += nazhi_weight
-		if code == "518880.SH":
-			w += golden_weight
-		weights[code] = w
-
-	# 计算当前权重（基于实际持仓和最新价格）
-	total_value = 0
-	current_prices = {}
-	for code in ACTUAL_POSITIONS:
-		price = get_last_price(code)
-		current_prices[code] = price
-		if price:
-			total_value += ACTUAL_POSITIONS.get(code, 0) * price
-	total_asset = total_value + AVAILABLE_CASH
-
-	print(f"\n{'='*60}")
-	print(f"目标权重 vs 当前权重")
-	print(f"{'='*60}")
-	print(f" 总资产 {total_asset:.1f}")
-	print(f"  {'代码':<14s} {'名称':<15s} {'持仓':<10s} {'市值':<10s}   {'目标权重':<12s} {'当前权重':<12s}")
-	print(f"  {'-'*100}")
-	actual_stocks = stocks.copy()
-	actual_stocks.append("511220.SH")
-	for code in actual_stocks:
-		name = get_stock_name(code)
-		target_wt = weights.get(code,0) * 100
-		cur_shares = ACTUAL_POSITIONS.get(code, 0)
-		cur_price = current_prices.get(code)
-		cur_value = cur_shares * cur_price if cur_price else 0
-		cur_wt = cur_value / total_asset * 100 if total_asset > 0 else 0
-		print(f"  {code:<14s} {name:<15s} {cur_shares:<10.0f} {cur_value:<10.1f} {target_wt:>12.2f}% {cur_wt:>12.2f}%")
-	print(f"{'现金':>70s}    {AVAILABLE_CASH/total_asset*100:7.2f}%")
-	print()
-
-
 # ======================== 债券买卖计算 ========================
 
 def calc_bond_trades(target_value, prices, positions_value):
@@ -283,6 +214,74 @@ def make_row(code, name, price, shares, cur_val, tgt_val, diff, action):
 def make_header():
 	"""构建表头"""
 	return make_row('代码', '名称', '股价', '持仓', '当前市值', '目标市值', '差值', '操作')
+
+# ======================== 权重计算（与母版完全一致） ========================
+
+def calc_ES_weights():
+	alpha = 0.05
+	num = int(base_days * alpha)
+	print(f"样本数: {num}（{base_days}天 × {alpha}）")
+
+	for s in stocks:
+		xtdata.download_history_data(s, period='1d', incrementally=True)
+
+	query_date = datetime.now().strftime('%Y%m%d')
+	price_data = xtdata.get_market_data_ex(['close'], stocks, period='1d',
+										   start_time='', end_time=query_date,
+										   count=base_days, dividend_type='front')
+
+	raw = {}
+	for code in stocks:
+		df = price_data.get(code)
+		if df is None or len(df) < base_days:
+			raw[code] = 0
+			print(f"{code} {get_stock_name(code)} 数据不足，权重=0")
+		else:
+			df['daily_return'] = df['close'].pct_change() * 100
+			df = df.iloc[1:].dropna(subset=['daily_return'])
+			srt = df['daily_return'].sort_values()
+			ES = srt.head(num).mean()
+			raw[code] = -1 / ES
+			print(f"{code} {get_stock_name(code)}  ES={ES:.3f}  raw={raw[code]:.4f}")
+
+	# 标准化 + 纳指/黄金加成（与母版一致）
+	total = sum(raw.values())
+	for code in stocks:
+		w = raw[code] / total * (1 - nazhi_weight - golden_weight)
+		if code == "513100.SH":
+			w += nazhi_weight
+		if code == "518880.SH":
+			w += golden_weight
+		weights[code] = w
+
+	# 计算当前权重（基于实际持仓和最新价格）
+	total_value = 0
+	current_prices = {}
+	for code in ACTUAL_POSITIONS:
+		price = get_last_price(code)
+		current_prices[code] = price
+		if price:
+			total_value += ACTUAL_POSITIONS.get(code, 0) * price
+	total_asset = total_value + AVAILABLE_CASH
+
+	print(f"\n{'='*60}")
+	print(f"目标权重 vs 当前权重")
+	print(f"{'='*60}")
+	print(f" 总资产 {total_asset:.1f}")
+	print(f"  {'代码':<14s} {'名称':<15s} {'持仓':<10s} {'市值':<10s}   {'目标权重':<12s} {'当前权重':<12s}")
+	print(f"  {'-'*100}")
+	actual_stocks = stocks.copy()
+	actual_stocks.append("511220.SH")
+	for code in actual_stocks:
+		name = get_stock_name(code)
+		target_wt = weights.get(code,0) * 100
+		cur_shares = ACTUAL_POSITIONS.get(code, 0)
+		cur_price = current_prices.get(code)
+		cur_value = cur_shares * cur_price if cur_price else 0
+		cur_wt = cur_value / total_asset * 100 if total_asset > 0 else 0
+		print(f"  {code:<14s} {name:<15s} {cur_shares:<10.0f} {cur_value:<10.1f} {target_wt:>12.2f}% {cur_wt:>12.2f}%")
+	print(f"{'现金':>70s}    {AVAILABLE_CASH/total_asset*100:7.2f}%")
+	print()
 
 
 def get_all_prices():
@@ -537,7 +536,7 @@ def take_profit_check(prices):
 				print(f"  {code} {get_stock_name(code)}: 涨幅达标但未触发({pct_30:.1f}%/30d) < 10%")
 				print(f"    今日涨幅 {pct:.2f}% > 120天第3高 {last_3th:.2f}%, 30日涨幅 {pct_30:.2f}%")
 		else:
-			print(f"  {code} {get_stock_name(code)}: 涨幅 {pct:.2f}% <= {last_3th:.2f}% , 30日涨幅 {pct_30:.2f}%")
+			print(f"  {code} {get_stock_name(code)}: 今日涨幅 {pct:.2f}% <= 阈值 {last_3th:.2f}% , 30日涨幅 {pct_30:.2f}%")
 
 	if not any_triggered:
 		print(f"  无触发止盈")
