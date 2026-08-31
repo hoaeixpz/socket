@@ -49,9 +49,9 @@ def get_log_path():
 	]
 	for p in candidates:
 		if os.path.exists(p):
-			print(f'logfiles路径: {p}')
+			#print(f'logfiles路径: {p}')
 			return p
-	print('未找到logfiles路径，使用默认路径')
+	#print('未找到logfiles路径，使用默认路径')
 	return candidates[0]
 
 
@@ -94,7 +94,7 @@ rebalance_tolerance = 0.06  # 偏离 6% 才交易
 weights = {}
 
 # 回撤管理
-record_max = 219202
+record_max = 233962.8
 max_down_T = [1.1, 1.7, 2.4, 3.2]
 last_level = 2          # 上次回撤等级（防止同一等级重复触发）
 force_level = None

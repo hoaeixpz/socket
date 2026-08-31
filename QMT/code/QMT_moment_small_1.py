@@ -425,7 +425,7 @@ def calc_sell_tax(value, stock):
 
 def sell_target_value(ContextInfo, stock, target_value, strat_idx=None):
 	positions = get_positions(ContextInfo)
-	for stock_code, pos in positions:
+	for stock_code, pos in positions.items():
 		if stock_code != stock:
 			continue
 
