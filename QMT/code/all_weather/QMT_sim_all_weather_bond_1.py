@@ -66,14 +66,14 @@ def get_current_date(ContextInfo):
 ACTUAL_POSITIONS = {
 	"511270.SH": 500,       # 十年地方债
 	"600900.SH": 1300,      # 长江电力
-	"511220.SH": 1800,      # 城投债ETF（由 buy_bond/sell_bond 管理，不参与权重计算）
-	"518880.SH": 3300,      # 黄金ETF
-	"601288.SH": 3600,      # 农业银行
-	"513100.SH": 16900,     # 纳指ETF
-	"159985.SZ": 10900,      # 豆粕ETF
+	"511220.SH": 2300,      # 城投债ETF（由 buy_bond/sell_bond 管理，不参与权重计算）
+	"518880.SH": 3100,      # 黄金ETF
+	"601288.SH": 3200,      # 农业银行
+	"513100.SH": 18300,     # 纳指ETF
+	"159985.SZ": 8900,      # 豆粕ETF
 }
 
-AVAILABLE_CASH = 1.7        # 账户可用资金（元）
+AVAILABLE_CASH = 942.55     # 账户可用资金（元）
 
 # ======================== 策略参数 ========================
 
@@ -94,7 +94,7 @@ rebalance_tolerance = 0.06  # 偏离 6% 才交易
 weights = {}
 
 # 回撤管理
-record_max = 233962.8
+record_max = 235215.45
 max_down_T = [1.1, 1.7, 2.4, 3.2]
 last_level = 2          # 上次回撤等级（防止同一等级重复触发）
 force_level = None
