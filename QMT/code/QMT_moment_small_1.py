@@ -359,23 +359,23 @@ def handlebar(ContextInfo):
 	if dt.hour == 9 and dt.minute == 35:
 		trade_etf(ContextInfo)
 
-	if dt.hour == 9 and dt.minute == 55 and is_weekday_job(ContextInfo):
+	if dt.hour == 9 and dt.minute == 56 and is_weekday_job(ContextInfo):
 		rebalance_sell(ContextInfo)
 
 	if dt.hour == 10 and dt.minute == 15:
 		stop_loss(ContextInfo)
 
-	if dt.hour == 10 and dt.minute == 30 and is_weekday_job(ContextInfo):
+	if dt.hour == 10 and dt.minute == 31 and is_weekday_job(ContextInfo):
 		if g.sell_done:
 			rebalance_buy(ContextInfo)
 		else:
 			print(f"今日({dt})非调仓日，不执行操作")
 
-	if dt.hour == 11 and dt.minute == 0:
+	if dt.hour == 11 and dt.minute == 1:
 		mom_rebalance(ContextInfo)
 
 
-	if dt.hour == 14 and dt.minute == 10:
+	if dt.hour == 14 and dt.minute == 11:
 		trade_afternoon(ContextInfo)
 
 
@@ -396,7 +396,7 @@ def handlebar(ContextInfo):
 # ================================================================
 # 下单函数
 # ================================================================
-# passorder(opType, orderType, accountid, orderCode, prType, modelprice, volume
+# passorder(opType, orderType, accountid, orderCode, prType, modelprice, volume, [strategyName, quickTrade, userOrderId],ContextInfo)
 # opType    : 23 买入 ，24 卖出
 # orderType : 1102 按价格买卖
 # accountid : ContextInfo.account 账号
@@ -404,8 +404,9 @@ def handlebar(ContextInfo):
 # prType    : 0-4: 卖5~卖1 、 5:最新价 、 6-10: 买1~买5 、 11: 指定价格
 # modelprice: 如果prType是11，填指定价格，不是填任意值
 # volume    : 根据orderType最后一位判断 为1，按股数买卖 、 为2，按目标价值买卖 、 为3，按百分比买卖
+# strategyName: 自定义策略名
 # quickTrade: 可选项， 为2 表明立刻下单，不用等待bar数据填充完整
-
+# userOrderId： 自定义ID
 
 def calc_commission(value):
 	#手续费，按万二算，不满5元按5元算
@@ -514,7 +515,7 @@ def buy_target_value(ContextInfo, stock, target_value, strat_idx=None):
 		commission = calc_commission(volume)
 		g.cash_reserved[strat_idx] -= (volume + commission)
 		g.positions[strat_idx].add(stock)
-		print(f"成功买入 {stock} 后，策略{strat_idx} 现有资金 {g.cash_reserved[strat_idx]:.2f}")
+		print(f"成功买入 {stock} 后，策略{strat_idx} 减少资金{volume:.2f}, 再扣除佣金{commission:.1f}, 现有资金 {g.cash_reserved[strat_idx]:.2f}")
 	#order_target_value(stock, target_value + current_price * 10, 'SALE1', ContextInfo, ContextInfo.account)
 
 def buy_target_shares(ContextInfo, stock, target_share, strat_idx=None):
@@ -784,10 +785,14 @@ def mom_rebalance(ContextInfo):
 				print(f"  {ContextInfo.get_stock_name(stock)}({stock}) 跌停，跳过")
 				continue
 			buy_target_value(ContextInfo, stock, target, MOM_IDX)
+			print("sleep 30s")
+			sleep_sec(30)
 		else:
 			print(f"  [与目标差异太小，不加仓] {ContextInfo.get_stock_name(stock)}({stock}): {current_val:,.2f} → {target:,.2f} 策略资金{stra_avi_cash:,.2f}")
 
 	print(f'√========== [动量策略] 调仓结束 ==========\n')
+
+	info_position(ContextInfo)
 
 
 # ================================================================
@@ -1105,7 +1110,7 @@ def rebalance_sell(ContextInfo):
 		print(f"√当前持股 {len(current_holdings)}只")
 		current_holdings.sort()
 		for stock in current_holdings:
-			print(f"√{ContextInfo.get_stock_name(stock)}")
+			print(f"{ContextInfo.get_stock_name(stock)}")
 			
 		print(f"√需要买入股票 {len(g.stocks_to_buy)}只")
 		print(f"√需要卖出股票 {len(g.stocks_to_sell)}只")
@@ -1141,7 +1146,7 @@ def rebalance_buy(ContextInfo):
 	g.count += 1
 	
 	current_date = get_current_date(ContextInfo)
-	print(f'√========== 执行周度调仓，日期：{current_date} ==========')
+	print(f'√========== [小市值策略]周度调仓(买入) {current_date} ==========')
 	# 执行买入逻辑
 	if g.stocks_to_buy:
 		print(f"√今日({current_date})为买入时间，执行买入操作")
@@ -1202,7 +1207,7 @@ def calc_position(ContextInfo):
 		
 	for stock, pos in g.excepted_position.items():
 		stock_name = ContextInfo.get_stock_name(stock)
-		print(' 期望持仓: %s(%s), 占比 %.2f%%' % (stock_name, stock, pos * 100))
+		print('  期望持仓: %s(%s), 占比 %.2f%%' % (stock_name, stock, pos * 100))
 
 	position_dict = {} #记录实际仓位比重
 	position_sum = 0
@@ -1346,7 +1351,7 @@ def calc_position(ContextInfo):
 						break
 				if num > 0:
 					g.excepted_position[stock] = (current_value + current_price * num * 100) / strategy_total
-					print(f'调整买入数量，追加{num}手,仓位占比调整为{g.excepted_position[stock] * 100:.2f}%')
+					print(f'√调整买入数量，追加{num}手,仓位占比调整为{g.excepted_position[stock] * 100:.2f}%')
 					
 		'''
 		amount = int(diff_value / current_price / 100) * 100
@@ -1538,7 +1543,7 @@ def sell_stocks(ContextInfo):
 	g.stocks_fail_sell = []
 	for stock in g.stocks_to_sell:
 		print('√>>>>>>>>>>>>')
-		print('√卖出: ',ContextInfo.get_stock_name(stock))
+		print('√卖出:',ContextInfo.get_stock_name(stock))
 		sell_target_value(ContextInfo, stock, 0, SC_IDX)
 		is_paused = ContextInfo.is_suspended_stock(stock)
 		is_dieting = is_limit_down(ContextInfo, stock)
@@ -1574,7 +1579,7 @@ def buy_stocks(ContextInfo):
 
 			print("")
 			available_cash = get_strategy_available_cash(SC_IDX)
-			print(f'===可用资金 {available_cash}===')
+			print(f'√===可用资金 {available_cash}===')
 
 			if stock == g.etf:
 				target_value_per_stock = min(available_cash, target_value_per_stock)
@@ -1637,14 +1642,14 @@ def info_position(ContextInfo):
 			blank = get_blank(ratio)
 			diff_price = price - pos['avg_cost']
 			industry = g.industry_dict.get(stock,None)
-			print(f"√{stock_name}({stock}) 占比 {pos['value'] / total_value * 100:.2f}%, 涨幅: {blank}{ratio:.2f}% ({diff_price * pos['total_amount']:.2f}) x {pos['total_amount']} = {pos['value']:.1f}元")
+			print(f"√{stock_name}({stock}) 占比 {pos['value'] / total_value * 100:.2f}% 涨幅: {blank}{ratio:.2f}% ({diff_price * pos['total_amount']:.2f}) x {pos['total_amount']} = {pos['value']:.1f}元")
 		
 		for stock, pos in positions.items():
 			stock_name = ContextInfo.get_stock_name(stock)
 			if pos['total_amount'] == 0:
 				print(f"√持仓: {stock_name}({stock}) 0股")
 
-		print(f'√*******************总资产 {total_value:.2f}  剩余可用金额 {available_cash:.2f}元*******************\n\n')
+		print(f'√*******************总资产 {total_value:.2f}  剩余可用金额 {available_cash:.2f}元*******************')
 
 		# 打印各策略资金隔离状况
 		for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
