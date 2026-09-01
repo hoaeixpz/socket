@@ -442,9 +442,9 @@ def sell_target_value(ContextInfo, stock, target_value, strat_idx=None):
 					6,						# prType    : 0-4: 卖5~卖1 、 5:最新价 、 6-10: 买1~买5 、 11: 指定价格
 					-1,						# modelprice: 如果prType是11，填指定价格，不是填任意值
 					pos['total_amount'],	# volume    : 根据orderType最后一位判断 为1，按股数买卖 、 为2，按目标价值买卖 、 为3，按百分比买卖
-					'',
+					'',						# strategyName : 策略名
 					2,						# quickTrade: 可选项， 为2 表明立刻下单，不用等待bar数据填充完整
-					f'清仓{stock}',
+					f'策略 {strat_idx} 清仓 {stock}',			# 备注
 					ContextInfo
 			)
 		else:
@@ -463,7 +463,9 @@ def sell_target_value(ContextInfo, stock, target_value, strat_idx=None):
 						6, 						# prType    : 0-4: 卖5~卖1 、 5:最新价 、 6-10: 买1~买5 、 11: 指定价格
 						-1, 					# modelprice: 如果prType是11，填指定价格，不是填任意值
 						volume, 				# volume    : 根据orderType最后一位判断 为1，按股数买卖 、 为2，按目标价值买卖 、 为3，按百分比买卖
+						'',						# strategyName : 策略名
 						2, 						# quickTrade: 可选项， 为2 表明立刻下单，不用等待bar数据填充完整
+						f'策略 {strat_idx} 卖出 {stock} {volume} 元',			# 备注
 						ContextInfo
 					)
 
@@ -505,7 +507,9 @@ def buy_target_value(ContextInfo, stock, target_value, strat_idx=None):
 				4, 						# prType    : 0-4: 卖5~卖1 、 5:最新价 、 6-10: 买1~买5 、 11: 指定价格
 				-1, 					# modelprice: 如果prType是11，填指定价格，不是填任意值
 				volume, 				# volume    : 根据orderType最后一位判断 为1，按股数买卖 、 为2，按目标价值买卖 、 为3，按百分比买卖
+				'',
 				2, 						# quickTrade: 可选项， 为2 表明立刻下单，不用等待bar数据填充完整
+				f'买入 {strat_idx} 股票 {stock} {volume} 元',
 				ContextInfo
 		)
 
@@ -531,7 +535,9 @@ def buy_target_shares(ContextInfo, stock, target_share, strat_idx=None):
 			6, 							# prType    : 0-4: 卖5~卖1 、 5:最新价 、 6-10: 买1~买5 、 11: 指定价格
 			-1, 						# modelprice: 如果prType是11，填指定价格，不是填任意值
 			target_share, 				# volume    : 根据orderType最后一位判断 为1，按股数买卖 、 为2，按价值买卖 、 为3，按百分比买卖
+			'',
 			2, 							# quickTrade: 可选项， 为2 表明立刻下单，不用等待bar数据填充完整
+			f'买入 {strat_idx} 股票 {stock} {target_share} 股',
 			ContextInfo)
 	print(f"buy {stock} {amount}股 @ {current_price:.2f}")
 	
@@ -545,6 +551,7 @@ def buy_target_shares(ContextInfo, stock, target_share, strat_idx=None):
 
 
 def order_callback(ContextInfo, orderInfo):
+	return
 	print("order_callback")
 	print_order_info(orderInfo)
 	'''
@@ -566,8 +573,10 @@ def deal_callback(ContextInfo, dealInfo):
 		print(f'实际买入 {dealInfo.m_strInstrumentID} {dealInfo.m_nVolume}股，每股{dealInfo.m_dPrice}元，合计:{dealInfo.m_dTradeAmount:.2f}, 手续费{dealInfo.m_dComssion:.2f}')
 
 	if buy_sell_str == '卖出':
-		if dealInfo.m_strRemark == 'qingkong':
-			print(f'卖出 {dealInfo.m_strInstrumentID} {dealInfo.m_nVolume}股 * {dealInfo.m_dPrice:.2f}元')
+		print(f'实际卖出 {dealInfo.m_strInstrumentID} {dealInfo.m_nVolume}股 * {dealInfo.m_dPrice:.2f}元')
+
+	print(f'备注 {dealInfo.m_strRemark}')
+	print(f"现有资金: {g.cash_reserved[0]} {g.cash_reserved[1]}")
 
 # ================================================================
 # 动量策略
