@@ -398,7 +398,7 @@ def handlebar(ContextInfo):
 # ================================================================
 # passorder(opType, orderType, accountid, orderCode, prType, modelprice, volume, [strategyName, quickTrade, userOrderId],ContextInfo)
 # opType    : 23 买入 ，24 卖出
-# orderType : 1102 按价格买卖
+# orderType : 1102 按价值买卖
 # accountid : ContextInfo.account 账号
 # orderCode : stock 股票代码
 # prType    : 0-4: 卖5~卖1 、 5:最新价 、 6-10: 买1~买5 、 11: 指定价格
@@ -457,7 +457,7 @@ def sell_target_value(ContextInfo, stock, target_value, strat_idx=None):
 					print(f"现有持仓 {pos['value']:.2f}元，相差 {volume:.2f}元，需要卖出股数 {volume / current_price:.2f}不足100股，放弃交易")
 				else:
 					passorder(24,				# opType    : 23 买入 ，24 卖出
-						1102,					# orderType : 1102 按价格买卖
+						1102,					# orderType : 1102 按价值买卖
 						ContextInfo.account,	# accountid : ContextInfo.account 账号
 						stock, 					# orderCode : stock 股票代码
 						6, 						# prType    : 0-4: 卖5~卖1 、 5:最新价 、 6-10: 买1~买5 、 11: 指定价格
@@ -500,8 +500,14 @@ def buy_target_value(ContextInfo, stock, target_value, strat_idx=None):
 		volume = min(volume, get_strategy_available_cash(strat_idx))
 
 	if volume > 0:
-		passorder(23,					# opType    : 23 买入 ，24 卖出
-				1102,					# orderType : 1102 按价格买卖
+		current_price = get_last_price(ContextInfo, stock)
+		amount = int(volume / current_price / 100) * 100
+		if amount < 100:
+			print(f"{stock} {ContextInfo.get_stock_name(stock)} 现价{current_price:.2f} 期望持仓 {target_value:.2f}元,")
+			print(f"现有持仓 {pos['value']:.2f}元，相差 {volume:.2f}元，需要买入股数 {volume / current_price:.2f}不足100股，放弃交易")
+		else:
+			passorder(23,				# opType    : 23 买入 ，24 卖出
+				1102,					# orderType : 1102 按价值买卖
 				ContextInfo.account, 	# accountid : ContextInfo.account 账号
 				stock, 					# orderCode : stock 股票代码
 				4, 						# prType    : 0-4: 卖5~卖1 、 5:最新价 、 6-10: 买1~买5 、 11: 指定价格
@@ -511,15 +517,15 @@ def buy_target_value(ContextInfo, stock, target_value, strat_idx=None):
 				2, 						# quickTrade: 可选项， 为2 表明立刻下单，不用等待bar数据填充完整
 				f'买入 {strat_idx} 股票 {stock} {volume} 元',
 				ContextInfo
-		)
+			)
 
-		print(f"buy {stock} passorder target value {target_value:.2f} current {current_value:.2f} volume {volume:.2f}")
-
-	if strat_idx is not None and volume > 0:
-		commission = calc_commission(volume)
-		g.cash_reserved[strat_idx] -= (volume + commission)
-		g.positions[strat_idx].add(stock)
-		print(f"成功买入 {stock} 后，策略{strat_idx} 减少资金{volume:.2f}, 再扣除佣金{commission:.1f}, 现有资金 {g.cash_reserved[strat_idx]:.2f}")
+			print(f"buy {stock} passorder target value {target_value:.2f} current {current_value:.2f} volume {volume:.2f}")
+			if strat_idx is not None:
+				estimate_cash = amount * current_price
+				commission = calc_commission(estimate_cash)
+				g.cash_reserved[strat_idx] -= (estimate_cash + commission)
+				g.positions[strat_idx].add(stock)
+				print(f"成功买入 {stock} 后，策略{strat_idx} 减少资金{estimate_cash:.2f}, 再扣除佣金{commission:.1f}, 现有资金为 {g.cash_reserved[strat_idx]:.2f}")
 	#order_target_value(stock, target_value + current_price * 10, 'SALE1', ContextInfo, ContextInfo.account)
 
 def buy_target_shares(ContextInfo, stock, target_share, strat_idx=None):
