@@ -650,6 +650,7 @@ def calc_momentum_score(ContextInfo, etf, days):
 												period='1d',
 												start_time='',
 												end_time=dt_str,
+												fill_data=False,
 												dividend_type='front',
 												count=days+1)
 	if etf not in history_data or history_data[etf].empty:
