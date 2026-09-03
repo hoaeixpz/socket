@@ -268,6 +268,7 @@ def init(ContextInfo):
 	print("init — 双策略合并版")
 	period = ContextInfo.period
 	print(period)
+	print(datetime.now().strftime('%Y%m%d-%H%M%S'))
 	ContextInfo.account = '8885388757'
 	ContextInfo.set_account(ContextInfo.account)
 	account_info = get_trade_detail_data(ContextInfo.account, 'STOCK', 'ACCOUNT')
@@ -350,7 +351,8 @@ def handlebar(ContextInfo):
 	# 将时间戳转换为可读的日期时间对象，这里需要根据QMT API具体函数来操作
 	# 假设有一个函数 timetag_to_datetime 用于转换
 	dt = get_current_date(ContextInfo)
-	#print(dt)
+	if dt.minute == 0:
+		print(dt)
 
 	if dt.hour == 9 and dt.minute == 31:
 		judge_date(ContextInfo)
@@ -384,6 +386,7 @@ def handlebar(ContextInfo):
 		#for obj in objlist:
 		#	print_hold_stock_info(obj)
 		after_trading_end(ContextInfo)
+		#select_etf(ContextInfo)
 		process_replace(g.log_path)
 
 	'''
@@ -639,9 +642,8 @@ def get_strategy_total(ContextInfo, strat_idx):
 			holdings_value += positions[stock]['value']
 	return g.cash_reserved[strat_idx] + holdings_value
 
-def calc_momentum_score(ContextInfo, etf, days):
-	"""计算单只ETF的动量得分。返回 (annualized_return, r2, score, min_recent_ratio)"""
-
+def calc_momentum_scores(ContextInfo, etf, days):
+	"""计算单只ETF当日以及上一日的动量得分。返回 (annualized_return, r2, min_recent_ratio, score, score_last)"""
 	# 获取历史数据
 	dt_str = get_current_date(ContextInfo).strftime('%Y%m%d')
 	down_history_data(etf, '1d', dt_str, "")
@@ -652,14 +654,24 @@ def calc_momentum_score(ContextInfo, etf, days):
 												end_time=dt_str,
 												fill_data=False,
 												dividend_type='front',
-												count=days+1)
+												count=days+2)
 	if etf not in history_data or history_data[etf].empty:
-		return 0, 0, 0, 0
+		return 0, 0, 0, 0, 0
 
 	df = history_data[etf]
 	close_prices = df['close'].values
-	prices = close_prices
+	prices = close_prices[1:]
 	print(prices)
+
+	annualized_return, r2, score, min_recent_ratio = calc_momentum_score(ContextInfo, prices)
+
+	prices_last = close_prices[:-1]
+	_, _, score_last, _ = calc_momentum_score(ContextInfo, prices_last)
+
+	return annualized_return, r2, min_recent_ratio, score, score_last
+
+def calc_momentum_score(ContextInfo, prices):
+	"""计算单只ETF的动量得分。返回 (annualized_return, r2, score, min_recent_ratio)"""
 
 	# 对数价格加权线性回归
 	y = np.log(prices)
@@ -696,17 +708,20 @@ def select_etf(ContextInfo):
 		print(f"\n========== [{label}] 开始 (窗口={days}天) ==========")
 		results = {}
 		for etf in ETF_POOL:
-			ann_ret, r2, score, recent_ratio = calc_momentum_score(ContextInfo, etf, days)
+			ann_ret, r2, recent_ratio, score, score_last = calc_momentum_scores(ContextInfo, etf, days)
 			name = ContextInfo.get_stock_name(etf) or etf
 			max_score = max_score_map.get(etf)
 			dip_min = ETF_DIP_MIN.get(etf, 0.95)
-			bad = (score <= 0 or score >= max_score) or recent_ratio < dip_min
+			bad = (score <= 0 or score >= max_score or score_last >= max_score) or recent_ratio < dip_min
 			down_ratio = (1 - recent_ratio) * 100
 			reason = ''
 			if bad:
 				reason += ' -> [淘汰]'
 				if score >= max_score:
 					reason += (f" 分数超出阈值{max_score}")
+				elif score_last >= max_score:
+					reason += (f" 近2日分数超出阈值{score_last:.2f} > {max_score}")
+
 				if recent_ratio < dip_min:
 					reason += (f" 跌幅超出阈值 {(1 - dip_min) * 100:.0f}%")
 
@@ -735,7 +750,7 @@ def mom_rebalance(ContextInfo):
 	if not is_trading_day(ContextInfo):
 		return
 
-	print(f'\n========== [动量策略] 每日调仓 {get_current_date(ContextInfo)} ==========')
+	print(f'\n√========== [动量策略] 每日调仓 {get_current_date(ContextInfo)} ==========')
 
 	# 选股
 	targets = select_etf(ContextInfo)
