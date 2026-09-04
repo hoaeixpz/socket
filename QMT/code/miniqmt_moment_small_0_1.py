@@ -367,7 +367,7 @@ def init():
 	info = g.xt_trader.query_stock_asset(g.account)
 
 	# 多策略配置
-	g.portfolio_value_proportion = [0.001, 0.999]
+	g.portfolio_value_proportion = [0.05, 0.95]
 	# 每个策略的预留现金（买卖驱动），互相隔离
 	g.cash_reserved = {MOM_IDX: g.portfolio_value_proportion[MOM_IDX] * info.cash,
 					   SC_IDX: g.portfolio_value_proportion[SC_IDX] * info.cash}
@@ -504,9 +504,9 @@ def run_strategy():
 	if g.portfolio_value_proportion[MOM_IDX] > 0:
 		scheduler.add_job(mom_rebalance, 'cron', hour=11, minute=0)
 
-	scheduler.add_job(closeQMT,              'cron', hour=15, minute=10)
-	scheduler.add_job(reopenQMT,             'cron', hour=18, minute=0)
-	scheduler.add_job(reconnect,             'cron', hour=18, minute=10)
+	#scheduler.add_job(closeQMT,              'cron', hour=15, minute=10)
+	#scheduler.add_job(reopenQMT,             'cron', hour=18, minute=0)
+	#scheduler.add_job(reconnect,             'cron', hour=18, minute=10)
 
 	try:
 		print("start")
@@ -778,10 +778,10 @@ def calc_momentum_scores(etf, days):
 	prices = close_prices[1:]
 	print(prices)
 
-	annualized_return, r2, score, min_recent_ratio = calc_momentum_score(ContextInfo, prices)
+	annualized_return, r2, score, min_recent_ratio = calc_momentum_score(prices)
 
 	prices_last = close_prices[:-1]
-	_, _, score_last, _ = calc_momentum_score(ContextInfo, prices_last)
+	_, _, score_last, _ = calc_momentum_score(prices_last)
 
 	return annualized_return, r2, min_recent_ratio, score, score_last
 
@@ -822,7 +822,7 @@ def select_etf():
 		print(f"\n========== [{label}] 开始 (窗口={days}天) ==========")
 		results = {}
 		for etf in ETF_POOL:
-			ann_ret, r2, recent_ratio, score, score_last = calc_momentum_score(etf, days)
+			ann_ret, r2, recent_ratio, score, score_last = calc_momentum_scores(etf, days)
 			name = get_stock_name(etf) or etf
 			max_score = max_score_map.get(etf)
 			dip_min = ETF_DIP_MIN.get(etf, 0.95)
@@ -1847,7 +1847,6 @@ if __name__ == '__main__':
 	if g.portfolio_value_proportion[SC_IDX] > 0:
 		sc_judge_date()
 		sc_prepare_stock_list()
-		g.yesterday_HL_list = ['002743.SZ']
 		#sc_trade_etf()
 		sc_rebalance_sell()
 		sc_stop_loss()
