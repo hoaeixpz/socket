@@ -760,13 +760,8 @@ def get_strategy_total(strat_idx):
 			holdings_value += positions[stock].market_value
 	return g.cash_reserved[strat_idx] + holdings_value
 
-def calc_momentum_score(etf, days):
-	"""计算单只ETF的动量得分。返回 (annualized_return, r2, score)。
-
-	参数:
-		etf: ETF代码
-		days: 回看窗口天数
-	"""
+def calc_momentum_scores(etf, days):
+	"""计算单只ETF当日以及上一日的动量得分。返回 (annualized_return, r2, min_recent_ratio, score, score_last)"""
 	# 获取历史数据
 	xtdata.download_history_data(etf, period='1d', incrementally=True)
 	history_data = xtdata.get_market_data_ex(['close'],
@@ -775,14 +770,23 @@ def calc_momentum_score(etf, days):
 											 start_time='',
 											 fill_data=False,
 											 dividend_type='front',
-											 count=days+1)
+											 count=days+2)
 	if etf not in history_data or history_data[etf].empty:
-		return 0, 0, 0, 0
+		return 0, 0, 0, 0, 0
 
 	close_prices = history_data[etf]['close'].values
-
-	prices = close_prices
+	prices = close_prices[1:]
 	print(prices)
+
+	annualized_return, r2, score, min_recent_ratio = calc_momentum_score(ContextInfo, prices)
+
+	prices_last = close_prices[:-1]
+	_, _, score_last, _ = calc_momentum_score(ContextInfo, prices_last)
+
+	return annualized_return, r2, min_recent_ratio, score, score_last
+
+def calc_momentum_score(prices):
+	"""计算单只ETF的动量得分。返回 (annualized_return, r2, score, min_recent_ratio)。"""
 
 	# 对数价格加权线性回归
 	y = np.log(prices)
@@ -818,17 +822,20 @@ def select_etf():
 		print(f"\n========== [{label}] 开始 (窗口={days}天) ==========")
 		results = {}
 		for etf in ETF_POOL:
-			ann_ret, r2, score, recent_ratio = calc_momentum_score(etf, days)
+			ann_ret, r2, recent_ratio, score, score_last = calc_momentum_score(etf, days)
 			name = get_stock_name(etf) or etf
 			max_score = max_score_map.get(etf)
 			dip_min = ETF_DIP_MIN.get(etf, 0.95)
-			bad = (score <= 0 or score >= max_score) or recent_ratio < dip_min
+			bad = (score <= 0 or score >= max_score or score_last >= max_score) or recent_ratio < dip_min
 			down_ratio = (1 - recent_ratio) * 100
 			reason = ''
 			if bad:
 				reason += ' -> [淘汰]'
 				if score >= max_score:
 					reason += (f" 分数超出阈值{max_score}")
+				elif score_last >= max_score:
+					reason += (f" 近2日分数超出阈值{score_last:.2f} > {max_score}")
+
 				if recent_ratio < dip_min:
 					reason += (f" 跌幅超出阈值 {(1 - dip_min) * 100:.0f}%")
 
@@ -1187,8 +1194,8 @@ def exec_all_weather():
 			print(f"{stock} {get_stock_name(stock)} 未买入, 目标市值{target_value:.2f}, 股价 {current_price}元, amount {target_value / current_price:.2f}")
 
 def sc_rebalance_sell():
-	#if not is_weekday_job(g.weekday):
-	#	return
+	if not is_weekday_job(g.weekday):
+		return
 	if not g.is_trading_day:
 		return
 	if g.trade is False:
@@ -1241,8 +1248,8 @@ def sc_rebalance_sell():
 
 def sc_rebalance_buy():
 	#卖出股票后才有钱买入
-	#if not is_weekday_job(g.weekday):
-	#	return
+	if not is_weekday_job(g.weekday):
+		return
 	if not g.is_trading_day:
 		return
 	if not g.sell_done:                     #卖出股票后才有钱买入
