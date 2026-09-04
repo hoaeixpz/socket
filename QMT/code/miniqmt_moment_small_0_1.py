@@ -377,6 +377,8 @@ def init():
 	g.positions = {MOM_IDX: set(), SC_IDX: set()}
 	positions = g.xt_trader.query_stock_positions(g.account)
 	for pos in positions:
+		if pos.volume == 0:
+			continue
 		if pos.stock_code in ETF_POOL:
 			g.positions[MOM_IDX].add(pos.stock_code)
 		else:
