@@ -26,8 +26,6 @@ print(sys.version_info)
 print(sys.version)
 print("===============================")
 
-ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
-
 class Tee:
 	"""将输出同时写入终端和日志文件"""
 	def __init__(self, log_file_path):
@@ -35,10 +33,9 @@ class Tee:
 		self.log = open(log_file_path, 'a', encoding='utf-8')  # 追加模式
 
 	def write(self, message):
-		#self.terminal.write(message)                  # 打印到控制台
-		clean_message = ansi_escape.sub('', message)  # 去除颜色代码
-		self.log.write(clean_message)                 # 写入日志文件
-		self.log.flush()                              # 实时写入磁盘
+		#self.terminal.write(message)           # 打印到控制台
+		self.log.write(message)                 # 写入日志文件
+		self.log.flush()                        # 实时写入磁盘
 
 	def flush(self):
 		try:
@@ -285,6 +282,8 @@ def init(ContextInfo):
 	g.positions = {MOM_IDX: set(), SC_IDX: set()}
 	objlist = get_trade_detail_data(ContextInfo.account, 'STOCK', 'POSITION')
 	for obj in objlist:
+		if obj.m_nVolume == 0:
+			continue
 		stock = obj.m_strInstrumentID + '.' + obj.m_strExchangeID
 		if stock in ETF_POOL:
 			g.positions[MOM_IDX].add(stock)
