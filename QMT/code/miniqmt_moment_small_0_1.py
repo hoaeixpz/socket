@@ -780,6 +780,7 @@ def calc_momentum_score(etf, days):
 	close_prices = history_data[etf]['close'].values
 
 	prices = close_prices
+	print(prices)
 
 	# 对数价格加权线性回归
 	y = np.log(prices)
