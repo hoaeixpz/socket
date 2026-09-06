@@ -1799,7 +1799,10 @@ def sc_info_position():
 					print(f'  [{name}策略] 上一交易日现金记录{g.cash_record[idx]:,.2f}')
 
 				if abs(cash_diff / available_cash) > 0.3:
-					print("资金差额较大，可能代码有问题，请调试")
+					print("资金差额较大，可能代码有问题，请调试。如果当日有转账，则2个策略分走一半差额资金")
+					for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
+						g.cash_reserved[idx] += cash_diff / 2
+						g.cash_record[idx] = g.cash_reserved[idx]
 				else:
 					if abs(g.cash_reserved[MOM_IDX] - g.cash_record[MOM_IDX]) < 0.001:
 						print("动量策略资金与上一交易日持平，更新小市值策略资金")
