@@ -1818,8 +1818,8 @@ def sc_info_position():
 							g.cash_reserved[idx] += cash_diff / 2
 							g.cash_record[idx] = g.cash_reserved[idx]
 
-					for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
-						print(f'  [{name}策略] 预留现金: {g.cash_reserved[idx]:,.2f}, 现金记录更新{g.cash_record[idx]:,.2f}')
+				for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
+					print(f'  [{name}策略] 预留现金: {g.cash_reserved[idx]:,.2f}, 现金记录更新{g.cash_record[idx]:,.2f}')
 
 			daily_return = total_value - g.last_pos_value
 			rate_of_return = daily_return / g.last_pos_value * 100
