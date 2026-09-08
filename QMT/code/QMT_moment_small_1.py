@@ -1672,7 +1672,7 @@ def info_position(ContextInfo):
 			blank = get_blank(ratio)
 			diff_price = price - pos['avg_cost']
 			industry = g.industry_dict.get(stock,None)
-			print(f"√{stock_name}({stock}) 占比 {pos['value'] / total_value * 100:.2f}% 涨幅: {blank}{ratio:.2f}% ({diff_price * pos['total_amount']:.2f}) x {pos['total_amount']} = {pos['value']:.1f}元")
+			print(f"√{stock_name}({stock}) 占比 {pos['value'] / total_value * 100:.2f}% 涨幅: {blank}{ratio:.2f}% ({diff_price * pos['total_amount']:.2f}) x {pos['total_amount']} = {pos['value']:.1f}元 {industry}")
 		
 		for stock, pos in positions.items():
 			stock_name = ContextInfo.get_stock_name(stock)
@@ -1724,9 +1724,11 @@ def after_trading_end(ContextInfo):
 				continue
 			price = pos['value'] / pos['total_amount']
 			ratio = (price / pos['avg_cost'] - 1) * 100
+			blank = get_blank(ratio)
 			diff_price = price - pos['avg_cost']
-			print(f"√持仓: {stock_name}({stock}), 占比 {pos['value'] / total_value * 100:.1f}%, 涨跌幅: {ratio:.1f}% ({diff_price * pos['total_amount']:.1f}), 数量: {pos['total_amount']}, 市值: {pos['value']:.1f}元")
-
+			industry = g.industry_dict.get(stock,None)
+			print(f"√{stock_name}({stock}) 占比 {pos['value'] / total_value * 100:.1f}% 涨跌幅: {blank}{ratio:.1f}% ({diff_price * pos['total_amount']:.1f}) x {pos['total_amount']} = {pos['value']:.1f}元 {industry}")
+		
 		for stock, pos in positions.items():
 			stock_name = ContextInfo.get_stock_name(stock)
 			if pos['total_amount'] == 0:
