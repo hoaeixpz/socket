@@ -333,7 +333,7 @@ def init(ContextInfo):
 
 	m_ratio = g.portfolio_value_proportion[MOM_IDX] * 100
 	s_ratio = g.portfolio_value_proportion[SC_IDX] * 100
-	print(f"双策略初始化完成: 动量{m_ratio}% + 小市值{s_ratio}%\033[0m")
+	print(f"双策略初始化完成: 动量{m_ratio}% + 小市值{s_ratio}%")
 	print(f"  初始资产 {g.last_pos_value:.2f}, 可用资金 {available_cash:.2f}")
 
 	info_position(ContextInfo)
@@ -360,19 +360,19 @@ def handlebar(ContextInfo):
 	if dt.hour == 9 and dt.minute == 35:
 		trade_etf(ContextInfo)
 
-	if dt.hour == 9 and dt.minute == 56 and is_weekday_job(ContextInfo):
+	if dt.hour == 9 and dt.minute == 55 and is_weekday_job(ContextInfo):
 		rebalance_sell(ContextInfo)
 
 	if dt.hour == 10 and dt.minute == 15:
 		stop_loss(ContextInfo)
 
-	if dt.hour == 10 and dt.minute == 31 and is_weekday_job(ContextInfo):
+	if dt.hour == 10 and dt.minute == 30 and is_weekday_job(ContextInfo):
 		if g.sell_done:
 			rebalance_buy(ContextInfo)
 		else:
 			print(f"今日({dt})非调仓日，不执行操作")
 
-	if dt.hour == 11 and dt.minute == 1:
+	if dt.hour == 11 and dt.minute == 0:
 		mom_rebalance(ContextInfo)
 
 
