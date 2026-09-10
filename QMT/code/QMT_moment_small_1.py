@@ -645,7 +645,8 @@ def calc_momentum_scores(ContextInfo, etf, days):
 	"""计算单只ETF当日以及上一日的动量得分。返回 (annualized_return, r2, min_recent_ratio, score, score_last)"""
 	# 获取历史数据
 	dt_str = get_current_date(ContextInfo).strftime('%Y%m%d')
-	down_history_data(etf, '1d', dt_str, "")
+	trade_dates = ContextInfo.get_trading_dates('000300.SH', '', dt_str, 5, '1d')
+	down_history_data(etf, '1d', trade_dates[0], "")
 	history_data = ContextInfo.get_market_data_ex(['close'],
 												[etf],
 												period='1d',
