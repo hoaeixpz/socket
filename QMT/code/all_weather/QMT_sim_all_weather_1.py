@@ -64,15 +64,15 @@ def get_current_date(ContextInfo):
 # ======================== 手动输入你的实际持仓 ========================
 
 ACTUAL_POSITIONS = {
-	"601088.SH": 300,       # 中国神华 — 填你的实际持仓股数
-	"601899.SH": 600,       # 紫金矿业 
-	"000429.SZ": 1500,      # 粤高速A
-	"601288.SH": 2000,      # 农业银行
-	"513100.SH": 10900,     # 纳指ETF
-	"159985.SZ": 6600,      # 豆粕ETF
+	"601088.SH": 300,		# 中国神华 — 填你的实际持仓股数
+	"601899.SH": 600,		# 紫金矿业 
+	"000429.SZ": 1500,		# 粤高速A
+	"601288.SH": 2000,		# 农业银行
+	"513100.SH": 10900,		# 纳指ETF
+	"159985.SZ": 6600,		# 豆粕ETF
 }
 
-AVAILABLE_CASH = 2679       # 账户可用资金（元）
+AVAILABLE_CASH = 0			# 账户可用资金（元）
 
 # ======================== 策略参数（与母版一致） ========================
 
@@ -163,7 +163,7 @@ def make_header():
 def calc_ES_weights(ContextInfo):
 	alpha = 0.05
 	num = int(base_days * alpha)
-	print(f"样本数: {num}（{base_days}天 * {alpha}）")
+	print(f"样本数: {num}（{base_days}天 x {alpha}）")
 
 	for s in stocks:
 		down_history_data(s, '1d', "", "")
@@ -405,6 +405,7 @@ def take_profit_check(ContextInfo, prices):
 												dividend_type='front',
 												count=base_days)
 
+	any_triggered = False
 	for code in stocks:
 		shares = ACTUAL_POSITIONS.get(code, 0)
 		#if shares <= 0:
@@ -435,11 +436,15 @@ def take_profit_check(ContextInfo, prices):
 				print(f"  {code} {ContextInfo.get_stock_name(code)}: 触发止盈!")
 				print(f"    今日涨幅 {pct:.2f}% > 120天第3高 {last_3th:.2f}%, 30日涨幅 {pct_30:.2f}%")
 				print(f"    √ 建议卖出 1/2 = {sell_amount}股")
+				any_triggered = True
 			else:
 				print(f"  {code} {ContextInfo.get_stock_name(code)}: 涨幅达标但未触发({pct_30:.1f}%/30d) < {T}%")
 				print(f"    今日涨幅 {pct:.2f}% > 120天第3高 {last_3th:.2f}%, 30日涨幅 {pct_30:.2f}%")
 		else:
 			print(f"  {code} {ContextInfo.get_stock_name(code)}: 今日涨幅 {pct:.2f}% <= 阈值 {last_3th:.2f}% , 30日涨幅 {pct_30:.2f}%")
+
+	if not any_triggered:
+		print(f"  无触发止盈")
 
 
 # ======================== 主流程 ========================
