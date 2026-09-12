@@ -299,7 +299,7 @@ def calc_AR_weights():
 			df['daily_return'] = df['close'].pct_change() * 100
 			df = df.iloc[1:].dropna(subset=['daily_return'])
 			srt = df['daily_return'].sort_values()
-			AR = srt.head(num).mean()
+			AR = srt.tail(num).mean()
 			weight = AR
 			weights[code] = weight
 			print(f"{code} {get_stock_name(code)} AR={AR:.3f}  raw={weight:.4f}")
