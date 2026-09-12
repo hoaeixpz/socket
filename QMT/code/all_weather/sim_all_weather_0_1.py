@@ -277,6 +277,40 @@ def calc_R2_weights():
 		for code in stocks:
 			weights[code] /= total
 
+def calc_AR_weights():
+	alpha = 0.05
+	num = int(base_days * alpha)
+	print(f"样本数: {num}（{base_days}天 × {alpha}）")
+
+	for s in stocks:
+		xtdata.download_history_data(s, period='1d', incrementally=True)
+
+	query_date = datetime.now().strftime('%Y%m%d')
+	price_data = xtdata.get_market_data_ex(['close'], stocks, period='1d',
+										   start_time='', end_time=query_date,
+										   count=base_days, dividend_type='front')
+
+	for code in stocks:
+		df = price_data.get(code)
+		if df is None or len(df) < base_days:
+			weights[code] = 0
+			print(f"{code} {get_stock_name(code)} 数据不足，权重=0")
+		else:
+			df['daily_return'] = df['close'].pct_change() * 100
+			df = df.iloc[1:].dropna(subset=['daily_return'])
+			srt = df['daily_return'].sort_values()
+			AR = srt.head(num).mean()
+			weight = AR
+			weights[code] = weight
+			print(f"{code} {get_stock_name(code)} AR={AR:.3f}  raw={weight:.4f}")
+			#print(srt.tail(num))
+
+	# 归一化
+	total = sum(weights.values())
+	if total > 0:
+		for code in stocks:
+			weights[code] /= total
+
 # ======================== 调仓计算 ========================
 
 def calc_trades():
@@ -437,7 +471,8 @@ if __name__ == "__main__":
 	print(f"{'='*60}\n")
 
 	#calc_ES_weights()
-	calc_R2_weights()
+	#calc_R2_weights()
+	calc_AR_weights()
 	diff_weight()
 	calc_trades()
 
