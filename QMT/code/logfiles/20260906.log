@@ -1938,3 +1938,13 @@ judge_date count  1
 
 
 sleep a day
+今天是交易日吗 False
+judge_date count  1
+
+收到信号 2，关闭调度器...
+调度器已关闭
+当前工作目录: C:\QMT\bin.x64
+sys.version_info(major=3, minor=6, micro=8, releaselevel='final', serial=0)
+3.6.8 (default, Dec 19 2022, 22:05:09) [MSC v.1900 64 bit (AMD64)]
+===============================
+logfiles路径: C:\Users\Administrator\Desktop\socket\QMT\code\logfiles

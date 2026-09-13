@@ -376,7 +376,7 @@ def handlebar(ContextInfo):
 		mom_rebalance(ContextInfo)
 
 
-	if dt.hour == 14 and dt.minute == 11:
+	if dt.hour == 14 and dt.minute == 10:
 		trade_afternoon(ContextInfo)
 
 
