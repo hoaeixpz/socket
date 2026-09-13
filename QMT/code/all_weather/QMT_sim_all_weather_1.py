@@ -181,7 +181,7 @@ def calc_ES_weights(ContextInfo):
 		df = price_data.get(code)
 		if df is None or len(df) < base_days:
 			weights[code] = 0
-			print(f"{code} {get_stock_name(code)} 数据不足，权重=0")
+			print(f"{code} {ContextInfo.get_stock_name(code)} 数据不足，权重=0")
 		else:
 			df['daily_return'] = df['close'].pct_change() * 100
 			df = df.iloc[1:].dropna(subset=['daily_return'])
@@ -190,7 +190,7 @@ def calc_ES_weights(ContextInfo):
 			AR = srt.mean()
 			weight = ES * (1 - AR)
 			weights[code] = weight
-			print(f"{code} {get_stock_name(code)}  ES={ES:.3f}  AR={AR:.3f}  raw={weight:.4f}")
+			print(f"{code} {ContextInfo.get_stock_name(code)}  ES={ES:.3f}  AR={AR:.3f}  raw={weight:.4f}")
 			#print(srt.tail(num))
 
 	# 归一化
@@ -314,7 +314,7 @@ def calc_AR_weights(ContextInfo):
 		df = price_data.get(code)
 		if df is None or len(df) < base_days:
 			weights[code] = 0
-			print(f"{code} {get_stock_name(code)} 数据不足，权重=0")
+			print(f"{code} {ContextInfo.get_stock_name(code)} 数据不足，权重=0")
 		else:
 			df['daily_return'] = df['close'].pct_change() * 100
 			df = df.iloc[1:].dropna(subset=['daily_return'])
@@ -322,7 +322,7 @@ def calc_AR_weights(ContextInfo):
 			AR = srt.tail(num).mean()
 			weight = AR
 			weights[code] = weight
-			print(f"{code} {get_stock_name(code)} AR={AR:.3f}  raw={weight:.4f}")
+			print(f"{code} {ContextInfo.get_stock_name(code)} AR={AR:.3f}  raw={weight:.4f}")
 			#print(srt.tail(num))
 
 	# 归一化
