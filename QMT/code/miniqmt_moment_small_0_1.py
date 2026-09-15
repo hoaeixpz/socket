@@ -27,8 +27,8 @@ ETF_POOL = [
 SAFE_ETF = '511220.SH'  # 城投债
 
 
-DEBUG_DAILY_MODE = False
-#DEBUG_DAILY_MODE = True
+#DEBUG_DAILY_MODE = False
+DEBUG_DAILY_MODE = True
 
 ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
@@ -367,7 +367,7 @@ def init():
 	info = g.xt_trader.query_stock_asset(g.account)
 
 	# 多策略配置
-	g.portfolio_value_proportion = [0.05, 0.95]
+	g.portfolio_value_proportion = [0.03, 0.97]
 	# 每个策略的预留现金（买卖驱动），互相隔离
 	g.cash_reserved = {MOM_IDX: g.portfolio_value_proportion[MOM_IDX] * info.cash,
 					   SC_IDX: g.portfolio_value_proportion[SC_IDX] * info.cash}
@@ -480,7 +480,8 @@ def shutdown_scheduler(signum, frame):
 	print(f"\n收到信号 {signum}，关闭调度器...")
 	scheduler.shutdown(wait=False)
 	print("调度器已关闭")
-	tee.close()
+	if not DEBUG_DAILY_MODE:
+		tee.close()
 	sys.exit(0)
 
 
@@ -1618,7 +1619,8 @@ def sc_stop_loss():
 										  end_time=dt_str, 
 										  count=1,
 										  dividend_type='none')
-			#print(price_data)
+			print(dt_str)
+			print(price_data)
 			df = list(price_data.values())[0]
 			down_ratio = (df.iloc[0]['close'] / df.iloc[0]['open'] - 1)
 			print("大盘涨幅 {:.2%}".format(down_ratio))
