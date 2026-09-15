@@ -16,6 +16,8 @@ from datetime import datetime, timedelta
 import sys
 import re
 
+sys.stdout.reconfigure(encoding='utf-8')
+
 ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
 class Tee:
