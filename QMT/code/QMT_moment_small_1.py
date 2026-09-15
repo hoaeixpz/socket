@@ -392,7 +392,8 @@ def handlebar(ContextInfo):
 	#TEST
 	if dt.hour == 15 and dt.minute == 0:
 		judge_date(ContextInfo)
-		trade_etf(ContextInfo)
+		prepare_stock_list(ContextInfo)
+		rebalance_sell(ContextInfo)
 	'''
 
 # ================================================================
@@ -912,10 +913,15 @@ def get_normal_stocks(ContextInfo, current_time):
 
 	non_st_stocks = []
 	for stock in stocklist:
+		stock_name = ContextInfo.get_stock_name(stock)
+		if "ST" in stock_name:
+			print(f"ST {stock}")
+			continue
 		ST = ContextInfo.get_his_st_data(stock)
 		if ST:
 			is_st = False
 			for stkey, time_period in ST.items():
+				#print(f"key period: {stkey} {time_period}")
 				for tp in time_period:
 					if is_date_in_range(current_time, tp[0], tp[1]):
 						#print(f"ST {stock}")
@@ -924,11 +930,6 @@ def get_normal_stocks(ContextInfo, current_time):
 				if is_st:
 					break
 			if is_st:
-				continue
-		else:
-			stock_name = ContextInfo.get_stock_name(stock)
-			if "ST" in stock_name:
-				#print(f"ST {stock}")
 				continue
 
 		non_st_stocks.append(stock)
