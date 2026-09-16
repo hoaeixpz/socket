@@ -447,7 +447,7 @@ def sell_target_value(ContextInfo, stock, target_value, strat_idx=None):
 					pos['total_amount'],	# volume    : 根据orderType最后一位判断 为1，按股数买卖 、 为2，按目标价值买卖 、 为3，按百分比买卖
 					'',						# strategyName : 策略名
 					2,						# quickTrade: 可选项， 为2 表明立刻下单，不用等待bar数据填充完整
-					f'策略 {strat_idx} 清仓 {stock}',			# 备注
+					f'策略 {strat_idx} 清仓 {stock} {ContextInfo.get_stock_name(stock)}',	# 备注
 					ContextInfo
 			)
 		else:
@@ -468,11 +468,11 @@ def sell_target_value(ContextInfo, stock, target_value, strat_idx=None):
 						volume, 				# volume    : 根据orderType最后一位判断 为1，按股数买卖 、 为2，按目标价值买卖 、 为3，按百分比买卖
 						'',						# strategyName : 策略名
 						2, 						# quickTrade: 可选项， 为2 表明立刻下单，不用等待bar数据填充完整
-						f'策略 {strat_idx} 卖出 {stock} {volume} 元',			# 备注
+						f'策略 {strat_idx} 卖出 {stock} {ContextInfo.get_stock_name(stock)} {volume} 元',	# 备注
 						ContextInfo
 					)
 
-					print(f"sell {stock} passorder target value {target_value:.2f} current {pos['value']:.2f} volume {volume:.2f} @{current_price:.2f}")
+					print(f"sell {stock} {ContextInfo.get_stock_name(stock)} passorder target value {target_value:.2f} current {pos['value']:.2f} volume {volume:.2f} @{current_price:.2f}")
 		break
 
 	if strat_idx is not None and not is_limit_down(ContextInfo, stock):
@@ -518,11 +518,11 @@ def buy_target_value(ContextInfo, stock, target_value, strat_idx=None):
 				volume, 				# volume    : 根据orderType最后一位判断 为1，按股数买卖 、 为2，按目标价值买卖 、 为3，按百分比买卖
 				'',
 				2, 						# quickTrade: 可选项， 为2 表明立刻下单，不用等待bar数据填充完整
-				f'买入 {strat_idx} 股票 {stock} {volume} 元',
+				f'策略 {strat_idx} 买入股票 {stock} {ContextInfo.get_stock_name(stock)} {volume} 元',
 				ContextInfo
 			)
 
-			print(f"buy {stock} passorder target value {target_value:.2f} current {current_value:.2f} volume {volume:.2f}")
+			print(f"buy {stock} {ContextInfo.get_stock_name(stock)} passorder target value {target_value:.2f} current {current_value:.2f} volume {volume:.2f}")
 			if strat_idx is not None:
 				estimate_cash = amount * current_price
 				commission = calc_commission(estimate_cash)
@@ -546,9 +546,9 @@ def buy_target_shares(ContextInfo, stock, target_share, strat_idx=None):
 			target_share, 				# volume    : 根据orderType最后一位判断 为1，按股数买卖 、 为2，按价值买卖 、 为3，按百分比买卖
 			'',
 			2, 							# quickTrade: 可选项， 为2 表明立刻下单，不用等待bar数据填充完整
-			f'买入 {strat_idx} 股票 {stock} {target_share} 股',
+			f'策略 {strat_idx} 买入股票 {stock} {ContextInfo.get_stock_name(stock)} {target_share} 股',
 			ContextInfo)
-	print(f"buy {stock} {amount}股 @ {current_price:.2f}")
+	print(f"buy {stock} {ContextInfo.get_stock_name(stock)} {amount}股 @ {current_price:.2f}")
 	
 	if strat_idx is not None:
 		if current_price:
@@ -924,7 +924,7 @@ def get_normal_stocks(ContextInfo, current_time):
 				#print(f"key period: {stkey} {time_period}")
 				for tp in time_period:
 					if is_date_in_range(current_time, tp[0], tp[1]):
-						#print(f"ST {stock}")
+						print(f"ST {stock}")
 						is_st = True
 						break
 				if is_st:
