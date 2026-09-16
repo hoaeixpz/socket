@@ -516,15 +516,15 @@ def take_profit_check(prices):
 			continue
 		df['daily_return'] = df['close'].pct_change() * 100
 		df = df.iloc[1:].dropna(subset=['daily_return'])
-		srt = df['daily_return'].sort_values()
+		srt = df.sort_values(by = ['daily_return'])
 		last_close = df['close'].iloc[-2]
 		price = prices.get(code)
-		#print(srt[-6:])
+		print(srt[-6:])
 		if price is None:
 			continue
 
 		pct = (price - last_close) / last_close * 100
-		last_3th = srt.iloc[-3]
+		last_3th = srt.iloc[-3]['daily_return']
 		idx_30 = -31 if len(df) >= 31 else 0
 		pct_30 = (price - df['close'].iloc[idx_30]) / df['close'].iloc[idx_30] * 100
 		

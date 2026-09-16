@@ -170,8 +170,8 @@ def get_trading_dates(stock, dt_str, days = 7):
 	return dates
 
 def is_trading_day():
-	if DEBUG_DAILY_MODE:
-		return True
+	#if DEBUG_DAILY_MODE:
+	#	return True
 
 	today = datetime.now().strftime('%Y%m%d')
 	dates = get_trading_dates('399101.SZ', today)
@@ -367,7 +367,7 @@ def init():
 	info = g.xt_trader.query_stock_asset(g.account)
 
 	# 多策略配置
-	g.portfolio_value_proportion = [0.03, 0.97]
+	g.portfolio_value_proportion = [0.97, 0.03]
 	# 每个策略的预留现金（买卖驱动），互相隔离
 	g.cash_reserved = {MOM_IDX: g.portfolio_value_proportion[MOM_IDX] * info.cash,
 					   SC_IDX: g.portfolio_value_proportion[SC_IDX] * info.cash}
@@ -1011,6 +1011,11 @@ def get_normal_stocks():
 	print(stocklist[:10])  # 打印前10只成分股
 
 	non_st_stocks = []
+	st_count = 0
+	expire_count = 0
+	ting_count = 0
+	limit_up_count = 0
+	limit_down_count = 0
 	current_holdings = get_current_holding_stocks()
 	for stock in stocklist:
 		detail = xtdata.get_instrument_detail(stock)
@@ -1020,27 +1025,33 @@ def get_normal_stocks():
 		stock_name = detail['InstrumentName']
 		if 'ST' in stock_name or 'st' in stock_name:
 			#print(stock, " ", stock_name)
+			st_count += 1
 			continue
 
 		if detail['ExpireDate'] != '99999999':
 			print(stock, " 可能退市 ", detail['ExpireDate'])
+			expire_count += 1
 			continue
 
 		if detail['InstrumentStatus'] < 0:
 			print(stock, " 可能停牌 ", detail['InstrumentStatus'])
+			ting_count += 1
 			continue
 
 		if stock not in current_holdings and is_limit_up(stock):
 			print(f'涨停 {stock} {stock_name}')
+			limit_up_count += 1
 			continue
 
 		if stock not in current_holdings and is_limit_down(stock):
 			print(f'跌停 {stock} {stock_name}')
+			limit_down_count += 1
 			continue
 
 		non_st_stocks.append(stock)
 
 	print(f'过滤ST/*ST股票后，剩余 {len(non_st_stocks)} 只')
+	print(f'ST {st_count}\n退市 {expire_count}\n停牌 {ting_count}\n涨停 {limit_up_count}\n跌停 {limit_down_count}')
 	return non_st_stocks
 
 

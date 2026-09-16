@@ -415,6 +415,9 @@ def calc_trades():
 
 def take_profit_check(prices):
 	"""检查是否需要止盈卖出"""
+	for s in stocks:
+		xtdata.download_history_data(s, period='1d', start_time="", end_time="")
+
 	query_date = datetime.now().strftime('%Y%m%d')
 	price_data = xtdata.get_market_data_ex(['close'], stocks, period='1d',
 										   start_time='', end_time=query_date, count=base_days, dividend_type='front')
@@ -429,15 +432,15 @@ def take_profit_check(prices):
 			continue
 		df['daily_return'] = df['close'].pct_change() * 100
 		df = df.iloc[1:].dropna(subset=['daily_return'])
-		srt = df['daily_return'].sort_values()
-		#print(srt[-6:])
+		srt = df.sort_values(by = ['daily_return'])
+		print(srt[-6:])
 		last_close = df['close'].iloc[-2]
 		price = prices.get(code)
 		if price is None:
 			continue
 
 		pct = (price - last_close) / last_close * 100
-		last_3th = srt.iloc[-3]
+		last_3th = srt.iloc[-3]['daily_return']
 		idx_30 = -30 if len(df) >= 30 else 0
 		pct_30 = (price - df['close'].iloc[idx_30]) / df['close'].iloc[idx_30] * 100
 		
