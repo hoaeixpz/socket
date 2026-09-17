@@ -159,8 +159,8 @@ def get_trading_dates(stock, dt_str, days=7):
 	return dates
 
 def is_trading_day():
-	if DEBUG_DAILY_MODE:
-		return True
+	#if DEBUG_DAILY_MODE:
+	#	return True
 	current_date = datetime.now()
 	today = current_date.strftime('%Y%m%d')
 	dates = get_trading_dates('399101.SZ', today)
@@ -283,7 +283,8 @@ def shutdown_scheduler(signum, frame):
 	print(f"\n收到信号 {signum}，关闭调度器...")
 	scheduler.shutdown(wait=False)
 	print("调度器已关闭")
-	tee.close()
+	if not DEBUG_DAILY_MODE:
+		tee.close()
 	sys.exit(0)
 
 
@@ -501,6 +502,7 @@ def calc_momentum_score(etf, days):
 	close_prices = history_data[etf]['close'].values
 
 	prices = close_prices
+	#print(prices)
 
 	# 对数价格加权线性回归
 	y = np.log(prices)
@@ -520,7 +522,7 @@ def calc_momentum_score(etf, days):
 	r2 = 1 - ss_res / ss_tot if ss_tot else 0
 
 	# 得分
-	score = annualized_return * r2
+	score = annualized_return * abs(r2)
 
 	# 近3日急跌
 	if len(prices) >= 4:
