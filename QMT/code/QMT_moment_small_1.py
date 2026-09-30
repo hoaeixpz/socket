@@ -272,7 +272,7 @@ def init(ContextInfo):
 	available_cash = account_info[0].m_dAvailable
 
 	# ===== 多策略配置 =====
-	g.portfolio_value_proportion = [0.03, 0.97]
+	g.portfolio_value_proportion = [0.99, 0.01]
 	# 每个策略的预留现金（买卖驱动），互相隔离
 	g.cash_reserved = {MOM_IDX: g.portfolio_value_proportion[MOM_IDX] * available_cash,
 					   SC_IDX: g.portfolio_value_proportion[SC_IDX] * available_cash}
@@ -360,13 +360,13 @@ def handlebar(ContextInfo):
 	if dt.hour == 9 and dt.minute == 35:
 		trade_etf(ContextInfo)
 
-	if dt.hour == 9 and dt.minute == 55 and is_weekday_job(ContextInfo):
+	if dt.hour == 9 and dt.minute == 50 and is_weekday_job(ContextInfo):
 		rebalance_sell(ContextInfo)
 
-	if dt.hour == 10 and dt.minute == 15:
+	if dt.hour == 10 and dt.minute == 0:
 		stop_loss(ContextInfo)
 
-	if dt.hour == 10 and dt.minute == 30 and is_weekday_job(ContextInfo):
+	if dt.hour == 10 and dt.minute == 5 and is_weekday_job(ContextInfo):
 		if g.sell_done:
 			rebalance_buy(ContextInfo)
 		else:
@@ -1622,19 +1622,33 @@ def buy_stocks(ContextInfo):
 					buy_target_shares(ContextInfo, stock, amount, SC_IDX)
 					#order_shares(stock, amount, ContextInfo, ContextInfo.account)
 			else:
+				positions = get_positions(ContextInfo)
 				if g.excepted_position.get(stock) is not None:
 					target_value_per_stock = g.excepted_position[stock] * strategy_total
 					current_value = 0
-					positions = get_positions(ContextInfo)
 					if stock in positions:
 						current_value = positions[stock]['value']
 					target_value_per_stock = min(available_cash + current_value, target_value_per_stock)
 				
 				raw_amount = target_value_per_stock / current_price
 				amount = int(raw_amount / 100) * 100  # 向下取整到100股的倍数
-				print(f'委托买入: {ContextInfo.get_stock_name(stock)}, {stock} \n目标价值:{target_value_per_stock:.2f}'
-					f'\n预计最终持股{amount}股，每股{current_price:.2f}元，合计:{amount * current_price:.2f}')
-				buy_target_value(ContextInfo, stock, target_value_per_stock, SC_IDX)
+				if raw_amount - amount > 98 :
+					amount += 100
+					print(f'{ContextInfo.get_stock_name(stock)} 计算持有股份数为 {raw_amount:.2f}，向上取整为 {amount}')
+					target_value_per_stock = amount * (current_price + 0.1)
+
+				if stock in positions:
+					current_amount = positions[stock]['total_amount']
+					incr_amount = amount - current_amount
+					print(f'委托买入: {ContextInfo.get_stock_name(stock)}, {stock}'
+						f'\n目标价值: {target_value_per_stock:.2f} 计算持股为{raw_amount:.2f}'
+						f'\n预计最终持股{amount}股，追加{incr_amount}股，每股{current_price:.2f}元，合计:{amount * current_price:.2f}')
+					buy_target_shares(ContextInfo, stock, incr_amount, SC_IDX)
+				else:
+					print(f'委托买入: {ContextInfo.get_stock_name(stock)}, {stock}'
+						f'\n目标价值: {target_value_per_stock:.2f} 计算持股为{raw_amount:.2f}'
+						f'\n预计最终持股{amount}股，每股{current_price:.2f}元，合计:{amount * current_price:.2f}')
+					buy_target_value(ContextInfo, stock, target_value_per_stock, SC_IDX)
 			sleep_sec(10)
 
 def get_blank(ratio):
@@ -1776,6 +1790,25 @@ def after_trading_end(ContextInfo):
 
 		for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
 			print(f'  [{name}策略] 预留现金: {g.cash_reserved[idx]:,.2f}, 现金记录更新{g.cash_record[idx]:,.2f}')
+
+	# 打印各策略资金隔离状况
+	for idx, name in [(MOM_IDX, '动量'), (SC_IDX, '小市值')]:
+		cash = g.cash_reserved[idx]
+		stock_set = g.positions[idx]
+		holdings_val = 0
+		stock_names = []
+		for stock, pos in positions.items():
+			if stock in stock_set:
+				holdings_val += pos['value']
+				stock_names.append(ContextInfo.get_stock_name(stock))
+
+		total = cash + holdings_val
+		print(f'  [{name}策略] 预留现金: {cash:,.2f} | 持仓市值: {holdings_val:,.2f} | 总资产: {total:,.2f}')
+		if stock_names:
+			print(f'    持仓: {", ".join(stock_names)}')
+		else:
+			print(f'    持仓: (空)')
+	print()
 
 	daily_return = total_value - g.last_pos_value
 	if g.last_pos_value != 0:
